@@ -17,6 +17,7 @@ build/
 # Local platform and agent state
 .vercel/
 .superpowers/
+.worktrees/
 
 # IDE and editor files
 .vscode/
