@@ -15,7 +15,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { broadcastPreferencesUpdated, PREFERENCE_SCOPES, readDefaultPeriod, readPreferredPageSize, readPreferredRefreshSeconds, rememberFiltersEnabled } from "@/lib/preferences";
+import { broadcastPreferencesUpdated, PREFERENCE_SCOPES, readDefaultPeriod, readPreferredPageSize, readPreferredRefreshSeconds, rememberFiltersEnabled, type DashboardPeriod } from "@/lib/preferences";
 import { trpc } from "@/lib/trpc";
 
 export default function Settings() {
@@ -183,7 +183,7 @@ export default function Settings() {
         <Card className="border-0">
           <CardHeader><CardTitle className="flex items-center gap-2 text-base"><Settings2 className="h-4 w-4" />Preferências do painel</CardTitle></CardHeader>
           <CardContent className="space-y-5">
-            <div><Label>Período padrão</Label><p className="mb-2 mt-1 text-xs text-[#667085]">Período selecionado ao abrir dashboards e análises.</p><Select value={defaultPeriod} onValueChange={setDefaultPeriod}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="today">Hoje</SelectItem><SelectItem value="7d">7 dias</SelectItem><SelectItem value="30d">30 dias</SelectItem><SelectItem value="90d">90 dias</SelectItem><SelectItem value="all">Todas as execuções</SelectItem></SelectContent></Select></div>
+            <div><Label>Período padrão</Label><p className="mb-2 mt-1 text-xs text-[#667085]">Período selecionado ao abrir dashboards e análises.</p><Select value={defaultPeriod} onValueChange={(value) => setDefaultPeriod(value as DashboardPeriod)}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="today">Hoje</SelectItem><SelectItem value="7d">7 dias</SelectItem><SelectItem value="30d">30 dias</SelectItem><SelectItem value="90d">90 dias</SelectItem><SelectItem value="all">Todas as execuções</SelectItem></SelectContent></Select></div>
             <div><Label>Atualização preferida</Label><p className="mb-2 mt-1 text-xs text-[#667085]">Intervalo sugerido para consultas automáticas.</p><Select value={refreshInterval} onValueChange={setRefreshInterval}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="15">15 segundos</SelectItem><SelectItem value="30">30 segundos</SelectItem><SelectItem value="60">1 minuto</SelectItem><SelectItem value="300">5 minutos</SelectItem></SelectContent></Select></div>
             <div><Label>Execuções por página</Label><Select value={pageSize} onValueChange={setPageSize}><SelectTrigger className="mt-2"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="25">25</SelectItem><SelectItem value="50">50</SelectItem><SelectItem value="100">100</SelectItem></SelectContent></Select></div>
             <div className="flex items-center justify-between"><div><Label>Lembrar filtros</Label><p className="mt-1 text-xs text-[#667085]">Mantém filtros e preferências entre sessões.</p></div><Switch checked={rememberFilters} onCheckedChange={setRememberFilters} /></div>

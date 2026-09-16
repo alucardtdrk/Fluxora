@@ -1,7 +1,7 @@
 import { authConfigured, clearSessionCookie } from "./auth.js";
 import { adminProcedure, operatorProcedure, protectedProcedure, publicProcedure, router } from "./_core/trpc.js";
 import { getN8nAnalytics, getN8nExecutionDetail, getN8nOverview, listN8nExecutions, listN8nExecutionsPage, listN8nWorkflows, preserveN8nExecutionDetails, setN8nWorkflowActive, syncN8nArchive } from "./n8n.js";
-import { archiveConfigured, getArchiveDiagnostics, getArchiveSyncState } from "./firestoreLogs.js";
+import { archiveConfigured, getArchiveDiagnostics, getArchiveSyncState, type ArchiveSyncState } from "./firestoreLogs.js";
 import { deleteFluxoraUser, listFluxoraUsers, setFluxoraUserActive, upsertFluxoraUser } from "./access.js";
 import { isFirestoreConfigured } from "./firestore.js";
 import { getN8nWorkflowDetail, restoreN8nWorkflowVersion, updateN8nWorkflowNode } from "./workflowEditor.js";
@@ -83,7 +83,7 @@ export const appRouter = router({
     setUserActive: adminProcedure.input(z.object({ email: z.string().email(), active: z.boolean() })).mutation(({ input, ctx }) => audited({ action: "user.status", category: "access", actor: ctx.user.email, actorRole: ctx.user.role, targetType: "user", targetId: input.email, summary: `${input.active ? "Ativou" : "Bloqueou"} o acesso de ${input.email}`, after: { active: input.active } }, () => setFluxoraUserActive(input.email, input.active, ctx.user.email))),
     deleteUser: adminProcedure.input(z.object({ email: z.string().email() })).mutation(({ input, ctx }) => audited({ action: "user.delete", category: "access", actor: ctx.user.email, actorRole: ctx.user.role, targetType: "user", targetId: input.email, summary: `Removeu o acesso de ${input.email}` }, () => deleteFluxoraUser(input.email))),
     systemStatus: adminProcedure.query(async () => {
-      const archive = await getArchiveDiagnostics().catch((error) => ({ configured: archiveConfigured(), totalArchived: 0, state: { lastError: error instanceof Error ? error.message : String(error) } }));
+      const archive = await getArchiveDiagnostics().catch((error) => ({ configured: archiveConfigured(), totalArchived: 0, state: { lastError: error instanceof Error ? error.message : String(error) } as ArchiveSyncState }));
       return { firestoreConfigured: isFirestoreConfigured(), archive };
     }),
     testN8n: adminProcedure.query(async () => {
