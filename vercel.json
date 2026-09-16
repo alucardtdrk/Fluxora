@@ -1,0 +1,42 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "version": 2,
+  "buildCommand": "pnpm build:vercel",
+  "outputDirectory": "dist/public",
+  "functions": {
+    "api/index.ts": {
+      "maxDuration": 300
+    }
+  },
+  "crons": [
+    {
+      "path": "/api/internal/sync-n8n",
+      "schedule": "0 3 * * *"
+    }
+  ],
+  "routes": [
+    {
+      "src": "/api/health",
+      "dest": "/api/index.ts?health=1"
+    },
+    {
+      "src": "/api/auth/(.*)",
+      "dest": "/api/index.ts?authPath=$1"
+    },
+    {
+      "src": "/api/internal/sync-n8n",
+      "dest": "/api/index.ts?syncN8n=1"
+    },
+    {
+      "src": "/api/trpc(?:/(.*))?",
+      "dest": "/api/index.ts?trpcPath=$1"
+    },
+    {
+      "handle": "filesystem"
+    },
+    {
+      "src": "/(.*)",
+      "dest": "/index.html"
+    }
+  ]
+}

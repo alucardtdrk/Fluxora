@@ -1,0 +1,350 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+
+@custom-variant dark (&:is(.dark *));
+
+@theme inline {
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
+}
+
+:root {
+  --primary: var(--color-blue-700);
+  --primary-foreground: var(--color-blue-50);
+  --sidebar-primary: var(--color-blue-600);
+  --sidebar-primary-foreground: var(--color-blue-50);
+  --chart-1: var(--color-blue-300);
+  --chart-2: var(--color-blue-500);
+  --chart-3: var(--color-blue-600);
+  --chart-4: var(--color-blue-700);
+  --chart-5: var(--color-blue-800);
+  --radius: 0.65rem;
+  --background: oklch(1 0 0);
+  --foreground: oklch(0.235 0.015 65);
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.235 0.015 65);
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.235 0.015 65);
+  --secondary: oklch(0.98 0.001 286.375);
+  --secondary-foreground: oklch(0.4 0.015 65);
+  --muted: oklch(0.967 0.001 286.375);
+  --muted-foreground: oklch(0.552 0.016 285.938);
+  --accent: oklch(0.967 0.001 286.375);
+  --accent-foreground: oklch(0.141 0.005 285.823);
+  --destructive: oklch(0.577 0.245 27.325);
+  --destructive-foreground: oklch(0.985 0 0);
+  --border: oklch(0.92 0.004 286.32);
+  --input: oklch(0.92 0.004 286.32);
+  --ring: oklch(0.623 0.214 259.815);
+  --sidebar: oklch(0.985 0 0);
+  --sidebar-foreground: oklch(0.235 0.015 65);
+  --sidebar-accent: oklch(0.967 0.001 286.375);
+  --sidebar-accent-foreground: oklch(0.141 0.005 285.823);
+  --sidebar-border: oklch(0.92 0.004 286.32);
+  --sidebar-ring: oklch(0.623 0.214 259.815);
+}
+
+.dark {
+  --primary: var(--color-blue-700);
+  --primary-foreground: var(--color-blue-50);
+  --sidebar-primary: var(--color-blue-500);
+  --sidebar-primary-foreground: var(--color-blue-50);
+  --background: oklch(0.141 0.005 285.823);
+  --foreground: oklch(0.85 0.005 65);
+  --card: oklch(0.21 0.006 285.885);
+  --card-foreground: oklch(0.85 0.005 65);
+  --popover: oklch(0.21 0.006 285.885);
+  --popover-foreground: oklch(0.85 0.005 65);
+  --secondary: oklch(0.24 0.006 286.033);
+  --secondary-foreground: oklch(0.7 0.005 65);
+  --muted: oklch(0.274 0.006 286.033);
+  --muted-foreground: oklch(0.705 0.015 286.067);
+  --accent: oklch(0.274 0.006 286.033);
+  --accent-foreground:  oklch(0.92 0.005 65);
+  --destructive: oklch(0.704 0.191 22.216);
+  --destructive-foreground: oklch(0.985 0 0);
+  --border: oklch(1 0 0 / 10%);
+  --input: oklch(1 0 0 / 15%);
+  --ring: oklch(0.488 0.243 264.376);
+  --chart-1: var(--color-blue-300);
+  --chart-2: var(--color-blue-500);
+  --chart-3: var(--color-blue-600);
+  --chart-4: var(--color-blue-700);
+  --chart-5: var(--color-blue-800);
+  --sidebar: oklch(0.21 0.006 285.885);
+  --sidebar-foreground: oklch(0.85 0.005 65);
+  --sidebar-accent: oklch(0.274 0.006 286.033);
+  --sidebar-accent-foreground:  oklch(0.985 0 0);
+  --sidebar-border: oklch(1 0 0 / 10%);
+  --sidebar-ring: oklch(0.488 0.243 264.376);
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+  button:not(:disabled),
+  [role="button"]:not([aria-disabled="true"]),
+  [type="button"]:not(:disabled),
+  [type="submit"]:not(:disabled),
+  [type="reset"]:not(:disabled),
+  a[href],
+  select:not(:disabled),
+  input[type="checkbox"]:not(:disabled),
+  input[type="radio"]:not(:disabled) {
+    @apply cursor-pointer;
+  }
+}
+
+@layer components {
+  /**
+   * Custom container utility that centers content and adds responsive padding.
+   *
+   * This overrides Tailwind's default container behavior to:
+   * - Auto-center content (mx-auto)
+   * - Add responsive horizontal padding
+   * - Set max-width for large screens
+   *
+   * Usage: <div className="container">...</div>
+   *
+   * For custom widths, use max-w-* utilities directly:
+   * <div className="max-w-6xl mx-auto px-4">...</div>
+   */
+  .container {
+    width: 100%;
+    margin-left: auto;
+    margin-right: auto;
+    padding-left: 1rem; /* 16px - mobile padding */
+    padding-right: 1rem;
+  }
+
+  .flex {
+    min-height: 0;
+    min-width: 0;
+  }
+
+  @media (min-width: 640px) {
+    .container {
+      padding-left: 1.5rem; /* 24px - tablet padding */
+      padding-right: 1.5rem;
+    }
+  }
+
+  @media (min-width: 1024px) {
+    .container {
+      padding-left: 2rem; /* 32px - desktop padding */
+      padding-right: 2rem;
+      max-width: 1280px; /* Standard content width */
+    }
+  }
+}
+
+/* Fluxora identity: Mirtilo, Curaçao, Vanilla and Tangerina. */
+:root {
+  --color-mirtilo-950: #280e59;
+  --color-mirtilo-900: #35106f;
+  --color-mirtilo-700: #286ef7;
+  --color-mirtilo-100: #e9e2ff;
+  --color-curacao-700: #286ef7;
+  --color-curacao-500: #5b91ff;
+  --color-curacao-100: #e8f0ff;
+  --color-vanilla-50: #f0ebe2;
+  --color-vanilla-100: #e8dfd1;
+  --fluxora-mirtilo: #280e59;
+  --fluxora-curacao: #286ef7;
+  --fluxora-vanilla: #f0ebe2;
+  --fluxora-tangerina: #ff4b1f;
+  --fluxora-ink: #261246;
+  --fluxora-muted: #72668a;
+  --fluxora-card: #fffdf8;
+  --primary: var(--fluxora-curacao);
+  --primary-foreground: #ffffff;
+  --sidebar-primary: var(--fluxora-curacao);
+  --sidebar-primary-foreground: #ffffff;
+  --chart-1: #286ef7;
+  --chart-2: #7153dd;
+  --chart-3: #ff4b1f;
+  --chart-4: #280e59;
+  --chart-5: #9d91ab;
+  --background: var(--fluxora-vanilla);
+  --foreground: var(--fluxora-ink);
+  --card: var(--fluxora-card);
+  --card-foreground: var(--fluxora-ink);
+  --ring: var(--fluxora-curacao);
+  --radius: 0.9rem;
+}
+
+html { background: var(--fluxora-vanilla); }
+body {
+  font-family: "Avenir Next", Avenir, "Segoe UI", sans-serif;
+  color: var(--fluxora-ink);
+  background:
+    radial-gradient(circle at 85% -10%, rgb(40 110 247 / .1), transparent 28rem),
+    radial-gradient(circle at 10% 35%, rgb(255 75 31 / .04), transparent 22rem),
+    var(--fluxora-vanilla);
+}
+button, a, input { transition: color 160ms ease, background-color 160ms ease, border-color 160ms ease, box-shadow 160ms ease, transform 160ms ease; }
+button:active { transform: scale(0.98); }
+::selection { background: rgb(40 110 247 / .2); color: var(--fluxora-mirtilo); }
+.fluxora-card { border: 1px solid rgb(40 14 89 / .09); box-shadow: 0 14px 35px rgb(40 14 89 / .06); }
+
+/* The operational screens were built with the previous palette as utility
+   classes. Map those semantics to the new identity without changing behavior. */
+.fluxora-app [class*="bg-[#11183D]"] { background-color: var(--fluxora-mirtilo) !important; }
+.fluxora-app [class*="text-[#11183D]"] { color: var(--fluxora-ink) !important; }
+.fluxora-app [class*="border-[#11183D]"] { border-color: var(--fluxora-mirtilo) !important; }
+.fluxora-app [class*="bg-[#4355D8]"] { background-color: var(--fluxora-curacao) !important; }
+.fluxora-app [class*="text-[#4355D8]"] { color: var(--fluxora-curacao) !important; }
+.fluxora-app [class*="border-[#4355D8]"] { border-color: var(--fluxora-curacao) !important; }
+.fluxora-app [class*="bg-[#6675F0]"] { background-color: #5b91ff !important; }
+.fluxora-app [class*="text-[#6675F0]"] { color: #286ef7 !important; }
+.fluxora-app [class*="bg-[#19D3C5]"] { background-color: var(--fluxora-curacao) !important; }
+.fluxora-app [class*="text-[#19D3C5]"] { color: var(--fluxora-curacao) !important; }
+.fluxora-app [class*="border-[#19D3C5]"] { border-color: var(--fluxora-curacao) !important; }
+.fluxora-app [class*="bg-[#F5F7FB]"] { background-color: var(--fluxora-vanilla) !important; }
+.fluxora-app [class*="text-[#667085]"] { color: var(--fluxora-muted) !important; }
+.fluxora-app [class*="text-[#98A2B3]"] { color: #978aa4 !important; }
+.fluxora-app [class*="bg-[#EEF1FF]"] { background-color: #e8f0ff !important; }
+.fluxora-app [class*="text-[#5D6EE8]"] { color: var(--fluxora-curacao) !important; }
+.fluxora-app [class*="bg-[#fff0e7]"],
+.fluxora-app [class*="bg-[#FFF5F1]"] { background-color: #fff1eb !important; }
+.fluxora-app [class*="text-[#bd6338]"],
+.fluxora-app [class*="text-[#A14E36]"] { color: #ca3e1b !important; }
+.fluxora-app .bg-white { background-color: var(--fluxora-card) !important; }
+.fluxora-app [class*="border-[#e8eaf3]"],
+.fluxora-app [class*="border-[#e7e9f1]"],
+.fluxora-app [class*="border-[#f1f2f7]"] { border-color: rgb(40 14 89 / .1) !important; }
+
+.fluxora-login { background: #280e59; }
+.fluxora-login-aurora {
+  background:
+    radial-gradient(circle at 18% 18%, rgb(40 110 247 / .26), transparent 28rem),
+    radial-gradient(circle at 86% 78%, rgb(255 75 31 / .16), transparent 30rem);
+}
+.fluxora-login-panel {
+  background:
+    radial-gradient(circle at 80% 0%, rgb(40 110 247 / .22), transparent 25rem),
+    #280e59;
+}
+.fluxora-login-panel [class*="text-[#7F8CC8]"] { color: #c8b9e8 !important; }
+.fluxora-login [class*="text-[#667085]"] { color: #72668a !important; }
+.fluxora-circuit {
+  background-image:
+    linear-gradient(90deg, transparent 0 17%, rgb(255 255 255 / .14) 17% 17.4%, transparent 17.4% 42%, rgb(40 110 247 / .72) 42% 42.6%, transparent 42.6%),
+    linear-gradient(0deg, transparent 0 48%, rgb(255 255 255 / .1) 48% 48.5%, transparent 48.5%);
+  mask-image: linear-gradient(to bottom, rgb(0 0 0 / .85), transparent 82%);
+}
+
+.dark {
+  --fluxora-mirtilo: #1b0b35;
+  --fluxora-vanilla: #120723;
+  --fluxora-ink: #f6f0ff;
+  --fluxora-card: #21103e;
+  --fluxora-muted: #c0b4d1;
+  --background: #120723;
+  --foreground: #f6f0ff;
+  --card: #21103e;
+  --card-foreground: #f6f0ff;
+  --popover: #261247;
+  --popover-foreground: #f6f0ff;
+  --secondary: #2a1650;
+  --secondary-foreground: #f6f0ff;
+  --muted: #2a1650;
+  --muted-foreground: #c0b4d1;
+  --accent: #301a59;
+  --accent-foreground: #ffffff;
+  --border: rgb(232 218 255 / .13);
+  --input: #301a59;
+  --ring: #5b91ff;
+}
+.dark,
+.dark body { background: #120723; color: #f6f0ff; }
+.dark .fluxora-app {
+  color: #f6f0ff;
+  background:
+    radial-gradient(circle at 78% -12%, rgb(91 145 255 / .12), transparent 30rem),
+    radial-gradient(circle at 0 42%, rgb(112 65 208 / .12), transparent 27rem),
+    #120723 !important;
+}
+.dark .fluxora-app [class*="bg-[#F5F7FB]"] { background-color: #120723 !important; }
+.dark .fluxora-app [class*="bg-[#F5F7FB]/"] { background-color: rgb(18 7 35 / .88) !important; }
+.dark .fluxora-app .bg-white { background-color: #21103e !important; }
+.dark .fluxora-app [class*="bg-[#EEF1FF]"] { background-color: #2b1950 !important; }
+.dark .fluxora-app [class*="bg-[#def8f7]"] { background-color: rgb(40 110 247 / .16) !important; }
+.dark .fluxora-app [class*="bg-[#edf0f7]"],
+.dark .fluxora-app [class*="bg-[#eef0f6]"] { background-color: #2a1650 !important; }
+.dark .fluxora-app [class*="bg-[#F8F9FD]"] { background-color: #2a1650 !important; }
+.dark .fluxora-app [class*="text-[#11183D]"] { color: #f6f0ff !important; }
+.dark .fluxora-app [class*="text-[#667085]"] { color: #c0b4d1 !important; }
+.dark .fluxora-app [class*="text-[#98A2B3]"] { color: #ac9fc0 !important; }
+.dark .fluxora-app [class*="text-[#B8C2E3]"] { color: #cec4dd !important; }
+.dark .fluxora-app [class*="text-[#AAB4DA]"] { color: #d6cdec !important; }
+.dark .fluxora-app [class*="text-[#19D3C5]"] { color: #75a5ff !important; }
+.dark .fluxora-app [class*="border-[#e8eaf3]"],
+.dark .fluxora-app [class*="border-[#e7e9f1]"],
+.dark .fluxora-app [class*="border-[#f1f2f7]"],
+.dark .fluxora-app [class*="border-[#E5E8F2]"] { border-color: rgb(232 218 255 / .13) !important; }
+.dark .fluxora-app input,
+.dark .fluxora-app textarea,
+.dark .fluxora-app button[role="combobox"] { color: #f6f0ff; background-color: #2a1650; border-color: rgb(232 218 255 / .16); }
+.dark .fluxora-app input::placeholder,
+.dark .fluxora-app textarea::placeholder { color: #a99aba; }
+
+/* Dialogs are rendered in a portal, outside .fluxora-app. Keep execution
+   details aligned with the same dark palette used by the application. */
+.dark [role="dialog"] {
+  background-color: #21103e;
+  color: #f6f0ff;
+  border-color: rgb(232 218 255 / .13);
+}
+.dark [role="dialog"] .bg-white { background-color: #21103e !important; }
+.dark [role="dialog"] [class*="bg-[#F5F7FB]"],
+.dark [role="dialog"] [class*="bg-[#F8F9FD]"],
+.dark [role="dialog"] [class*="bg-[#FBFCFE]"] { background-color: #2a1650 !important; }
+.dark [role="dialog"] [class*="text-[#11183D]"] { color: #f6f0ff !important; }
+.dark [role="dialog"] [class*="text-[#667085]"] { color: #c0b4d1 !important; }
+.dark [role="dialog"] [class*="text-[#98A2B3]"] { color: #ac9fc0 !important; }
+.dark [role="dialog"] [class*="text-[#E8ECFF]"] { color: #e8e2f5 !important; }
+.dark [role="dialog"] [class*="border-[#eef0f6]"],
+.dark [role="dialog"] [class*="border-[#e9ebf3]"],
+.dark [role="dialog"] [class*="border-[#E8EBF4]"],
+.dark [role="dialog"] [class*="border-[#DDE2EE]"] { border-color: rgb(232 218 255 / .14) !important; }
+
+@media (prefers-reduced-motion: reduce) { *, *::before, *::after { scroll-behavior: auto !important; transition-duration: 0.01ms !important; animation-duration: 0.01ms !important; } }

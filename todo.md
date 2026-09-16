@@ -1,0 +1,33 @@
+# Project TODO
+
+- [x] Refinar identidade visual Mirtilo, Curação e Vanilla para uma interface elegante e corporativa
+- [x] Implementar layout operacional responsivo com sidebar recolhível, header e navegação principal
+- [x] Implementar dashboard com indicadores de saúde, volume de execuções, falhas e disponibilidade
+- [x] Implementar gráficos operacionais de execuções, sucesso, falhas, distribuição e duração
+- [x] Implementar listagem de workflows com busca e filtros básicos
+- [x] Implementar detalhe de workflow com métricas, histórico e ações operacionais seguras
+- [x] Implementar histórico de execuções com filtros, status e duração
+- [x] Implementar painel de erros e analytics com estados sem telemetria
+- [x] Implementar cliente n8n exclusivamente no backend usando N8N_BASE_URL e N8N_API_KEY
+- [x] Garantir que URL e chave do n8n nunca sejam expostas no frontend ou em respostas indevidas
+- [x] Criar estados de loading, erro, vazio, atualização e feedback por toast
+- [x] Documentar variáveis de ambiente e configuração compatível com deploy na Vercel
+- [x] Criar e atualizar testes Vitest para integração e segurança da camada n8n
+- [x] Executar typecheck, testes, build e verificação visual responsiva
+- [x] Salvar checkpoint final para entrega do projeto
+- [x] Aplicar um layout compartilhado com sidebar e header em todas as rotas operacionais
+- [x] Adicionar indicador explícito de disponibilidade no dashboard
+- [x] Implementar gate de autenticação e estados de erro distintos nas páginas operacionais
+- [x] Adicionar uso real de toast para atualização, sucesso e falha de carregamento
+- [x] Diferenciar ausência de telemetria de falha de consulta ao n8n
+- [x] Propagar estados tipados de n8n não configurado, erro de autenticação e falha de API sem mascarar respostas
+- [x] Ajustar os toasts de atualização para refletirem falhas reais do n8n
+- [x] Refletir a diferença entre telemetria vazia e erro de consulta nas páginas operacionais
+- [x] Propagar status discriminado de n8n configurado, não configurado, não autorizado e erro de API
+- [x] Corrigir o teste de falha de autenticação para permanecer dentro do describe
+- [x] Tratar explicitamente n8n não configurado como aviso no refresh e executar validação final
+- [x] Adicionar a série real de falhas ao gráfico e distribuição completa dos status operacionais
+- [x] Implementar ações reais e seguras no detalhe do workflow ou documentar bloqueio técnico verificável
+- [x] Adicionar loading, erro, não encontrado e n8n não configurado no detalhe do workflow
+- [x] Transformar o card de distribuição em uma visualização multistatus real para sucesso, falhas, execução, aguardando e canceladas
+- [x] Reexecutar typecheck e build após a alteração final da distribuição
