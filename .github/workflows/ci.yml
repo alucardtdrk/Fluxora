@@ -16,8 +16,6 @@ jobs:
 
       - name: Preparar pnpm
         uses: pnpm/action-setup@v4
-        with:
-          version: 10
 
       - name: Preparar Node.js
         uses: actions/setup-node@v4
