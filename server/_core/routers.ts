@@ -1,9 +1,9 @@
-import { authConfigured, clearSessionCookie } from "./auth.js";
-import { adminProcedure, operatorProcedure, protectedProcedure, publicProcedure, router } from "./_core/trpc.js";
-import { getN8nAnalytics, getN8nExecutionDetail, getN8nOverview, listN8nExecutions, listN8nWorkflows, setN8nWorkflowActive, syncN8nArchive } from "./n8n.js";
-import { archiveConfigured, getArchiveDiagnostics, getArchiveSyncState } from "./firestoreLogs.js";
-import { deleteFluxoraUser, listFluxoraUsers, setFluxoraUserActive, upsertFluxoraUser } from "./access.js";
-import { isFirestoreConfigured } from "./firestore.js";
+import { authConfigured, clearSessionCookie } from "../auth.js";
+import { adminProcedure, operatorProcedure, protectedProcedure, publicProcedure, router } from "./trpc.js";
+import { getN8nAnalytics, getN8nExecutionDetail, getN8nOverview, listN8nExecutions, listN8nWorkflows, setN8nWorkflowActive, syncN8nArchive } from "../n8n.js";
+import { archiveConfigured, getArchiveDiagnostics, getArchiveSyncState } from "../firestoreLogs.js";
+import { deleteFluxoraUser, listFluxoraUsers, setFluxoraUserActive, upsertFluxoraUser } from "../access.js";
+import { isFirestoreConfigured } from "../firestore.js";
 import { z } from "zod";
 
 const periodSchema = z.enum(["today", "7d", "30d", "90d", "all"]);

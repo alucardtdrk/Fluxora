@@ -10,6 +10,19 @@ import {
 
 export type ArchivePeriod = "today" | "7d" | "30d" | "90d" | "all";
 
+export type ArchivedExecutionNode = {
+  nodeName?: string;
+  runIndex?: number;
+  status?: string;
+  startTime?: string;
+  executionTimeMs?: number | null;
+  source?: unknown;
+  input?: unknown;
+  output?: unknown;
+  outputItems?: number;
+  error?: unknown;
+};
+
 export type ArchivedExecution = {
   executionId: string;
   workflowId?: string;
@@ -25,7 +38,7 @@ export type ArchivedExecution = {
   retrySuccessId?: string | null;
   lastNodeExecuted?: string | null;
   error?: unknown;
-  nodes?: unknown[];
+  nodes?: ArchivedExecutionNode[];
   nodeMetrics?: Array<{ nodeName: string; status: string; executionTimeMs: number | null; outputItems: number }>;
   detailsAvailable?: boolean;
   detailFetchAttemptedAt?: string;

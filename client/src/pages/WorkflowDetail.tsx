@@ -126,7 +126,7 @@ export default function WorkflowDetail() {
     const executedNodes = executionDetail.data?.execution?.nodes ?? [];
     if (!executedNodes.length) return;
     if (!selectedNodeName || !executedNodes.some((node: any) => node.nodeName === selectedNodeName)) {
-      setSelectedNodeName(executedNodes[0].nodeName);
+      setSelectedNodeName(executedNodes[0]?.nodeName ?? null);
     }
   }, [executionDetail.data, selectedNodeName]);
 
