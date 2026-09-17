@@ -15,6 +15,7 @@ import Monitoring from "./pages/Monitoring";
 import Settings from "./pages/Settings";
 import Users from "./pages/Users";
 import Audit from "./pages/Audit";
+import WorkspaceSecurity from "./pages/WorkspaceSecurity";
 
 function ErrorsPage() { return <ErrorsInsights />; }
 
@@ -39,6 +40,7 @@ function Router() {
     <Route path="/errors" component={ErrorsPage} />
     <Route path="/analytics" component={Insights} />
     <Route path="/monitoring" component={Monitoring} />
+    <Route path="/workspace-security" component={WorkspaceSecurity} />
     <Route path="/settings">{() => <AdminOnly><Settings /></AdminOnly>}</Route>
     <Route path="/users">{() => <AdminOnly><Users /></AdminOnly>}</Route>
     <Route path="/audit">{() => <AdminOnly><Audit /></AdminOnly>}</Route>
