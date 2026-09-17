@@ -9,6 +9,7 @@ import { getNotificationReadState, saveNotificationReadState } from "./notificat
 import { listWorkflowAlertRules, listWorkflowRunbooks, listWorkflowSlos, saveWorkflowAlertRule, saveWorkflowRunbook, saveWorkflowSlo, updateIncidentState } from "./observability.js";
 import { z } from "zod";
 import { listAuditEvents, recordAuditEventSafe, type AuditEventInput } from "./audit.js";
+import { syncGoogleWorkspaceSecurity } from "./googleWorkspace/runtime.js";
 
 const periodSchema = z.enum(["today", "7d", "30d", "90d", "all"]);
 const roleSchema = z.enum(["admin", "operator", "viewer"]);
@@ -82,9 +83,11 @@ export const appRouter = router({
     saveUser: adminProcedure.input(z.object({ email: z.string().email(), name: z.string().max(120).optional(), role: roleSchema, active: z.boolean().default(true) })).mutation(({ input, ctx }) => audited({ action: "user.save", category: "access", actor: ctx.user.email, actorRole: ctx.user.role, targetType: "user", targetId: input.email, targetName: input.name, summary: `Criou ou atualizou o acesso de ${input.email}`, after: input }, () => upsertFluxoraUser({ ...input, actor: ctx.user.email }))),
     setUserActive: adminProcedure.input(z.object({ email: z.string().email(), active: z.boolean() })).mutation(({ input, ctx }) => audited({ action: "user.status", category: "access", actor: ctx.user.email, actorRole: ctx.user.role, targetType: "user", targetId: input.email, summary: `${input.active ? "Ativou" : "Bloqueou"} o acesso de ${input.email}`, after: { active: input.active } }, () => setFluxoraUserActive(input.email, input.active, ctx.user.email))),
     deleteUser: adminProcedure.input(z.object({ email: z.string().email() })).mutation(({ input, ctx }) => audited({ action: "user.delete", category: "access", actor: ctx.user.email, actorRole: ctx.user.role, targetType: "user", targetId: input.email, summary: `Removeu o acesso de ${input.email}` }, () => deleteFluxoraUser(input.email))),
+    syncGoogleWorkspace: adminProcedure.mutation(({ ctx }) => audited({ action: "google_workspace.sync", category: "configuration", actor: ctx.user.email, actorRole: ctx.user.role, targetType: "google_workspace", summary: "Executou a sincronização de segurança do Google Workspace" }, () => syncGoogleWorkspaceSecurity())),
     systemStatus: adminProcedure.query(async () => {
       const archive = await getArchiveDiagnostics().catch((error) => ({ configured: archiveConfigured(), totalArchived: 0, state: { lastError: error instanceof Error ? error.message : String(error) } as ArchiveSyncState }));
-      return { firestoreConfigured: isFirestoreConfigured(), archive };
+      const workspaceConfigured = ["GOOGLE_WORKSPACE_SERVICE_ACCOUNT_EMAIL", "GOOGLE_WORKSPACE_PRIVATE_KEY", "GOOGLE_WORKSPACE_ADMIN_EMAIL", "GOOGLE_WORKSPACE_CUSTOMER_ID", "GOOGLE_WORKSPACE_DOMAIN"].every((key) => Boolean(String(process.env[key] || "").trim()));
+      return { firestoreConfigured: isFirestoreConfigured(), archive, googleWorkspaceSecurity: { configured: workspaceConfigured } };
     }),
     testN8n: adminProcedure.query(async () => {
       const [overview, workflows] = await Promise.all([getN8nOverview("today", []), listN8nWorkflows()]);

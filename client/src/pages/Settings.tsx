@@ -34,6 +34,7 @@ export default function Settings() {
   const [syncProgress, setSyncProgress] = useState("");
 
   const sync = trpc.n8n.syncArchive.useMutation();
+  const syncWorkspace = trpc.admin.syncGoogleWorkspace.useMutation();
   const preserveDetails = trpc.n8n.preserveExecutionDetails.useMutation();
   const testN8n = trpc.admin.testN8n.useQuery(undefined, { enabled: false, retry: false });
   const testFirestore = trpc.admin.testFirestore.useQuery(undefined, { enabled: false, retry: false });
@@ -118,6 +119,18 @@ export default function Settings() {
     toast.success("Cache local limpo");
   };
 
+  const synchronizeGoogleWorkspace = async () => {
+    try {
+      const result = await syncWorkspace.mutateAsync();
+      const total = Object.values(result.sources).reduce((sum, source) => sum + source.persisted, 0);
+      if (result.status === "failure") throw new Error("Nenhuma fonte do Google Workspace pôde ser sincronizada.");
+      await system.refetch();
+      toast.success(result.status === "partial" ? "Sincronização parcial concluída" : "Google Workspace sincronizado", { description: `${total.toLocaleString("pt-BR")} registros foram atualizados.` });
+    } catch (error) {
+      toast.error("A sincronização do Google Workspace falhou", { description: error instanceof Error ? error.message : "Revise a configuração e tente novamente." });
+    }
+  };
+
   const synchronizeHistory = async () => {
     try {
       setSyncingHistory(true);
@@ -196,6 +209,7 @@ export default function Settings() {
         <Card className="border-0"><CardHeader><CardTitle className="flex items-center gap-2 text-base"><DatabaseZap className="h-4 w-4" />Integrações</CardTitle></CardHeader><CardContent className="space-y-4">
           <div className="flex items-center justify-between rounded-xl bg-[#F5F7FB] p-4"><div><p className="text-sm font-semibold">n8n</p><p className="mt-1 text-xs text-[#667085]">Fonte operacional das automações.</p></div><span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${overview.data?.connected ? "bg-[#e3f6eb] text-[#258b57]" : "bg-[#fff0e7] text-[#bd6338]"}`}>{overview.isLoading ? "Verificando" : overview.data?.connected ? "Online" : "Indisponível"}</span></div>
           <div className="flex items-center justify-between rounded-xl bg-[#F5F7FB] p-4"><div><p className="text-sm font-semibold">Firestore</p><p className="mt-1 text-xs text-[#667085]">Histórico permanente das execuções.</p></div><span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${system.data?.firestoreConfigured ? "bg-[#e3f6eb] text-[#258b57]" : "bg-[#fff0e7] text-[#bd6338]"}`}>{system.isLoading ? "Verificando" : system.data?.firestoreConfigured ? "Conectado" : "Indisponível"}</span></div>
+          <div className="flex items-center justify-between rounded-xl bg-[#F5F7FB] p-4"><div><p className="text-sm font-semibold">Google Workspace Security</p><p className="mt-1 text-xs text-[#667085]">Alertas, login, OAuth, Drive e postura do domínio.</p></div><span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${system.data?.googleWorkspaceSecurity?.configured ? "bg-[#e3f6eb] text-[#258b57]" : "bg-[#fff0e7] text-[#bd6338]"}`}>{system.isLoading ? "Verificando" : system.data?.googleWorkspaceSecurity?.configured ? "Pronto para sincronizar" : "Configuração pendente"}</span></div>
           <div className="grid grid-cols-2 gap-3"><Button variant="outline" onClick={async () => { const r = await testN8n.refetch(); r.data?.ok ? toast.success("n8n conectado") : toast.error("n8n indisponível"); }}>Testar n8n</Button><Button variant="outline" onClick={async () => { const r = await testFirestore.refetch(); r.data?.ok ? toast.success("Firestore conectado") : toast.error("Firestore indisponível"); }}>Testar Firestore</Button></div>
         </CardContent></Card>
       </TabsContent>
@@ -229,6 +243,7 @@ export default function Settings() {
         <Card className="border-0"><CardHeader><CardTitle className="flex items-center gap-2 text-base"><ShieldCheck className="h-4 w-4" />Sessão e acesso</CardTitle></CardHeader><CardContent className="space-y-4"><div className="rounded-xl bg-[#F5F7FB] p-4"><p className="text-xs text-[#667085]">Usuário atual</p><p className="mt-1 font-semibold">{user?.name}</p><p className="text-xs text-[#667085]">{user?.email}</p></div><div className="rounded-xl bg-[#F5F7FB] p-4"><p className="text-xs text-[#667085]">Perfil</p><p className="mt-1 font-semibold">Administrador</p></div><p className="text-xs leading-5 text-[#667085]">O login utiliza Google corporativo e o acesso só é concedido a pessoas habilitadas no Fluxora.</p></CardContent></Card>
         <Card className="border-0"><CardHeader><CardTitle className="flex items-center gap-2 text-base"><Users className="h-4 w-4" />Controle de acesso</CardTitle></CardHeader><CardContent><p className="text-sm text-[#667085]">Gerencie usuários, bloqueios e perfis em uma área administrativa dedicada.</p><Link href="/users"><Button className="mt-5 bg-[#4355D8] hover:bg-[#3546C7]">Gerenciar usuários</Button></Link></CardContent></Card>
         <Card className="border-0 lg:col-span-2"><CardHeader><CardTitle className="text-base">Manutenção</CardTitle></CardHeader><CardContent className="flex flex-wrap gap-3"><Button variant="outline" onClick={clearLocalCache}>Limpar cache local</Button><Button variant="outline" onClick={() => overview.refetch()}>Atualizar conexão n8n</Button><Button variant="outline" onClick={() => system.refetch()}>Atualizar status do histórico</Button></CardContent></Card>
+        {user?.role === "admin" && <Card className="border-0 lg:col-span-2"><CardHeader><CardTitle className="text-base">Google Workspace Security</CardTitle></CardHeader><CardContent className="flex flex-wrap items-center gap-3"><p className="text-sm text-[#667085]">Execute uma coleta imediata de alertas, auditoria e postura do domínio.</p><Button variant="outline" disabled={!system.data?.googleWorkspaceSecurity?.configured || syncWorkspace.isPending} onClick={() => void synchronizeGoogleWorkspace()}>{syncWorkspace.isPending ? "Sincronizando..." : "Sincronizar agora"}</Button></CardContent></Card>}
       </TabsContent>
     </Tabs>
   </div></OperationsShell>;

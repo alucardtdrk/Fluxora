@@ -300,7 +300,7 @@ Expected: PASS.
 - Test: `server/googleWorkspace/repository.test.ts`
 - Reuse: `server/firestore.ts`
 
-- [ ] **Step 1: Write failing repository tests**
+- [x] **Step 1: Write failing repository tests**
 
 Create an injected Firestore adapter and verify:
 
@@ -312,13 +312,13 @@ it("stores directory posture separately from audit events", async () => {});
 it("persists only a safe error summary in synchronization state", async () => {});
 ```
 
-- [ ] **Step 2: Run the test and confirm failure**
+- [x] **Step 2: Run the test and confirm failure**
 
 Run: `npm test -- server/googleWorkspace/repository.test.ts`
 
 Expected: FAIL because `repository.ts` does not exist.
 
-- [ ] **Step 3: Implement collection boundaries**
+- [x] **Step 3: Implement collection boundaries**
 
 Use these collections:
 
@@ -330,7 +330,7 @@ fluxora_workspace_directory_posture
 
 Use the deterministic normalized event ID as the Firestore document ID. Store the normalized event plus `ingestedAt`; never store OAuth tokens, JWT assertions or service-account key material.
 
-- [ ] **Step 4: Implement atomic save semantics**
+- [x] **Step 4: Implement atomic save semantics**
 
 Expose:
 
@@ -346,7 +346,7 @@ saveSourceBatch(input: {
 
 Use Firestore commit operations so event writes and the successful cursor transition are submitted together. On failure, write only a separate failed-attempt state that leaves the last successful cursor untouched.
 
-- [ ] **Step 5: Run verification**
+- [x] **Step 5: Run verification**
 
 Run: `npm test -- server/googleWorkspace/repository.test.ts`
 
@@ -367,7 +367,7 @@ Expected: PASS.
 - Create: `server/googleWorkspace/normalizers/alertCenter.ts`
 - Test: `server/googleWorkspace/collectors/alertCenter.test.ts`
 
-- [ ] **Step 1: Write fixtures and failing tests**
+- [x] **Step 1: Write fixtures and failing tests**
 
 Include fixtures for account takeover, phishing, data loss and superadministrator password reset. Verify:
 
@@ -379,13 +379,13 @@ it("drops a superadministrator password reset event", async () => {});
 it("does not drop unrelated administrator events", async () => {});
 ```
 
-- [ ] **Step 2: Run the test and confirm failure**
+- [x] **Step 2: Run the test and confirm failure**
 
 Run: `npm test -- server/googleWorkspace/collectors/alertCenter.test.ts`
 
 Expected: FAIL because the collector and normalizer do not exist.
 
-- [ ] **Step 3: Implement Alert Center listing**
+- [x] **Step 3: Implement Alert Center listing**
 
 Call:
 
@@ -395,11 +395,11 @@ GET https://alertcenter.googleapis.com/v1beta1/alerts
 
 Use `customerId`, `pageSize`, `pageToken`, `orderBy=createTime asc`, and a `createTime` filter starting five minutes before the last successful event time. On the first run, use a configurable 24-hour bootstrap lookback; historical backfill is a separate explicit operation.
 
-- [ ] **Step 4: Normalize and filter**
+- [x] **Step 4: Normalize and filter**
 
 Create stable event IDs from `alert_center` and Google `alertId`. Preserve the original alert type, source, create time and essential structured fields in metadata. Implement an explicit predicate named `isExcludedSuperadminPasswordReset`; keep its matching rules narrow and covered by tests.
 
-- [ ] **Step 5: Run verification**
+- [x] **Step 5: Run verification**
 
 Run: `npm test -- server/googleWorkspace/collectors/alertCenter.test.ts`
 
@@ -420,7 +420,7 @@ Expected: PASS.
 - Create: `server/googleWorkspace/normalizers/reports.ts`
 - Test: `server/googleWorkspace/collectors/reports.test.ts`
 
-- [ ] **Step 1: Write fixtures and failing tests**
+- [x] **Step 1: Write fixtures and failing tests**
 
 Cover these applications and representative activities:
 
@@ -433,13 +433,13 @@ drive       external sharing, visibility and download-related activity when expo
 
 Tests must verify pagination, stable IDs, actor/IP extraction, severity mapping, five-minute overlap and source-specific cursor isolation.
 
-- [ ] **Step 2: Run the test and confirm failure**
+- [x] **Step 2: Run the test and confirm failure**
 
 Run: `npm test -- server/googleWorkspace/collectors/reports.test.ts`
 
 Expected: FAIL because the Reports collector and normalizer do not exist.
 
-- [ ] **Step 3: Implement a constrained Reports collector**
+- [x] **Step 3: Implement a constrained Reports collector**
 
 Call only:
 
@@ -449,15 +449,15 @@ GET https://admin.googleapis.com/admin/reports/v1/activity/users/all/application
 
 Allow only `login`, `admin`, `token`, and `drive` as application names. Set `customerId`, `startTime`, `endTime`, `maxResults`, and `pageToken`. Treat a Google `403` for a licensed-but-unavailable source as a source failure, not as an empty successful result.
 
-- [ ] **Step 4: Normalize activity records**
+- [x] **Step 4: Normalize activity records**
 
 An activity containing multiple events becomes one normalized event per child event. Build the external ID from application, activity unique qualifier, event name and stable child index. Keep the raw parameter map bounded: discard values larger than the configured metadata limit and record that truncation occurred.
 
-- [ ] **Step 5: Apply the approved exclusion**
+- [x] **Step 5: Apply the approved exclusion**
 
 Reuse a shared narrow exclusion predicate for superadministrator password-reset activity. Confirm ordinary password changes, login attacks, role changes and recovery-setting changes remain visible.
 
-- [ ] **Step 6: Run verification**
+- [x] **Step 6: Run verification**
 
 Run: `npm test -- server/googleWorkspace/collectors/reports.test.ts`
 
