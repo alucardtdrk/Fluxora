@@ -231,6 +231,47 @@ export async function setFirestoreDocument(collection: string, id: string, data:
   return decodeDocument(await response.json());
 }
 
+export async function mergeFirestoreDocument(collection: string, id: string, data: FirestoreRecord) {
+  const fields = encodeFields(data);
+  const updateMask = Object.keys(fields)
+    .map((fieldPath) => `updateMask.fieldPaths=${encodeURIComponent(fieldPath)}`)
+    .join("&");
+  const suffix = updateMask ? `?${updateMask}` : "";
+  const response = await firestoreFetch(`/${encodeURIComponent(collection)}/${encodeURIComponent(id)}${suffix}`, {
+    method: "PATCH",
+    body: JSON.stringify({ fields }),
+  });
+  if (!response.ok) throw new Error(`FIRESTORE_MERGE_${response.status}:${await response.text()}`);
+  return decodeDocument(await response.json());
+}
+
+export interface FirestoreWrite {
+  collection: string;
+  id: string;
+  data: FirestoreRecord;
+}
+
+export async function commitFirestoreWrites(documents: readonly FirestoreWrite[]) {
+  if (!documents.length) return { writes: 0 };
+  if (documents.length > 500) throw new Error("FIRESTORE_COMMIT_TOO_MANY_WRITES");
+  const config = getFirebaseConfig();
+  if (!config) throw new Error("FIREBASE_NOT_CONFIGURED");
+
+  const response = await firestoreFetch(":commit", {
+    method: "POST",
+    body: JSON.stringify({
+      writes: documents.map(({ collection, id, data }) => ({
+        update: {
+          name: resourceName(config.projectId, collection, id),
+          fields: encodeFields(data),
+        },
+      })),
+    }),
+  });
+  if (!response.ok) throw new Error(`FIRESTORE_COMMIT_${response.status}:${await response.text()}`);
+  return { writes: documents.length };
+}
+
 export async function commitFirestoreDocuments(collection: string, documents: Array<{ id: string; data: FirestoreRecord }>) {
   if (!documents.length) return { writes: 0 };
   const config = getFirebaseConfig();

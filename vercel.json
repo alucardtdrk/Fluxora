@@ -12,6 +12,10 @@
     {
       "path": "/api/internal/sync-n8n",
       "schedule": "0 3 * * *"
+    },
+    {
+      "path": "/api/internal/sync-google-workspace",
+      "schedule": "*/15 * * * *"
     }
   ],
   "routes": [
@@ -26,6 +30,10 @@
     {
       "src": "/api/internal/sync-n8n",
       "dest": "/api/index.ts?syncN8n=1"
+    },
+    {
+      "src": "/api/internal/sync-google-workspace",
+      "dest": "/api/index.ts?syncWorkspace=1"
     },
     {
       "src": "/api/trpc(?:/(.*))?",

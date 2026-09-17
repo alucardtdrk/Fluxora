@@ -84,7 +84,8 @@ export const appRouter = router({
     deleteUser: adminProcedure.input(z.object({ email: z.string().email() })).mutation(({ input, ctx }) => audited({ action: "user.delete", category: "access", actor: ctx.user.email, actorRole: ctx.user.role, targetType: "user", targetId: input.email, summary: `Removeu o acesso de ${input.email}` }, () => deleteFluxoraUser(input.email))),
     systemStatus: adminProcedure.query(async () => {
       const archive = await getArchiveDiagnostics().catch((error) => ({ configured: archiveConfigured(), totalArchived: 0, state: { lastError: error instanceof Error ? error.message : String(error) } as ArchiveSyncState }));
-      return { firestoreConfigured: isFirestoreConfigured(), archive };
+      const workspaceConfigured = ["GOOGLE_WORKSPACE_SERVICE_ACCOUNT_EMAIL", "GOOGLE_WORKSPACE_PRIVATE_KEY", "GOOGLE_WORKSPACE_ADMIN_EMAIL", "GOOGLE_WORKSPACE_CUSTOMER_ID", "GOOGLE_WORKSPACE_DOMAIN"].every((key) => Boolean(String(process.env[key] || "").trim()));
+      return { firestoreConfigured: isFirestoreConfigured(), archive, googleWorkspaceSecurity: { configured: workspaceConfigured } };
     }),
     testN8n: adminProcedure.query(async () => {
       const [overview, workflows] = await Promise.all([getN8nOverview("today", []), listN8nWorkflows()]);
