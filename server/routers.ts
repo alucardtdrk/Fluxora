@@ -10,6 +10,7 @@ import { listWorkflowAlertRules, listWorkflowRunbooks, listWorkflowSlos, saveWor
 import { z } from "zod";
 import { listAuditEvents, recordAuditEventSafe, type AuditEventInput } from "./audit.js";
 import { syncGoogleWorkspaceSecurity } from "./googleWorkspace/runtime.js";
+import { getWorkspaceSecurityDashboard } from "./googleWorkspace/dashboard.js";
 
 const periodSchema = z.enum(["today", "7d", "30d", "90d", "all"]);
 const roleSchema = z.enum(["admin", "operator", "viewer"]);
@@ -38,6 +39,9 @@ export const appRouter = router({
     markRead: protectedProcedure
       .input(z.object({ executionIds: z.array(z.string().min(1)).max(250) }))
       .mutation(({ input, ctx }) => saveNotificationReadState(ctx.user.email, input.executionIds)),
+  }),
+  workspaceSecurity: router({
+    overview: protectedProcedure.query(() => getWorkspaceSecurityDashboard()),
   }),
   n8n: router({
     overview: protectedProcedure.input(z.object({ period: periodSchema.default("7d"), workflowIds: z.array(z.string()).default([]), inactiveHours: z.number().int().min(1).max(168).default(24) })).query(({ input }) => getN8nOverview(input.period, input.workflowIds, input.inactiveHours)),

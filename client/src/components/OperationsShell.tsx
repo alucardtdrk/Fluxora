@@ -35,6 +35,7 @@ const operationItems = [
   { label: "Execuções", path: "/executions", icon: Activity },
   { label: "Erros", path: "/errors", icon: AlertTriangle },
   { label: "Analytics", path: "/analytics", icon: BarChart3 },
+  { label: "Workspace Security", path: "/workspace-security", icon: ShieldCheck },
 ];
 
 const baseManagementItems = [
