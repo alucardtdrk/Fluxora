@@ -6,7 +6,7 @@ describe("Workspace security dashboard", () => {
     const dashboard = await createWorkspaceSecurityDashboard({
       listEvents: async () => [
         {
-          id: "event-high", source: "login", category: "authentication", type: "login_failure", severity: "high", title: "Falha de login", description: "Tentativa bloqueada", occurredAt: new Date("2026-09-17T10:00:00.000Z"), metadata: { token: "hidden" },
+          id: "event-high", externalId: "google-alert-123", source: "login", category: "authentication", type: "login_failure", severity: "high", title: "Falha de login", description: "Tentativa bloqueada", occurredAt: new Date("2026-09-17T10:00:00.000Z"), actor: "ana@example.com", target: "admin@example.com", ipAddress: "198.51.100.10", country: "BR", metadata: { token: "hidden" },
         },
         {
           id: "event-low", source: "drive", category: "data", type: "download", severity: "low", title: "Download", description: "Arquivo acessado", occurredAt: new Date("2026-09-17T09:00:00.000Z"), metadata: { path: "/confidential" },
@@ -17,7 +17,7 @@ describe("Workspace security dashboard", () => {
 
     expect(dashboard.summary).toEqual({ recentEvents: 2, highOrCriticalEvents: 1 });
     expect(dashboard.posture).toEqual({ suspendedUsers: 2, usersWithoutTwoStepVerification: 5 });
-    expect(dashboard.events[0]).toMatchObject({ id: "event-high", source: "login", severity: "high" });
+    expect(dashboard.events[0]).toMatchObject({ id: "event-high", externalId: "google-alert-123", source: "login", severity: "high", actor: "ana@example.com", target: "admin@example.com", ipAddress: "198.51.100.10", country: "BR" });
     expect(dashboard.events[0]).not.toHaveProperty("metadata");
   });
 

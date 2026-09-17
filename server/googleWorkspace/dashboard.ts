@@ -7,6 +7,7 @@ import type { SecuritySeverity, WorkspaceSecuritySource } from "./types.js";
 
 export interface WorkspaceDashboardEvent {
   readonly id: string;
+  readonly externalId?: string;
   readonly source: WorkspaceSecuritySource;
   readonly category: string;
   readonly type: string;
@@ -51,6 +52,7 @@ function dateValue(value: unknown): string {
 function dashboardEvent(record: FirestoreRecord): WorkspaceDashboardEvent {
   return {
     id: stringValue(record.id) ?? stringValue(record._documentId) ?? "",
+    externalId: stringValue(record.externalId),
     source: String(record.source || "alert_center") as WorkspaceSecuritySource,
     category: String(record.category || "workspace_security"),
     type: String(record.type || "unknown"),
@@ -93,7 +95,7 @@ export function createWorkspaceSecurityDashboard(dependencies: DashboardDependen
 
 async function listWorkspaceEvents(): Promise<readonly FirestoreRecord[]> {
   return runFirestoreQuery({
-    select: { fields: ["source", "category", "type", "severity", "title", "description", "occurredAt", "actor", "target", "ipAddress", "country"].map((fieldPath) => ({ fieldPath })) },
+    select: { fields: ["externalId", "source", "category", "type", "severity", "title", "description", "occurredAt", "actor", "target", "ipAddress", "country"].map((fieldPath) => ({ fieldPath })) },
     from: [{ collectionId: WORKSPACE_SECURITY_EVENTS_COLLECTION }],
     orderBy: [{ field: { fieldPath: "occurredAt" }, direction: "DESCENDING" }],
     limit: 250,
