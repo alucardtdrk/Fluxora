@@ -91,6 +91,17 @@ describe("Google Workspace repository", () => {
     });
   });
 
+  it("splits large batches while advancing the checkpoint only in the final write", async () => {
+    const adapter = new MemoryFirestoreAdapter();
+    const repository = createGoogleWorkspaceRepository(adapter);
+    const events = Array.from({ length: 500 }, (_value, index) => event({ id: `event-${index}`, externalId: `google-event-${index}` }));
+
+    await repository.saveSourceBatch({ source: "login", events, attemptedAt: "2026-09-16T10:09:00.000Z" });
+
+    expect(adapter.operations).toEqual(["commit", "commit"]);
+    expect(adapter.documents.get("fluxora_workspace_sync_state/login")).toMatchObject({ source: "login", lastError: null });
+  });
+
   it("does not advance the cursor when a batch write fails", async () => {
     const adapter = new MemoryFirestoreAdapter();
     adapter.documents.set("fluxora_workspace_sync_state/login", { cursor: "safe-cursor" });

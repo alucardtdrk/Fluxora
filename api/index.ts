@@ -13,7 +13,7 @@ import { syncN8nArchive } from "../server/n8n.js";
 import { archiveConfigured, getArchiveSyncState } from "../server/firestoreLogs.js";
 import { authorizeGoogleUser } from "../server/access.js";
 import { isInternalRequestAuthorized } from "../server/internalAuth.js";
-import { isInternalRequestAuthorized } from "../server/internalAuth.js";
+import { syncGoogleWorkspaceSecurity } from "../server/googleWorkspace/runtime.js";
 
 const app = express();
 app.set("trust proxy", 1);
@@ -24,7 +24,6 @@ app.use((req: any, _res: any, next: any) => {
   const health = current.searchParams.get("health");
   const authPath = current.searchParams.get("authPath");
   const syncN8n = current.searchParams.get("syncN8n");
-  const syncWorkspace = current.searchParams.get("syncWorkspace");
   const syncWorkspace = current.searchParams.get("syncWorkspace");
 
   if (trpcPath !== null) {
@@ -39,8 +38,6 @@ app.use((req: any, _res: any, next: any) => {
     req.url = `/api/auth/${authPath}${suffix ? `?${suffix}` : ""}`;
   } else if (syncN8n === "1") {
     req.url = "/api/internal/sync-n8n";
-  } else if (syncWorkspace === "1") {
-    req.url = "/api/internal/sync-google-workspace";
   } else if (syncWorkspace === "1") {
     req.url = "/api/internal/sync-google-workspace";
   }
@@ -81,16 +78,15 @@ app.all("/api/internal/sync-n8n", async (req: any, res: any) => {
 
 app.get("/api/internal/sync-google-workspace", async (req: any, res: any) => {
   if (!isInternalRequestAuthorized(req.headers)) return res.status(401).json({ ok: false, error: "unauthorized" });
-  const configured = ["GOOGLE_WORKSPACE_SERVICE_ACCOUNT_EMAIL", "GOOGLE_WORKSPACE_PRIVATE_KEY", "GOOGLE_WORKSPACE_ADMIN_EMAIL", "GOOGLE_WORKSPACE_CUSTOMER_ID", "GOOGLE_WORKSPACE_DOMAIN"].every((key) => Boolean(String(process.env[key] || "").trim()));
-  if (!configured) return res.status(503).json({ ok: false, error: "configuration_missing" });
-  return res.status(501).json({ ok: false, error: "sync_not_wired" });
-});
-
-app.get("/api/internal/sync-google-workspace", async (req: any, res: any) => {
-  if (!isInternalRequestAuthorized(req.headers)) return res.status(401).json({ ok: false, error: "unauthorized" });
-  const configured = ["GOOGLE_WORKSPACE_SERVICE_ACCOUNT_EMAIL", "GOOGLE_WORKSPACE_PRIVATE_KEY", "GOOGLE_WORKSPACE_ADMIN_EMAIL", "GOOGLE_WORKSPACE_CUSTOMER_ID", "GOOGLE_WORKSPACE_DOMAIN"].every((key) => Boolean(String(process.env[key] || "").trim()));
-  if (!configured) return res.status(503).json({ ok: false, error: "configuration_missing" });
-  return res.status(501).json({ ok: false, error: "sync_not_wired" });
+  try {
+    const summary = await syncGoogleWorkspaceSecurity();
+    const ok = summary.status === "success" || summary.status === "partial" || summary.status === "skipped_locked";
+    return res.status(ok ? 200 : 500).json({ ok, summary });
+  } catch (error) {
+    const configurationError = error instanceof Error && error.message.startsWith("Missing required Google Workspace configuration:");
+    console.error(JSON.stringify({ level: "error", message: "google_workspace_sync_failed", configurationError }));
+    return res.status(configurationError ? 503 : 500).json({ ok: false, error: configurationError ? "configuration_missing" : "sync_failed" });
+  }
 });
 
 function getBaseUrl(req: any) {

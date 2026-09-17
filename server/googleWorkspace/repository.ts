@@ -1,5 +1,6 @@
 import {
   commitFirestoreWrites,
+  getFirestoreDocument,
   mergeFirestoreDocument,
   type FirestoreRecord,
 } from "../firestore.js";
@@ -18,6 +19,7 @@ export interface WorkspaceFirestoreWrite {
 export interface WorkspaceFirestoreAdapter {
   commit(writes: readonly WorkspaceFirestoreWrite[]): Promise<void>;
   merge(collection: string, id: string, data: FirestoreRecord): Promise<void>;
+  get?(collection: string, id: string): Promise<FirestoreRecord | null>;
 }
 
 export interface SaveSourceBatchInput {
@@ -44,6 +46,9 @@ const defaultAdapter: WorkspaceFirestoreAdapter = {
   async merge(collection, id, data) {
     await mergeFirestoreDocument(collection, id, data);
   },
+  async get(collection, id) {
+    return getFirestoreDocument(collection, id);
+  },
 };
 
 export function createGoogleWorkspaceRepository(
@@ -51,6 +56,13 @@ export function createGoogleWorkspaceRepository(
   now: () => Date = () => new Date(),
 ) {
   return {
+    async getSourceState(source: WorkspaceSecuritySource): Promise<{ lastSuccessfulEventAt: Date | null }> {
+      const record = await adapter.get?.(WORKSPACE_SYNC_STATE_COLLECTION, source);
+      const value = record?.lastSuccessfulEventAt;
+      const date = value instanceof Date ? value : typeof value === "string" ? new Date(value) : null;
+      return { lastSuccessfulEventAt: date && Number.isFinite(date.getTime()) ? date : null };
+    },
+
     async saveSourceBatch(input: SaveSourceBatchInput): Promise<{ insertedOrUpdated: number }> {
       const ingestedAt = now();
       const eventWrites: WorkspaceFirestoreWrite[] = input.events.map((event) => ({
@@ -70,14 +82,20 @@ export function createGoogleWorkspaceRepository(
       };
 
       try {
-        await adapter.commit([
-          ...eventWrites,
-          {
-            collection: WORKSPACE_SYNC_STATE_COLLECTION,
-            id: input.source,
-            data: successfulState,
-          },
-        ]);
+        const batches = eventWrites.length
+          ? Array.from({ length: Math.ceil(eventWrites.length / 499) }, (_value, index) => eventWrites.slice(index * 499, (index + 1) * 499))
+          : [[]];
+        for (let index = 0; index < batches.length; index += 1) {
+          const isFinalBatch = index === batches.length - 1;
+          await adapter.commit([
+            ...batches[index]!,
+            ...(isFinalBatch ? [{
+              collection: WORKSPACE_SYNC_STATE_COLLECTION,
+              id: input.source,
+              data: successfulState,
+            }] : []),
+          ]);
+        }
       } catch (error) {
         await adapter.merge(WORKSPACE_SYNC_STATE_COLLECTION, input.source, {
           source: input.source,
