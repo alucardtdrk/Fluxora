@@ -67,9 +67,9 @@ describe("Google Workspace security runtime", () => {
 
     const result = await sync.run();
 
-    expect(backfills).toEqual([{ application: "login", start: new Date("2026-06-20T12:00:00.000Z"), end: new Date("2026-06-21T12:00:00.000Z") }]);
+    expect(backfills).toEqual([{ application: "login", start: new Date("2026-06-20T12:00:00.000Z"), end: new Date("2026-09-18T12:00:00.000Z") }]);
     expect(result.backfill).toMatchObject({ windowsProcessed: 1, targetDays: 90 });
-    expect(saved.at(-1)).toMatchObject({ source: "login", backfill: { coveredThrough: "2026-06-21T12:00:00.000Z" } });
+    expect(saved.at(-1)).toMatchObject({ source: "login", backfill: { coveredThrough: "2026-09-18T12:00:00.000Z" } });
   });
 
   it("continues historical coverage without running the full incremental sync first", async () => {
@@ -95,5 +95,28 @@ describe("Google Workspace security runtime", () => {
     expect(incrementalCollections).toBe(0);
     expect(result).toMatchObject({ windowsProcessed: 1, failedSources: [], targetDays: 90 });
     expect(saved).toHaveLength(1);
+  });
+
+  it("caps a manual cycle at 300 events while checkpointing each page", async () => {
+    const requestedPageSizes: number[] = [];
+    const sync = createGoogleWorkspaceSecuritySync({
+      config: { customerId: "customer", domain: "example.com" }, client: {} as never,
+      repository: {
+        getSourceState: async () => ({ lastSuccessfulEventAt: null, backfillTargetStart: null, backfillTargetEnd: null, backfillCoveredThrough: null, backfillPageToken: null }),
+        saveSourceBatch: async (input) => ({ insertedOrUpdated: input.events.length }),
+        saveDirectoryPosture: async () => undefined, listRecentEvents: async () => [], saveFindings: async () => ({ insertedOrUpdated: 0 }),
+      },
+      collectReportsBatch: async (input) => {
+        const count = input.pageSize ?? 250;
+        requestedPageSizes.push(count);
+        return { events: Array.from({ length: count }, (_, index) => ({ id: `${input.application}-${index}` })) as never, pagesRead: 1, nextPageToken: "next", truncated: true };
+      },
+      now: () => new Date("2026-09-18T12:00:00.000Z"),
+    });
+
+    const result = await sync.continueBackfill();
+
+    expect(requestedPageSizes).toEqual([250, 50]);
+    expect(result).toMatchObject({ eventsCollected: 300, requestsProcessed: 2 });
   });
 });

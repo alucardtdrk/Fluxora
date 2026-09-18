@@ -26,6 +26,7 @@ export interface CollectReportsEvidenceInput {
   readonly rangeEnd?: Date;
   readonly startPageToken?: string;
   readonly maxPages?: number;
+  readonly pageSize?: number;
 }
 
 export interface CollectedReportsEvidence {
@@ -54,7 +55,7 @@ export async function collectReportsEvidenceBatch(input: CollectReportsEvidenceI
   url.searchParams.set("customerId", input.customerId);
   url.searchParams.set("startTime", (input.rangeStart ?? startTime(input.lastSuccessfulEventAt, observedAt)).toISOString());
   url.searchParams.set("endTime", (input.rangeEnd ?? observedAt).toISOString());
-  url.searchParams.set("maxResults", "250");
+  url.searchParams.set("maxResults", String(Math.max(1, Math.min(250, input.pageSize ?? 250))));
 
   const events: WorkspaceSecurityEvent[] = [];
   let pagesRead = 0;

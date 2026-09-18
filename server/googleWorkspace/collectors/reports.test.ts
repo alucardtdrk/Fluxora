@@ -154,4 +154,12 @@ describe("Reports collector", () => {
     expect(result).toMatchObject({ pagesRead: 1, nextPageToken: "continue", truncated: true });
     expect(client.requestedUrls[0]).toContain("startTime=2026-06-20T00%3A00%3A00.000Z");
   });
+
+  it("limits the requested page size to the remaining event budget", async () => {
+    const client = new PageClient([{ items: [] }]);
+
+    await collectReportsEvidenceBatch({ client, application: "login", customerId: "customer", pageSize: 75, maxPages: 1 });
+
+    expect(client.requestedUrls[0]).toContain("maxResults=75");
+  });
 });

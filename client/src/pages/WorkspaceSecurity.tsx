@@ -56,7 +56,7 @@ export default function WorkspaceSecurity() {
     onSuccess: async (result) => {
       await dashboard.refetch();
       if (result.windowsProcessed > 0) {
-        toast.success("Lote histórico concluído", { description: `${result.windowsProcessed} janela${result.windowsProcessed === 1 ? "" : "s"} de auditoria avançada${result.windowsProcessed === 1 ? "" : "s"}.` });
+        toast.success("Lote histórico concluído", { description: `${result.eventsCollected.toLocaleString("pt-BR")} eventos coletados; ${result.sourcesCompleted} fonte${result.sourcesCompleted === 1 ? "" : "s"} concluída${result.sourcesCompleted === 1 ? "" : "s"}.` });
       } else {
         toast.warning("Nenhum lote conseguiu avançar", { description: result.failedSources.length ? "Algumas fontes do Google Workspace não responderam. Consulte os avisos nas fontes de auditoria." : "A cobertura disponível já foi processada." });
       }
