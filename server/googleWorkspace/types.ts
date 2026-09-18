@@ -14,6 +14,15 @@ export type WorkspaceSecurityMetadata = Readonly<Record<string, WorkspaceSecurit
   readonly [workspaceSecurityMetadataBrand]: true;
 };
 
+export interface WorkspaceSecuritySafeDetails {
+  readonly reporterEmail?: string;
+  readonly suspectedSender?: string;
+  readonly subject?: string;
+  readonly affectedUsers?: readonly string[];
+  readonly indicatorUrls?: readonly string[];
+  readonly attachmentNames?: readonly string[];
+}
+
 export interface SanitizedWorkspaceSecurityMetadata {
   readonly metadata: WorkspaceSecurityMetadata;
   readonly truncated: boolean;
@@ -82,7 +91,25 @@ export interface WorkspaceSecurityEvent {
   target?: string;
   ipAddress?: string;
   country?: string;
+  safeDetails?: WorkspaceSecuritySafeDetails;
   metadata: WorkspaceSecurityMetadata;
+}
+
+export type WorkspaceFindingRule = "distributed_login_failures" | "suspicious_login_then_oauth" | "admin_change_then_identity_risk" | "drive_activity_after_identity_risk" | "repeated_phishing_or_malware";
+
+export interface WorkspaceSecurityFinding {
+  readonly id: string;
+  readonly rule: WorkspaceFindingRule;
+  readonly severity: Extract<SecuritySeverity, "high" | "critical">;
+  readonly title: string;
+  readonly description: string;
+  readonly subjects: readonly string[];
+  readonly ipAddresses: readonly string[];
+  readonly eventIds: readonly string[];
+  readonly firstOccurredAt: Date;
+  readonly lastOccurredAt: Date;
+  readonly evidenceCount: number;
+  readonly expiresAt: Date;
 }
 
 export interface WorkspaceSyncCursor {

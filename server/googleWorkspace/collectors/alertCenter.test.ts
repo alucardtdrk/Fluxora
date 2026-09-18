@@ -140,6 +140,31 @@ describe("Alert Center normalizer", () => {
     });
   });
 
+  it("keeps only safe phishing details", () => {
+    const normalized = normalizeAlertCenterAlert({
+      ...phishingAlert,
+      data: {
+        "@type": "type.googleapis.com/google.apps.alertcenter.type.MailPhishing",
+        reporterEmail: "reporter@example.com",
+        maliciousEntity: { fromHeader: "attacker@example.net", subject: "Urgente" },
+        affectedUserEmails: ["employee@example.com"],
+        urls: ["https://phishing.example"],
+        attachments: ["invoice.zip"],
+        messageBody: "never persist this",
+      },
+    }, new Date("2026-09-16T10:10:00.000Z"));
+
+    expect(normalized?.safeDetails).toEqual({
+      reporterEmail: "reporter@example.com",
+      suspectedSender: "attacker@example.net",
+      subject: "Urgente",
+      affectedUsers: ["employee@example.com"],
+      indicatorUrls: ["https://phishing.example"],
+      attachmentNames: ["invoice.zip"],
+    });
+    expect(JSON.stringify(normalized)).not.toContain("never persist this");
+  });
+
   it("drops a superadministrator password reset event", () => {
     expect(isExcludedSuperadminPasswordReset(superadminPasswordResetAlert)).toBe(true);
     expect(normalizeAlertCenterAlert(superadminPasswordResetAlert, new Date("2026-09-16T10:10:00.000Z"))).toBeNull();

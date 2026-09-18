@@ -1,7 +1,9 @@
 import { getDetailedEvidenceExpiry, workspaceSecurityEventId } from "../config.js";
 import {
+  MAX_WORKSPACE_SECURITY_METADATA_STRING_CHARACTERS,
   sanitizeWorkspaceSecurityMetadata,
   type SecuritySeverity,
+  type WorkspaceSecuritySafeDetails,
   type WorkspaceSecurityEvent,
 } from "../types.js";
 
@@ -30,18 +32,40 @@ function firstText(value: unknown): string | undefined {
   return text(value);
 }
 
-function metadataValue(value: unknown): string | number | boolean | null | undefined {
-  if (value === null || typeof value === "string" || typeof value === "number" || typeof value === "boolean") {
-    return value;
-  }
-  if (Array.isArray(value) || (typeof value === "object" && value !== null)) {
-    try {
-      return JSON.stringify(value);
-    } catch {
-      return undefined;
-    }
-  }
-  return undefined;
+function boundedText(value: unknown): string | undefined {
+  const result = text(value);
+  return result ? Array.from(result).slice(0, MAX_WORKSPACE_SECURITY_METADATA_STRING_CHARACTERS).join("") : undefined;
+}
+
+function stringList(value: unknown): readonly string[] | undefined {
+  const values = Array.isArray(value) ? value : [value];
+  const safeValues = values
+    .map(boundedText)
+    .filter((item): item is string => Boolean(item))
+    .slice(0, 20);
+  return safeValues.length ? safeValues : undefined;
+}
+
+function recordValue(value: unknown): Readonly<Record<string, unknown>> | undefined {
+  return typeof value === "object" && value !== null && !Array.isArray(value)
+    ? value as Readonly<Record<string, unknown>>
+    : undefined;
+}
+
+function phishingSafeDetails(data: Readonly<Record<string, unknown>>): WorkspaceSecuritySafeDetails | undefined {
+  if (text(data["@type"]) !== "type.googleapis.com/google.apps.alertcenter.type.MailPhishing") return undefined;
+
+  const maliciousEntity = recordValue(data.maliciousEntity);
+  const details: WorkspaceSecuritySafeDetails = {
+    reporterEmail: boundedText(data.reporterEmail) ?? boundedText(data.reportedBy),
+    suspectedSender: boundedText(maliciousEntity?.fromHeader) ?? boundedText(data.senderEmail),
+    subject: boundedText(maliciousEntity?.subject) ?? boundedText(data.subject),
+    affectedUsers: stringList(data.affectedUserEmails),
+    indicatorUrls: stringList(data.urls),
+    attachmentNames: stringList(data.attachments),
+  };
+
+  return Object.values(details).some((value) => value !== undefined) ? details : undefined;
 }
 
 function severityFor(alert: GoogleAlertCenterAlert): SecuritySeverity {
@@ -97,11 +121,6 @@ export function normalizeAlertCenterAlert(
     dataType: text(data["@type"]),
   };
 
-  for (const [key, value] of Object.entries(data)) {
-    if (key === "@type") continue;
-    metadataInput[`data_${key}`] = metadataValue(value);
-  }
-
   return {
     id: workspaceSecurityEventId("alert_center", alert.alertId),
     externalId: alert.alertId,
@@ -118,6 +137,7 @@ export function normalizeAlertCenterAlert(
     target: firstText(data.affectedUserEmails) ?? text(data.targetEmail) ?? text(data.resourceName),
     ipAddress: text(data.ipAddress),
     country: text(data.country),
+    safeDetails: phishingSafeDetails(data),
     metadata: sanitizeWorkspaceSecurityMetadata(metadataInput).metadata,
   };
 }
