@@ -14,6 +14,15 @@ export type WorkspaceSecurityMetadata = Readonly<Record<string, WorkspaceSecurit
   readonly [workspaceSecurityMetadataBrand]: true;
 };
 
+export interface WorkspaceSecuritySafeDetails {
+  readonly reporterEmail?: string;
+  readonly suspectedSender?: string;
+  readonly subject?: string;
+  readonly affectedUsers?: readonly string[];
+  readonly indicatorUrls?: readonly string[];
+  readonly attachmentNames?: readonly string[];
+}
+
 export interface SanitizedWorkspaceSecurityMetadata {
   readonly metadata: WorkspaceSecurityMetadata;
   readonly truncated: boolean;
@@ -82,6 +91,7 @@ export interface WorkspaceSecurityEvent {
   target?: string;
   ipAddress?: string;
   country?: string;
+  safeDetails?: WorkspaceSecuritySafeDetails;
   metadata: WorkspaceSecurityMetadata;
 }
 
