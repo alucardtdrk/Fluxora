@@ -7,6 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/_core/hooks/useAuth";
+import { toast } from "sonner";
 
 const sourceLabels: Record<string, string> = {
   alert_center: "Alert Center",
@@ -51,7 +52,17 @@ function EventDetail({ label, value }: { label: string; value?: string }) {
 export default function WorkspaceSecurity() {
   const { user } = useAuth();
   const dashboard = trpc.workspaceSecurity.overview.useQuery(undefined, { retry: false, refetchInterval: 30_000 });
-  const continueBackfill = trpc.workspaceSecurity.continueBackfill.useMutation({ onSuccess: () => dashboard.refetch() });
+  const continueBackfill = trpc.workspaceSecurity.continueBackfill.useMutation({
+    onSuccess: async (result) => {
+      await dashboard.refetch();
+      if (result.windowsProcessed > 0) {
+        toast.success("Lote histórico concluído", { description: `${result.windowsProcessed} janela${result.windowsProcessed === 1 ? "" : "s"} de auditoria avançada${result.windowsProcessed === 1 ? "" : "s"}.` });
+      } else {
+        toast.warning("Nenhum lote conseguiu avançar", { description: result.failedSources.length ? "Algumas fontes do Google Workspace não responderam. Consulte os avisos nas fontes de auditoria." : "A cobertura disponível já foi processada." });
+      }
+    },
+    onError: (error) => toast.error("O histórico não avançou", { description: error.message || "Tente novamente em instantes." }),
+  });
   const [source, setSource] = useState("all");
   const [severity, setSeverity] = useState("all");
   const [period, setPeriod] = useState("90d");

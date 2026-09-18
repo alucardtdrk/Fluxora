@@ -71,4 +71,29 @@ describe("Google Workspace security runtime", () => {
     expect(result.backfill).toMatchObject({ windowsProcessed: 1, targetDays: 90 });
     expect(saved.at(-1)).toMatchObject({ source: "login", backfill: { coveredThrough: "2026-06-21T12:00:00.000Z" } });
   });
+
+  it("continues historical coverage without running the full incremental sync first", async () => {
+    let incrementalCollections = 0;
+    const saved: unknown[] = [];
+    const sync = createGoogleWorkspaceSecuritySync({
+      config: { customerId: "customer", domain: "example.com" }, client: {} as never,
+      repository: {
+        getSourceState: async () => ({ lastSuccessfulEventAt: null, backfillTargetStart: null, backfillTargetEnd: null, backfillCoveredThrough: null, backfillPageToken: null }),
+        saveSourceBatch: async (input) => { saved.push(input); return { insertedOrUpdated: input.events.length }; },
+        saveDirectoryPosture: async () => undefined, listRecentEvents: async () => [], saveFindings: async () => ({ insertedOrUpdated: 0 }),
+      },
+      collectAlertCenter: async () => { incrementalCollections += 1; return []; },
+      collectReports: async () => { incrementalCollections += 1; return []; },
+      collectDirectory: async () => { incrementalCollections += 1; return { capturedAt: new Date(), domain: "example.com" } as never; },
+      collectReportsBatch: async () => ({ events: [], pagesRead: 1, truncated: false }),
+      maxBackfillWindows: 1,
+      now: () => new Date("2026-09-18T12:00:00.000Z"),
+    });
+
+    const result = await sync.continueBackfill();
+
+    expect(incrementalCollections).toBe(0);
+    expect(result).toMatchObject({ windowsProcessed: 1, failedSources: [], targetDays: 90 });
+    expect(saved).toHaveLength(1);
+  });
 });
