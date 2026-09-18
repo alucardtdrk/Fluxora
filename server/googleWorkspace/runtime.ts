@@ -6,10 +6,11 @@ import { collectReportsEvidence } from "./collectors/reports.js";
 import { loadGoogleWorkspaceConfig, type GoogleWorkspaceConfig } from "./config.js";
 import { googleWorkspaceRepository } from "./repository.js";
 import { createWorkspaceSync } from "./sync.js";
+import { CORRELATION_WINDOW_MS, correlateWorkspaceSecurityEvents } from "./correlation.js";
 import type { WorkspaceSecurityEvent, WorkspaceSecuritySource } from "./types.js";
 
 type ReportApplication = "login" | "admin" | "token" | "drive";
-type Repository = Pick<typeof googleWorkspaceRepository, "getSourceState" | "saveSourceBatch" | "saveDirectoryPosture">;
+type Repository = Pick<typeof googleWorkspaceRepository, "getSourceState" | "saveSourceBatch" | "saveDirectoryPosture" | "listRecentEvents" | "saveFindings">;
 
 function latestEventAt(events: readonly WorkspaceSecurityEvent[]): string | undefined {
   const latest = events.reduce<Date | null>((current, event) =>
@@ -24,12 +25,14 @@ export function createGoogleWorkspaceSecuritySync(input: {
   readonly collectAlertCenter?: typeof collectAlertCenterEvidence;
   readonly collectReports?: typeof collectReportsEvidence;
   readonly collectDirectory?: typeof collectDirectoryPosture;
+  readonly correlate?: typeof correlateWorkspaceSecurityEvents;
   readonly now?: () => Date;
 }) {
   const now = input.now ?? (() => new Date());
   const collectAlerts = input.collectAlertCenter ?? collectAlertCenterEvidence;
   const collectReports = input.collectReports ?? collectReportsEvidence;
   const collectDirectory = input.collectDirectory ?? collectDirectoryPosture;
+  const correlate = input.correlate ?? correlateWorkspaceSecurityEvents;
 
   const eventSource = (source: WorkspaceSecuritySource, application?: ReportApplication) => ({
     name: source,
@@ -49,7 +52,7 @@ export function createGoogleWorkspaceSecuritySync(input: {
     },
   });
 
-  return createWorkspaceSync({
+  const sourceSync = createWorkspaceSync({
     now,
     sources: [
       eventSource("alert_center"),
@@ -67,6 +70,20 @@ export function createGoogleWorkspaceSecuritySync(input: {
       },
     ],
   });
+
+  return {
+    async run() {
+      const summary = await sourceSync.run();
+      try {
+        const events = await input.repository.listRecentEvents(new Date(now().getTime() - CORRELATION_WINDOW_MS));
+        const findings = correlate(events, now());
+        const saved = await input.repository.saveFindings(findings);
+        return { ...summary, findings: { generated: findings.length, persisted: saved.insertedOrUpdated } };
+      } catch {
+        return { ...summary, findings: { generated: 0, persisted: 0, safeError: "correlation" as const } };
+      }
+    },
+  };
 }
 
 export async function syncGoogleWorkspaceSecurity() {

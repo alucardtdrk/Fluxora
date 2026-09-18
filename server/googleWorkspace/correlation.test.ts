@@ -63,4 +63,15 @@ describe("Workspace security correlation", () => {
 
     expect(findings).toContainEqual(expect.objectContaining({ rule: "repeated_phishing_or_malware", subjects: ["ana@example.com"], evidenceCount: 3 }));
   });
+
+  it("correlates administration and Drive activity after an identity risk", () => {
+    const findings = correlateWorkspaceSecurityEvents([
+      event({ externalId: "risk", actor: "ana@example.com", source: "login", type: "login_success", severity: "high" }),
+      event({ externalId: "admin", actor: "ana@example.com", source: "admin", category: "administration", type: "assign_role", severity: "high", occurredAt: new Date("2026-09-17T11:10:00.000Z") }),
+      event({ externalId: "drive", actor: "ana@example.com", source: "drive", category: "data_protection", type: "change_user_access", severity: "high", occurredAt: new Date("2026-09-17T11:20:00.000Z") }),
+    ], observedAt);
+
+    expect(findings).toContainEqual(expect.objectContaining({ rule: "admin_change_then_identity_risk" }));
+    expect(findings).toContainEqual(expect.objectContaining({ rule: "drive_activity_after_identity_risk" }));
+  });
 });

@@ -2,11 +2,13 @@ import {
   commitFirestoreWrites,
   getFirestoreDocument,
   mergeFirestoreDocument,
+  runFirestoreQuery,
   type FirestoreRecord,
 } from "../firestore.js";
-import type { WorkspaceSecurityEvent, WorkspaceSecuritySource } from "./types.js";
+import type { WorkspaceSecurityEvent, WorkspaceSecurityFinding, WorkspaceSecuritySource } from "./types.js";
 
 export const WORKSPACE_SECURITY_EVENTS_COLLECTION = "fluxora_workspace_security_events";
+export const WORKSPACE_SECURITY_FINDINGS_COLLECTION = "fluxora_workspace_security_findings";
 export const WORKSPACE_SYNC_STATE_COLLECTION = "fluxora_workspace_sync_state";
 export const WORKSPACE_DIRECTORY_POSTURE_COLLECTION = "fluxora_workspace_directory_posture";
 
@@ -37,6 +39,15 @@ export interface DirectoryPostureSnapshot extends FirestoreRecord {
 
 function eventRecord(event: WorkspaceSecurityEvent, ingestedAt: Date): FirestoreRecord {
   return { ...event, ingestedAt };
+}
+
+function asRecentEvent(record: FirestoreRecord): WorkspaceSecurityEvent | null {
+  const toDate = (value: unknown) => value instanceof Date ? value : new Date(String(value || ""));
+  const occurredAt = toDate(record.occurredAt);
+  const observedAt = toDate(record.observedAt);
+  const expiresAt = toDate(record.expiresAt);
+  if (!Number.isFinite(occurredAt.getTime()) || !Number.isFinite(observedAt.getTime()) || !Number.isFinite(expiresAt.getTime())) return null;
+  return { ...record, occurredAt, observedAt, expiresAt } as WorkspaceSecurityEvent;
 }
 
 const defaultAdapter: WorkspaceFirestoreAdapter = {
@@ -115,6 +126,27 @@ export function createGoogleWorkspaceRepository(
         id,
         data,
       }]);
+    },
+
+    async saveFindings(findings: readonly WorkspaceSecurityFinding[]): Promise<{ insertedOrUpdated: number }> {
+      for (let offset = 0; offset < findings.length; offset += 499) {
+        await adapter.commit(findings.slice(offset, offset + 499).map((finding) => ({
+          collection: WORKSPACE_SECURITY_FINDINGS_COLLECTION,
+          id: finding.id,
+          data: { ...finding },
+        })));
+      }
+      return { insertedOrUpdated: findings.length };
+    },
+
+    async listRecentEvents(since: Date): Promise<readonly WorkspaceSecurityEvent[]> {
+      const records = await runFirestoreQuery({
+        from: [{ collectionId: WORKSPACE_SECURITY_EVENTS_COLLECTION }],
+        where: { fieldFilter: { field: { fieldPath: "occurredAt" }, op: "GREATER_THAN_OR_EQUAL", value: { timestampValue: since.toISOString() } } },
+        orderBy: [{ field: { fieldPath: "occurredAt" }, direction: "ASCENDING" }],
+        limit: 1000,
+      });
+      return records.map(asRecentEvent).filter((event): event is WorkspaceSecurityEvent => Boolean(event));
     },
   };
 }

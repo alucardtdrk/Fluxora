@@ -78,5 +78,35 @@ export function correlateWorkspaceSecurityEvents(events: readonly WorkspaceSecur
     });
   }
 
+  for (const actor of unique(recentEvents.map((event) => event.actor))) {
+    const actorEvents = recentEvents.filter((event) => event.actor === actor);
+    const identityRisk = actorEvents.find((event) => event.source === "login" && (event.severity === "high" || event.severity === "critical"));
+    if (!identityRisk) continue;
+
+    const adminEvent = actorEvents.find((event) => event.source === "admin" && (event.severity === "high" || event.severity === "critical") && event.occurredAt >= identityRisk.occurredAt);
+    if (adminEvent) {
+      const evidence = [identityRisk, adminEvent];
+      findings.push({
+        id: findingId("admin_change_then_identity_risk", actor, identityRisk.occurredAt), rule: "admin_change_then_identity_risk", severity: "high",
+        title: "Alteração administrativa após risco de identidade", description: "Uma alteração administrativa ocorreu após um sinal de risco para o mesmo usuário.",
+        subjects: [actor], ipAddresses: unique(evidence.map((event) => event.ipAddress)), eventIds: unique(evidence.map((event) => event.id)),
+        firstOccurredAt: identityRisk.occurredAt, lastOccurredAt: adminEvent.occurredAt, evidenceCount: 2,
+        expiresAt: new Date(Math.min(...evidence.map((event) => event.expiresAt.getTime()))),
+      });
+    }
+
+    const driveEvent = actorEvents.find((event) => event.source === "drive" && (event.severity === "high" || event.severity === "critical") && event.occurredAt >= identityRisk.occurredAt);
+    if (driveEvent) {
+      const evidence = [identityRisk, driveEvent];
+      findings.push({
+        id: findingId("drive_activity_after_identity_risk", actor, identityRisk.occurredAt), rule: "drive_activity_after_identity_risk", severity: "high",
+        title: "Atividade no Drive após risco de identidade", description: "Uma atividade sensível no Drive ocorreu após um sinal de risco para o mesmo usuário.",
+        subjects: [actor], ipAddresses: unique(evidence.map((event) => event.ipAddress)), eventIds: unique(evidence.map((event) => event.id)),
+        firstOccurredAt: identityRisk.occurredAt, lastOccurredAt: driveEvent.occurredAt, evidenceCount: 2,
+        expiresAt: new Date(Math.min(...evidence.map((event) => event.expiresAt.getTime()))),
+      });
+    }
+  }
+
   return findings;
 }

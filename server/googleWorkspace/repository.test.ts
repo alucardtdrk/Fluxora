@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { sanitizeWorkspaceSecurityMetadata, type WorkspaceSecurityEvent } from "./types.js";
+import { sanitizeWorkspaceSecurityMetadata, type WorkspaceSecurityEvent, type WorkspaceSecurityFinding } from "./types.js";
 import {
   createGoogleWorkspaceRepository,
+  WORKSPACE_SECURITY_FINDINGS_COLLECTION,
   type WorkspaceFirestoreAdapter,
   type WorkspaceFirestoreWrite,
 } from "./repository.js";
@@ -46,6 +47,15 @@ function event(overrides: Partial<WorkspaceSecurityEvent> = {}): WorkspaceSecuri
     actor: "admin@example.com",
     metadata: sanitizeWorkspaceSecurityMetadata({ method: "password" }).metadata,
     ...overrides,
+  };
+}
+
+function finding(): WorkspaceSecurityFinding {
+  return {
+    id: "finding-1", rule: "suspicious_login_then_oauth", severity: "high", title: "Risco", description: "Risco correlacionado",
+    subjects: ["admin@example.com"], ipAddresses: ["198.51.100.10"], eventIds: ["event-1"],
+    firstOccurredAt: new Date("2026-09-16T10:00:00.000Z"), lastOccurredAt: new Date("2026-09-16T10:10:00.000Z"), evidenceCount: 2,
+    expiresAt: new Date("2027-03-18T10:00:00.000Z"),
   };
 }
 
@@ -158,5 +168,17 @@ describe("Google Workspace repository", () => {
       lastError: "persistence",
     });
     expect(JSON.stringify(state)).not.toContain("secret-value");
+  });
+
+  it("upserts correlated findings separately from source events", async () => {
+    const adapter = new MemoryFirestoreAdapter();
+    const repository = createGoogleWorkspaceRepository(adapter);
+
+    await repository.saveFindings([finding()]);
+
+    expect(adapter.documents.get(`${WORKSPACE_SECURITY_FINDINGS_COLLECTION}/finding-1`)).toMatchObject({
+      rule: "suspicious_login_then_oauth",
+      eventIds: ["event-1"],
+    });
   });
 });

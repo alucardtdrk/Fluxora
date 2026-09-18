@@ -14,6 +14,8 @@ describe("Google Workspace security runtime", () => {
           return { insertedOrUpdated: input.events.length };
         },
         saveDirectoryPosture: async () => undefined,
+        listRecentEvents: async () => [],
+        saveFindings: async (findings) => ({ insertedOrUpdated: findings.length }),
       },
       collectAlertCenter: async () => [],
       collectReports: async (input) => [{ id: input.application, occurredAt: new Date("2026-09-17T10:00:00.000Z") }] as never,
