@@ -103,6 +103,18 @@ function databaseBase(projectId: string) {
   return `https://firestore.googleapis.com/v1/projects/${encodeURIComponent(projectId)}/databases/(default)/documents`;
 }
 
+export function normalizeFirestorePath(path: string) {
+  const segments = path.split("/");
+  if (!path || path.startsWith("/") || path.endsWith("/") || segments.some((segment) => !segment || segment === "." || segment === "..")) {
+    throw new Error("invalid Firestore path");
+  }
+  return segments.join("/");
+}
+
+function encodeFirestorePath(path: string) {
+  return normalizeFirestorePath(path).split("/").map(encodeURIComponent).join("/");
+}
+
 async function firestoreFetch(path: string, init?: RequestInit) {
   const config = getFirebaseConfig();
   if (!config) throw new Error("FIREBASE_NOT_CONFIGURED");
@@ -212,18 +224,25 @@ function decodeDocument(document: any): FirestoreRecord & { _documentId: string 
 }
 
 function resourceName(projectId: string, collection: string, id: string) {
-  return `projects/${projectId}/databases/(default)/documents/${collection}/${id}`;
+  return `projects/${projectId}/databases/(default)/documents/${encodeFirestorePath(collection)}/${encodeURIComponent(id)}`;
 }
 
 export async function getFirestoreDocument(collection: string, id: string) {
-  const response = await firestoreFetch(`/${encodeURIComponent(collection)}/${encodeURIComponent(id)}`);
+  const response = await firestoreFetch(`/${encodeFirestorePath(collection)}/${encodeURIComponent(id)}`);
   if (response.status === 404) return null;
   if (!response.ok) throw new Error(`FIRESTORE_GET_${response.status}:${await response.text()}`);
   return decodeDocument(await response.json());
 }
 
+export async function listFirestoreCollection(collection: string) {
+  const response = await firestoreFetch(`/${encodeFirestorePath(collection)}`);
+  if (!response.ok) throw new Error(`FIRESTORE_LIST_${response.status}:${await response.text()}`);
+  const json = await response.json() as { documents?: unknown[] };
+  return (json.documents ?? []).map(decodeDocument);
+}
+
 export async function setFirestoreDocument(collection: string, id: string, data: FirestoreRecord) {
-  const response = await firestoreFetch(`/${encodeURIComponent(collection)}/${encodeURIComponent(id)}`, {
+  const response = await firestoreFetch(`/${encodeFirestorePath(collection)}/${encodeURIComponent(id)}`, {
     method: "PATCH",
     body: JSON.stringify({ fields: encodeFields(data) }),
   });
@@ -237,7 +256,7 @@ export async function mergeFirestoreDocument(collection: string, id: string, dat
     .map((fieldPath) => `updateMask.fieldPaths=${encodeURIComponent(fieldPath)}`)
     .join("&");
   const suffix = updateMask ? `?${updateMask}` : "";
-  const response = await firestoreFetch(`/${encodeURIComponent(collection)}/${encodeURIComponent(id)}${suffix}`, {
+  const response = await firestoreFetch(`/${encodeFirestorePath(collection)}/${encodeURIComponent(id)}${suffix}`, {
     method: "PATCH",
     body: JSON.stringify({ fields }),
   });
@@ -305,7 +324,7 @@ export async function commitFirestoreDocuments(collection: string, documents: Ar
 
 
 export async function deleteFirestoreDocument(collection: string, id: string) {
-  const response = await firestoreFetch(`/${encodeURIComponent(collection)}/${encodeURIComponent(id)}`, { method: "DELETE" });
+  const response = await firestoreFetch(`/${encodeFirestorePath(collection)}/${encodeURIComponent(id)}`, { method: "DELETE" });
   if (response.status === 404) return { deleted: false };
   if (!response.ok) throw new Error(`FIRESTORE_DELETE_${response.status}:${await response.text()}`);
   return { deleted: true };
