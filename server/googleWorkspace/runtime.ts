@@ -85,33 +85,38 @@ export function createGoogleWorkspaceSecuritySync(input: {
     ],
   });
 
+  const continueBackfill = async () => {
+    const backfill = { windowsProcessed: 0, failedSources: [] as WorkspaceSecuritySource[], targetDays: WORKSPACE_BACKFILL_DAYS };
+    const deadline = Date.now() + 240_000;
+    const reportSources: ReadonlyArray<{ source: WorkspaceSecuritySource; application: ReportApplication }> = [
+      { source: "login", application: "login" }, { source: "admin", application: "admin" }, { source: "oauth_token", application: "token" }, { source: "drive", application: "drive" }, { source: "groups", application: "groups" }, { source: "mobile", application: "mobile" }, { source: "rules", application: "rules" }, { source: "gmail", application: "gmail" }, { source: "user_accounts", application: "user_accounts" }, { source: "saml", application: "saml" }, { source: "calendar", application: "calendar" }, { source: "chat", application: "chat" }, { source: "meet", application: "meet" },
+    ];
+    for (const item of reportSources) {
+      if (backfill.windowsProcessed >= (input.maxBackfillWindows ?? 4) || Date.now() >= deadline) break;
+      const state = await input.repository.getSourceState(item.source);
+      const targetEnd = state?.backfillTargetEnd ?? now();
+      const targetStart = state?.backfillTargetStart ?? new Date(targetEnd.getTime() - WORKSPACE_BACKFILL_DAYS * 24 * 60 * 60 * 1_000);
+      const window = planWorkspaceBackfillWindow({ targetStart, targetEnd, coveredThrough: state?.backfillCoveredThrough ?? undefined });
+      if (window.start >= targetEnd) continue;
+      try {
+        const collected = await collectReportsBatch({ client: input.client, application: item.application, customerId: input.config.customerId, rangeStart: window.start, rangeEnd: window.end, startPageToken: state?.backfillPageToken ?? undefined, maxPages: 2, now });
+        const saved = await input.repository.saveSourceBatch({ source: item.source, events: collected.events, attemptedAt: now().toISOString(), lastSuccessfulEventAt: state?.lastSuccessfulEventAt?.toISOString(), backfill: { targetStart: targetStart.toISOString(), targetEnd: targetEnd.toISOString(), coveredThrough: (collected.truncated ? window.start : window.end).toISOString(), pageToken: collected.nextPageToken } });
+        await input.repository.saveSourceDiagnostics?.(item.source, { status: collected.events.length ? "ok" : "empty", collected: collected.events.length, persisted: saved.insertedOrUpdated, completedAt: now().toISOString() });
+        backfill.windowsProcessed += 1;
+      } catch {
+        backfill.failedSources.push(item.source);
+        await input.repository.saveSourceDiagnostics?.(item.source, { status: "failure", collected: 0, persisted: 0, safeError: "unknown", completedAt: now().toISOString() });
+      }
+    }
+    return backfill;
+  };
+
   return {
+    continueBackfill,
     async run() {
       const summary = await sourceSync.run();
       await Promise.all(Object.entries(summary.sources).filter(([source]) => source !== "directory_posture").map(([source, status]) => input.repository.saveSourceDiagnostics?.(source as WorkspaceSecuritySource, { status: status.status, collected: status.collected, persisted: status.persisted, safeError: status.safeError, completedAt: summary.finishedAt })));
-      const backfill = { windowsProcessed: 0, targetDays: WORKSPACE_BACKFILL_DAYS };
-      if (input.enableBackfill) {
-        const deadline = Date.now() + 240_000;
-        const reportSources: ReadonlyArray<{ source: WorkspaceSecuritySource; application: ReportApplication }> = [
-          { source: "login", application: "login" }, { source: "admin", application: "admin" }, { source: "oauth_token", application: "token" }, { source: "drive", application: "drive" }, { source: "groups", application: "groups" }, { source: "mobile", application: "mobile" }, { source: "rules", application: "rules" }, { source: "gmail", application: "gmail" }, { source: "user_accounts", application: "user_accounts" }, { source: "saml", application: "saml" }, { source: "calendar", application: "calendar" }, { source: "chat", application: "chat" }, { source: "meet", application: "meet" },
-        ];
-        for (const item of reportSources) {
-          if (backfill.windowsProcessed >= (input.maxBackfillWindows ?? 4) || Date.now() >= deadline) break;
-          const state = await input.repository.getSourceState(item.source);
-          const targetEnd = state?.backfillTargetEnd ?? now();
-          const targetStart = state?.backfillTargetStart ?? new Date(targetEnd.getTime() - WORKSPACE_BACKFILL_DAYS * 24 * 60 * 60 * 1_000);
-          const window = planWorkspaceBackfillWindow({ targetStart, targetEnd, coveredThrough: state?.backfillCoveredThrough ?? undefined });
-          if (window.start >= targetEnd) continue;
-          try {
-            const collected = await collectReportsBatch({ client: input.client, application: item.application, customerId: input.config.customerId, rangeStart: window.start, rangeEnd: window.end, startPageToken: state?.backfillPageToken ?? undefined, maxPages: 2, now });
-            await input.repository.saveSourceBatch({ source: item.source, events: collected.events, attemptedAt: now().toISOString(), lastSuccessfulEventAt: state?.lastSuccessfulEventAt?.toISOString(), backfill: { targetStart: targetStart.toISOString(), targetEnd: targetEnd.toISOString(), coveredThrough: (collected.truncated ? window.start : window.end).toISOString(), pageToken: collected.nextPageToken } });
-            await input.repository.saveSourceDiagnostics?.(item.source, { status: collected.events.length ? "ok" : "empty", collected: collected.events.length, persisted: collected.events.length, completedAt: now().toISOString() });
-            backfill.windowsProcessed += 1;
-          } catch {
-            await input.repository.saveSourceDiagnostics?.(item.source, { status: "failure", collected: 0, persisted: 0, safeError: "unknown", completedAt: now().toISOString() });
-          }
-        }
-      }
+      const backfill = input.enableBackfill ? await continueBackfill() : { windowsProcessed: 0, failedSources: [], targetDays: WORKSPACE_BACKFILL_DAYS };
       try {
         const events = await input.repository.listRecentEvents(new Date(now().getTime() - CORRELATION_WINDOW_MS));
         const findings = correlate(events, now());
@@ -129,4 +134,11 @@ export async function syncGoogleWorkspaceSecurity() {
   const tokenProvider = createGoogleWorkspaceTokenProvider(config);
   const client = createGoogleWorkspaceClient(tokenProvider);
   return createGoogleWorkspaceSecuritySync({ config, client, repository: googleWorkspaceRepository, enableBackfill: true }).run();
+}
+
+export async function continueGoogleWorkspaceSecurityBackfill() {
+  const config = loadGoogleWorkspaceConfig();
+  const tokenProvider = createGoogleWorkspaceTokenProvider(config);
+  const client = createGoogleWorkspaceClient(tokenProvider);
+  return createGoogleWorkspaceSecuritySync({ config, client, repository: googleWorkspaceRepository }).continueBackfill();
 }

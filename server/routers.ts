@@ -9,7 +9,7 @@ import { getNotificationReadState, saveNotificationReadState } from "./notificat
 import { listWorkflowAlertRules, listWorkflowRunbooks, listWorkflowSlos, saveWorkflowAlertRule, saveWorkflowRunbook, saveWorkflowSlo, updateIncidentState } from "./observability.js";
 import { z } from "zod";
 import { listAuditEvents, recordAuditEventSafe, type AuditEventInput } from "./audit.js";
-import { syncGoogleWorkspaceSecurity } from "./googleWorkspace/runtime.js";
+import { continueGoogleWorkspaceSecurityBackfill, syncGoogleWorkspaceSecurity } from "./googleWorkspace/runtime.js";
 import { getWorkspaceSecurityDashboard } from "./googleWorkspace/dashboard.js";
 
 const periodSchema = z.enum(["today", "7d", "30d", "90d", "all"]);
@@ -42,7 +42,7 @@ export const appRouter = router({
   }),
   workspaceSecurity: router({
     overview: protectedProcedure.query(() => getWorkspaceSecurityDashboard()),
-    continueBackfill: adminProcedure.mutation(({ ctx }) => audited({ action: "google_workspace.backfill", category: "configuration", actor: ctx.user.email, actorRole: ctx.user.role, targetType: "google_workspace", summary: "Avançou o histórico de segurança do Google Workspace" }, () => syncGoogleWorkspaceSecurity())),
+    continueBackfill: adminProcedure.mutation(({ ctx }) => audited({ action: "google_workspace.backfill", category: "configuration", actor: ctx.user.email, actorRole: ctx.user.role, targetType: "google_workspace", summary: "Avançou o histórico de segurança do Google Workspace" }, () => continueGoogleWorkspaceSecurityBackfill())),
   }),
   n8n: router({
     overview: protectedProcedure.input(z.object({ period: periodSchema.default("7d"), workflowIds: z.array(z.string()).default([]), inactiveHours: z.number().int().min(1).max(168).default(24) })).query(({ input }) => getN8nOverview(input.period, input.workflowIds, input.inactiveHours)),
