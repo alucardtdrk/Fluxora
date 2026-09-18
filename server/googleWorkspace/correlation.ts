@@ -108,5 +108,18 @@ export function correlateWorkspaceSecurityEvents(events: readonly WorkspaceSecur
     }
   }
 
+  const singleSignalRules = [
+    { rule: "two_step_verification_disabled", matches: (event: WorkspaceSecurityEvent) => event.source === "login" && event.type.toLowerCase().includes("2sv_disable"), title: "Verificação em duas etapas desativada", description: "Uma conta teve a verificação em duas etapas desativada." },
+    { rule: "privilege_escalation", matches: (event: WorkspaceSecurityEvent) => event.source === "admin" && /assign.*role|role.*assign|privilege/.test(event.type.toLowerCase()), title: "Alteração de privilégio administrativo", description: "Uma função ou privilégio administrativo sensível foi alterado." },
+    { rule: "external_drive_sharing", matches: (event: WorkspaceSecurityEvent) => event.source === "drive" && /external|public/.test(`${event.type} ${JSON.stringify(event.metadata)}`.toLowerCase()), title: "Compartilhamento externo no Drive", description: "Um recurso do Drive foi exposto externamente ou publicamente." },
+    { rule: "high_severity_dlp", matches: (event: WorkspaceSecurityEvent) => event.source === "rules" && event.severity === "high", title: "Regra de proteção de dados acionada", description: "Uma regra de alta severidade foi acionada no Google Workspace." },
+  ] as const;
+  for (const definition of singleSignalRules) {
+    for (const signal of recentEvents.filter(definition.matches)) {
+      const subject = signal.actor ?? signal.target ?? "workspace";
+      findings.push({ id: findingId(definition.rule, subject, signal.occurredAt), rule: definition.rule, severity: signal.severity === "critical" ? "critical" : "high", title: definition.title, description: definition.description, subjects: subject === "workspace" ? [] : [subject], ipAddresses: unique([signal.ipAddress]), eventIds: [signal.id], firstOccurredAt: signal.occurredAt, lastOccurredAt: signal.occurredAt, evidenceCount: 1, expiresAt: signal.expiresAt });
+    }
+  }
+
   return findings;
 }

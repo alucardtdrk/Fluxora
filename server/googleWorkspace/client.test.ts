@@ -109,6 +109,27 @@ describe("Google Workspace GET-only client", () => {
     ]);
   });
 
+  it("starts from a saved token and stops at the page budget", async () => {
+    const fetcher = vi
+      .fn<typeof fetch>()
+      .mockResolvedValueOnce(new Response(JSON.stringify({ items: ["second"], nextPageToken: "third" }), { status: 200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ items: ["third"], nextPageToken: "fourth" }), { status: 200 }));
+    const observedTokens: Array<string | undefined> = [];
+    const client = createGoogleWorkspaceClient(tokenProvider(), { fetch: fetcher });
+
+    const pages = await collectPages(client.paginate<{ items: string[]; nextPageToken?: string }>(
+      new URL("https://admin.googleapis.com/admin/reports/v1/activity/users/all/apps/login"),
+      { startPageToken: "second", maxPages: 2, onPage: ({ nextPageToken }) => observedTokens.push(nextPageToken) },
+    ));
+
+    expect(pages).toHaveLength(2);
+    expect(observedTokens).toEqual(["third", "fourth"]);
+    expect(fetcher.mock.calls.map(([url]) => url)).toEqual([
+      "https://admin.googleapis.com/admin/reports/v1/activity/users/all/apps/login?pageToken=second",
+      "https://admin.googleapis.com/admin/reports/v1/activity/users/all/apps/login?pageToken=third",
+    ]);
+  });
+
   it("stops a repeated next-page token before it can request the same page again", async () => {
     const fetcher = vi
       .fn<typeof fetch>()

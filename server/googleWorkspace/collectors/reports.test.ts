@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import type { GoogleWorkspaceClient } from "../client.js";
-import { collectReportsEvidence } from "./reports.js";
+import type { GoogleWorkspaceClient, GoogleWorkspacePaginationOptions } from "../client.js";
+import { collectReportsEvidence, collectReportsEvidenceBatch } from "./reports.js";
 import {
   normalizeReportsActivity,
   type GoogleReportsActivity,
@@ -48,9 +48,12 @@ class PageClient implements GoogleWorkspaceClient {
     throw new Error("Reports collection must use pagination");
   }
 
-  async *paginate<T>(url: URL): AsyncIterable<T> {
+  async *paginate<T>(url: URL, options: GoogleWorkspacePaginationOptions = {}): AsyncIterable<T> {
     this.requestedUrls.push(url.toString());
-    for (const page of this.pages) yield page as T;
+    for (const [index, page] of this.pages.slice(0, options.maxPages).entries()) {
+      yield page as T;
+      options.onPage?.({ pageNumber: index + 1, nextPageToken: (page as { nextPageToken?: string }).nextPageToken });
+    }
   }
 }
 
@@ -68,7 +71,7 @@ describe("Reports collector", () => {
 
     expect(events).toHaveLength(2);
     expect(client.requestedUrls).toEqual([
-      "https://admin.googleapis.com/admin/reports/v1/activity/users/all/applications/login?customerId=C01234567&startTime=2026-09-17T11%3A55%3A00.000Z&endTime=2026-09-17T12%3A10%3A00.000Z&maxResults=1000",
+      "https://admin.googleapis.com/admin/reports/v1/activity/users/all/applications/login?customerId=C01234567&startTime=2026-09-17T11%3A55%3A00.000Z&endTime=2026-09-17T12%3A10%3A00.000Z&maxResults=250",
     ]);
   });
 
@@ -126,5 +129,29 @@ describe("Reports collector", () => {
       customerId: "C01234567",
       lastSuccessfulEventAt: new Date("2026-09-17T12:00:00.000Z"),
     })).rejects.toMatchObject({ status: 403 });
+  });
+
+  it("classifies high-value security events and routine activity", () => {
+    const now = new Date("2026-09-17T12:10:00.000Z");
+    const activity = (applicationName: string, name: string, parameters: GoogleReportsActivity["events"][number]["parameters"] = []): GoogleReportsActivity => ({
+      id: { time: "1789552800", uniqueQualifier: `${applicationName}-${name}`, applicationName },
+      actor: { email: "employee@example.com" },
+      events: [{ name, parameters }],
+    });
+
+    expect(normalizeReportsActivity("login", activity("login", "2sv_disable"), now)[0]?.severity).toBe("high");
+    expect(normalizeReportsActivity("rules", activity("rules", "rule_trigger", [{ name: "severity", value: "HIGH" }]), now)[0]?.severity).toBe("high");
+    expect(normalizeReportsActivity("drive", activity("drive", "change_user_access", [{ name: "visibility", value: "shared_externally" }]), now)[0]?.severity).toBe("high");
+    expect(normalizeReportsActivity("calendar", activity("calendar", "event_viewed"), now)[0]).toMatchObject({ source: "calendar", severity: "informational" });
+    expect(normalizeReportsActivity("gmail", activity("gmail", "email_log_search"), now)[0]).toMatchObject({ source: "gmail" });
+    expect(normalizeReportsActivity("saml", activity("saml", "login_success"), now)[0]).toMatchObject({ source: "saml", category: "identity" });
+  });
+
+  it("collects an explicit historical window with a page budget", async () => {
+    const client = new PageClient([{ items: [loginActivity], nextPageToken: "continue" }]);
+    const result = await collectReportsEvidenceBatch({ client, application: "login", customerId: "customer", rangeStart: new Date("2026-06-20T00:00:00Z"), rangeEnd: new Date("2026-06-21T00:00:00Z"), maxPages: 1 });
+
+    expect(result).toMatchObject({ pagesRead: 1, nextPageToken: "continue", truncated: true });
+    expect(client.requestedUrls[0]).toContain("startTime=2026-06-20T00%3A00%3A00.000Z");
   });
 });

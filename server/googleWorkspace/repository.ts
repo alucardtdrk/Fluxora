@@ -31,6 +31,15 @@ export interface SaveSourceBatchInput {
   readonly nextCursor?: string;
   readonly lastSuccessfulEventAt?: string;
   readonly attemptedAt: string;
+  readonly backfill?: { readonly targetStart: string; readonly targetEnd: string; readonly coveredThrough: string; readonly pageToken?: string };
+}
+
+export interface WorkspaceSourceState {
+  readonly lastSuccessfulEventAt: Date | null;
+  readonly backfillTargetStart: Date | null;
+  readonly backfillTargetEnd: Date | null;
+  readonly backfillCoveredThrough: Date | null;
+  readonly backfillPageToken: string | null;
 }
 
 export interface DirectoryPostureSnapshot extends FirestoreRecord {
@@ -68,11 +77,13 @@ export function createGoogleWorkspaceRepository(
   now: () => Date = () => new Date(),
 ) {
   return {
-    async getSourceState(source: WorkspaceSecuritySource): Promise<{ lastSuccessfulEventAt: Date | null }> {
+    async getSourceState(source: WorkspaceSecuritySource): Promise<WorkspaceSourceState> {
       const record = await adapter.get?.(WORKSPACE_SYNC_STATE_COLLECTION, source);
-      const value = record?.lastSuccessfulEventAt;
-      const date = value instanceof Date ? value : typeof value === "string" ? new Date(value) : null;
-      return { lastSuccessfulEventAt: date && Number.isFinite(date.getTime()) ? date : null };
+      const date = (value: unknown) => {
+        const parsed = value instanceof Date ? value : typeof value === "string" ? new Date(value) : null;
+        return parsed && Number.isFinite(parsed.getTime()) ? parsed : null;
+      };
+      return { lastSuccessfulEventAt: date(record?.lastSuccessfulEventAt), backfillTargetStart: date(record?.backfillTargetStart), backfillTargetEnd: date(record?.backfillTargetEnd), backfillCoveredThrough: date(record?.backfillCoveredThrough), backfillPageToken: typeof record?.backfillPageToken === "string" ? record.backfillPageToken : null };
     },
 
     async saveSourceBatch(input: SaveSourceBatchInput): Promise<{ insertedOrUpdated: number }> {
@@ -91,6 +102,7 @@ export function createGoogleWorkspaceRepository(
           ? new Date(input.lastSuccessfulEventAt)
           : null,
         lastError: null,
+        ...(input.backfill ? { backfillTargetStart: new Date(input.backfill.targetStart), backfillTargetEnd: new Date(input.backfill.targetEnd), backfillCoveredThrough: new Date(input.backfill.coveredThrough), backfillPageToken: input.backfill.pageToken ?? null } : {}),
       };
 
       try {

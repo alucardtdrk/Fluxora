@@ -29,7 +29,7 @@ describe("Directory posture collector", () => {
   it("paginates users and role assignments using only safe fields", async () => {
     const client = new PageClient({ users: [{ users: [], nextPageToken: "u2" }, { users: [] }], roles: [{ items: [] }], assignments: [{ items: [], nextPageToken: "a2" }, { items: [] }] });
     await collectDirectoryPosture({ client, customerId: "C01234567", domain: "example.com", capturedAt: new Date("2026-09-17T12:00:00Z") });
-    expect(client.urls[0]).toContain("fields=nextPageToken%2Cusers%28id%2Csuspended%2CisEnrolledIn2Sv%29");
+    expect(client.urls[0]).toContain("fields=nextPageToken%2Cusers%28id%2CprimaryEmail%2Cname%28fullName%29%2CorgUnitPath%2Csuspended%2CisEnrolledIn2Sv%29");
     expect(client.urls[2]).toContain("roleassignments");
     expect(client.urls.join(" ")).not.toContain("recovery");
   });
@@ -40,5 +40,14 @@ describe("Directory posture collector", () => {
     expect(JSON.stringify(posture)).not.toContain("secret@example.com");
     expect(JSON.stringify(posture)).not.toContain("9999999999");
     expect(JSON.stringify(posture)).not.toContain("accessToken");
+  });
+
+  it("returns bounded remediation details from allowlisted directory fields", async () => {
+    const client = new PageClient({ users: [{ users: [{ id: "u1", primaryEmail: "ana@example.com", name: { fullName: "Ana" }, orgUnitPath: "/Financeiro", suspended: false, isEnrolledIn2Sv: false }] }], roles: [{ items: [] }], assignments: [{ items: [] }] });
+    const posture = await collectDirectoryPosture({ client, customerId: "C01234567", domain: "example.com" });
+
+    expect(posture.withoutTwoStepVerificationUsers).toEqual([{ id: "u1", email: "ana@example.com", displayName: "Ana", orgUnitPath: "/Financeiro", suspended: false, twoStepEnrolled: false }]);
+    expect(client.urls[0]).toContain("primaryEmail");
+    expect(client.urls[0]).toContain("orgUnitPath");
   });
 });

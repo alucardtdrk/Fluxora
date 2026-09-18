@@ -29,7 +29,7 @@ describe("Google Workspace security runtime", () => {
       directory_posture: { status: "ok", collected: 1, persisted: 1 },
     }));
     expect(Object.values(summary.sources).map((source) => source.status)).toEqual([
-      "empty", "ok", "ok", "ok", "ok", "ok", "ok", "ok", "ok",
+      "empty", "ok", "ok", "ok", "ok", "ok", "ok", "ok", "ok", "ok", "ok", "ok", "ok", "ok", "ok",
     ]);
     expect(summary.status).toBe("success");
     expect(saved).toEqual([
@@ -41,6 +41,34 @@ describe("Google Workspace security runtime", () => {
       { source: "groups", count: 1 },
       { source: "mobile", count: 1 },
       { source: "rules", count: 1 },
+      { source: "gmail", count: 1 },
+      { source: "user_accounts", count: 1 },
+      { source: "saml", count: 1 },
+      { source: "calendar", count: 1 },
+      { source: "chat", count: 1 },
+      { source: "meet", count: 1 },
     ]);
+  });
+
+  it("advances one resumable historical window without rescanning 90 days", async () => {
+    const backfills: Array<{ start?: Date; end?: Date; application: string }> = [];
+    const saved: unknown[] = [];
+    const sync = createGoogleWorkspaceSecuritySync({
+      config: { customerId: "customer", domain: "example.com" }, client: {} as never,
+      repository: {
+        getSourceState: async () => ({ lastSuccessfulEventAt: null, backfillTargetStart: null, backfillTargetEnd: null, backfillCoveredThrough: null, backfillPageToken: null }),
+        saveSourceBatch: async (input) => { saved.push(input); return { insertedOrUpdated: input.events.length }; },
+        saveDirectoryPosture: async () => undefined, listRecentEvents: async () => [], saveFindings: async () => ({ insertedOrUpdated: 0 }),
+      },
+      collectAlertCenter: async () => [], collectReports: async () => [], collectDirectory: async () => ({ capturedAt: new Date(), domain: "example.com" }) as never,
+      collectReportsBatch: async (input) => { backfills.push({ start: input.rangeStart, end: input.rangeEnd, application: input.application }); return { events: [], pagesRead: 1, truncated: false }; },
+      enableBackfill: true, maxBackfillWindows: 1, now: () => new Date("2026-09-18T12:00:00.000Z"),
+    });
+
+    const result = await sync.run();
+
+    expect(backfills).toEqual([{ application: "login", start: new Date("2026-06-20T12:00:00.000Z"), end: new Date("2026-06-21T12:00:00.000Z") }]);
+    expect(result.backfill).toMatchObject({ windowsProcessed: 1, targetDays: 90 });
+    expect(saved.at(-1)).toMatchObject({ source: "login", backfill: { coveredThrough: "2026-06-21T12:00:00.000Z" } });
   });
 });

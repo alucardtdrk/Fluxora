@@ -29,6 +29,10 @@ class MemoryFirestoreAdapter implements WorkspaceFirestoreAdapter {
     const key = `${collection}/${id}`;
     this.documents.set(key, { ...this.documents.get(key), ...structuredClone(data) });
   }
+
+  async get(collection: string, id: string): Promise<Record<string, unknown> | null> {
+    return this.documents.get(`${collection}/${id}`) ?? null;
+  }
 }
 
 function event(overrides: Partial<WorkspaceSecurityEvent> = {}): WorkspaceSecurityEvent {
@@ -179,6 +183,27 @@ describe("Google Workspace repository", () => {
     expect(adapter.documents.get(`${WORKSPACE_SECURITY_FINDINGS_COLLECTION}/finding-1`)).toMatchObject({
       rule: "suspicious_login_then_oauth",
       eventIds: ["event-1"],
+    });
+  });
+
+  it("persists and restores resumable 90-day coverage", async () => {
+    const adapter = new MemoryFirestoreAdapter();
+    const repository = createGoogleWorkspaceRepository(adapter);
+    await repository.saveSourceBatch({
+      source: "login",
+      events: [],
+      attemptedAt: "2026-09-18T10:00:00.000Z",
+      backfill: {
+        targetStart: "2026-06-20T10:00:00.000Z",
+        targetEnd: "2026-09-18T10:00:00.000Z",
+        coveredThrough: "2026-06-21T10:00:00.000Z",
+      },
+    });
+
+    expect(await repository.getSourceState("login")).toMatchObject({
+      backfillTargetStart: new Date("2026-06-20T10:00:00.000Z"),
+      backfillTargetEnd: new Date("2026-09-18T10:00:00.000Z"),
+      backfillCoveredThrough: new Date("2026-06-21T10:00:00.000Z"),
     });
   });
 });
