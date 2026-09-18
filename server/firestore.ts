@@ -115,6 +115,17 @@ function encodeFirestorePath(path: string) {
   return normalizeFirestorePath(path).split("/").map(encodeURIComponent).join("/");
 }
 
+export function getFirestoreCollectionQueryPath(collection: string) {
+  const segments = normalizeFirestorePath(collection).split("/");
+  if (segments.length % 2 === 0) throw new Error("invalid Firestore collection path");
+  const collectionId = segments.at(-1)!;
+  const parent = segments.slice(0, -1).join("/");
+  return {
+    endpoint: parent ? `/${encodeFirestorePath(parent)}:runQuery` : ":runQuery",
+    collectionId,
+  };
+}
+
 async function firestoreFetch(path: string, init?: RequestInit) {
   const config = getFirebaseConfig();
   if (!config) throw new Error("FIREBASE_NOT_CONFIGURED");
@@ -346,9 +357,17 @@ export async function countFirestoreCollection(collection: string) {
   return Number(raw || 0);
 }
 export async function runFirestoreQuery(structuredQuery: FirestoreRecord) {
-  const response = await firestoreFetch(":runQuery", {
+  const from = Array.isArray(structuredQuery.from) ? structuredQuery.from : [];
+  const firstFrom = from[0] as FirestoreRecord | undefined;
+  const collection = typeof firstFrom?.collectionId === "string" ? firstFrom.collectionId : "";
+  const queryPath = getFirestoreCollectionQueryPath(collection);
+  const normalizedQuery = {
+    ...structuredQuery,
+    from: [{ ...firstFrom, collectionId: queryPath.collectionId }, ...from.slice(1)],
+  };
+  const response = await firestoreFetch(queryPath.endpoint, {
     method: "POST",
-    body: JSON.stringify({ structuredQuery }),
+    body: JSON.stringify({ structuredQuery: normalizedQuery }),
   });
   if (!response.ok) throw new Error(`FIRESTORE_QUERY_${response.status}:${await response.text()}`);
   const rows = await response.json() as any[];

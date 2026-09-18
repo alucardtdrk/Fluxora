@@ -1,5 +1,6 @@
 import { createHash } from "node:crypto";
 import { getFirestoreDocument, runFirestoreQuery, setFirestoreDocument, type FirestoreRecord } from "./firestore.js";
+import { getFluxoraCollectionPaths } from "./fluxoraFirestorePaths.js";
 
 export type IncidentStatus = "new" | "acknowledged" | "investigating" | "resolved";
 export type IncidentSeverity = "critical" | "high" | "medium" | "low";
@@ -54,10 +55,10 @@ export type WorkflowAlertRule = {
   updatedBy?: string;
 };
 
-const INCIDENT_COLLECTION = "fluxora_incidents";
-const SLO_COLLECTION = "fluxora_slos";
+const INCIDENT_COLLECTION = getFluxoraCollectionPaths("incidents").destination;
+const SLO_COLLECTION = getFluxoraCollectionPaths("slos").destination;
 const RUNBOOK_COLLECTION = "fluxora_runbooks";
-const ALERT_RULE_COLLECTION = "fluxora_alert_rules";
+const ALERT_RULE_COLLECTION = getFluxoraCollectionPaths("alertRules").destination;
 
 function documentId(value: string) {
   return createHash("sha256").update(value).digest("hex").slice(0, 40);

@@ -7,6 +7,7 @@ import {
   setFirestoreDocument,
   type FirestoreRecord,
 } from "./firestore.js";
+import { getFluxoraCollectionPaths } from "./fluxoraFirestorePaths.js";
 
 export type ArchivePeriod = "today" | "7d" | "30d" | "90d" | "all";
 
@@ -85,7 +86,7 @@ function logsCollection() {
   return String(process.env.FIRESTORE_N8N_LOGS_COLLECTION || "logs_n8n_automacoes").trim() || "logs_n8n_automacoes";
 }
 
-const SYSTEM_COLLECTION = "fluxora_system";
+const SYSTEM_COLLECTION = getFluxoraCollectionPaths("system").destination;
 const SYNC_DOCUMENT = "n8n_sync";
 
 function readLimit() {

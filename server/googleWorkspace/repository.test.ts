@@ -74,9 +74,9 @@ describe("Google Workspace repository", () => {
     await repository.saveSourceBatch(input);
 
     const storedEvents = [...adapter.documents.keys()].filter((key) =>
-      key.startsWith("fluxora_workspace_security_events/"),
+      key.startsWith("fluxora/data/workspace-security-events/"),
     );
-    expect(storedEvents).toEqual(["fluxora_workspace_security_events/event-1"]);
+    expect(storedEvents).toEqual(["fluxora/data/workspace-security-events/event-1"]);
   });
 
   it("writes an event batch before advancing its source cursor", async () => {
@@ -92,7 +92,7 @@ describe("Google Workspace repository", () => {
     });
 
     expect(adapter.operations).toEqual(["commit"]);
-    expect(adapter.documents.get("fluxora_workspace_sync_state/login")).toMatchObject({
+    expect(adapter.documents.get("fluxora/data/workspace-sync-state/login")).toMatchObject({
       cursor: "cursor-2",
       lastAttemptedAt: new Date("2026-09-16T10:09:00.000Z"),
       lastSucceededAt: new Date("2026-09-16T10:10:00.000Z"),
@@ -109,12 +109,12 @@ describe("Google Workspace repository", () => {
     await repository.saveSourceBatch({ source: "login", events, attemptedAt: "2026-09-16T10:09:00.000Z" });
 
     expect(adapter.operations).toEqual(["commit", "commit"]);
-    expect(adapter.documents.get("fluxora_workspace_sync_state/login")).toMatchObject({ source: "login", lastError: null });
+    expect(adapter.documents.get("fluxora/data/workspace-sync-state/login")).toMatchObject({ source: "login", lastError: null });
   });
 
   it("does not advance the cursor when a batch write fails", async () => {
     const adapter = new MemoryFirestoreAdapter();
-    adapter.documents.set("fluxora_workspace_sync_state/login", { cursor: "safe-cursor" });
+    adapter.documents.set("fluxora/data/workspace-sync-state/login", { cursor: "safe-cursor" });
     adapter.failNextCommit = true;
     const repository = createGoogleWorkspaceRepository(adapter);
 
@@ -125,11 +125,11 @@ describe("Google Workspace repository", () => {
       attemptedAt: "2026-09-16T10:09:00.000Z",
     })).rejects.toThrow("token secret-value was rejected");
 
-    expect(adapter.documents.get("fluxora_workspace_sync_state/login")).toMatchObject({
+    expect(adapter.documents.get("fluxora/data/workspace-sync-state/login")).toMatchObject({
       cursor: "safe-cursor",
       lastError: "persistence",
     });
-    expect(adapter.documents.has("fluxora_workspace_security_events/event-1")).toBe(false);
+    expect(adapter.documents.has("fluxora/data/workspace-security-events/event-1")).toBe(false);
   });
 
   it("stores directory posture separately from audit events", async () => {
@@ -144,10 +144,10 @@ describe("Google Workspace repository", () => {
       roles: { delegatedAdmins: 3 },
     });
 
-    expect(adapter.documents.get("fluxora_workspace_directory_posture/current")).toMatchObject({
+    expect(adapter.documents.get("fluxora/data/workspace-directory-posture/current")).toMatchObject({
       users: { total: 25, suspended: 2 },
     });
-    expect([...adapter.documents.keys()].some((key) => key.startsWith("fluxora_workspace_security_events/"))).toBe(false);
+    expect([...adapter.documents.keys()].some((key) => key.startsWith("fluxora/data/workspace-security-events/"))).toBe(false);
   });
 
   it("persists only a safe error summary in synchronization state", async () => {
@@ -161,7 +161,7 @@ describe("Google Workspace repository", () => {
       attemptedAt: "2026-09-16T10:09:00.000Z",
     })).rejects.toThrow();
 
-    const state = adapter.documents.get("fluxora_workspace_sync_state/login");
+    const state = adapter.documents.get("fluxora/data/workspace-sync-state/login");
     expect(state).toEqual({
       source: "login",
       lastAttemptedAt: new Date("2026-09-16T10:09:00.000Z"),
