@@ -11,6 +11,7 @@ import { z } from "zod";
 import { listAuditEvents, recordAuditEventSafe, type AuditEventInput } from "./audit.js";
 import { syncGoogleWorkspaceSecurity } from "./googleWorkspace/runtime.js";
 import { getWorkspaceSecurityDashboard } from "./googleWorkspace/dashboard.js";
+import { migrateAllFluxoraCollections } from "./fluxoraFirestoreMigration.js";
 
 const periodSchema = z.enum(["today", "7d", "30d", "90d", "all"]);
 const roleSchema = z.enum(["admin", "operator", "viewer"]);
@@ -88,6 +89,7 @@ export const appRouter = router({
     setUserActive: adminProcedure.input(z.object({ email: z.string().email(), active: z.boolean() })).mutation(({ input, ctx }) => audited({ action: "user.status", category: "access", actor: ctx.user.email, actorRole: ctx.user.role, targetType: "user", targetId: input.email, summary: `${input.active ? "Ativou" : "Bloqueou"} o acesso de ${input.email}`, after: { active: input.active } }, () => setFluxoraUserActive(input.email, input.active, ctx.user.email))),
     deleteUser: adminProcedure.input(z.object({ email: z.string().email() })).mutation(({ input, ctx }) => audited({ action: "user.delete", category: "access", actor: ctx.user.email, actorRole: ctx.user.role, targetType: "user", targetId: input.email, summary: `Removeu o acesso de ${input.email}` }, () => deleteFluxoraUser(input.email))),
     syncGoogleWorkspace: adminProcedure.mutation(({ ctx }) => audited({ action: "google_workspace.sync", category: "configuration", actor: ctx.user.email, actorRole: ctx.user.role, targetType: "google_workspace", summary: "Executou a sincronização de segurança do Google Workspace" }, () => syncGoogleWorkspaceSecurity())),
+    migrateFluxoraFirestore: adminProcedure.mutation(({ ctx }) => audited({ action: "fluxora.firestore_migrate", category: "configuration", actor: ctx.user.email, actorRole: ctx.user.role, targetType: "fluxora_firestore", summary: "Migrou somente as coleções autorizadas do Fluxora" }, () => migrateAllFluxoraCollections())),
     systemStatus: adminProcedure.query(async () => {
       const archive = await getArchiveDiagnostics().catch((error) => ({ configured: archiveConfigured(), totalArchived: 0, state: { lastError: error instanceof Error ? error.message : String(error) } as ArchiveSyncState }));
       const workspaceConfigured = ["GOOGLE_WORKSPACE_SERVICE_ACCOUNT_EMAIL", "GOOGLE_WORKSPACE_PRIVATE_KEY", "GOOGLE_WORKSPACE_ADMIN_EMAIL", "GOOGLE_WORKSPACE_CUSTOMER_ID", "GOOGLE_WORKSPACE_DOMAIN"].every((key) => Boolean(String(process.env[key] || "").trim()));

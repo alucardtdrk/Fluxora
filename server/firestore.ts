@@ -234,6 +234,13 @@ export async function getFirestoreDocument(collection: string, id: string) {
   return decodeDocument(await response.json());
 }
 
+export async function listFirestoreCollection(collection: string) {
+  const response = await firestoreFetch(`/${encodeFirestorePath(collection)}`);
+  if (!response.ok) throw new Error(`FIRESTORE_LIST_${response.status}:${await response.text()}`);
+  const json = await response.json() as { documents?: unknown[] };
+  return (json.documents ?? []).map(decodeDocument);
+}
+
 export async function setFirestoreDocument(collection: string, id: string, data: FirestoreRecord) {
   const response = await firestoreFetch(`/${encodeFirestorePath(collection)}/${encodeURIComponent(id)}`, {
     method: "PATCH",

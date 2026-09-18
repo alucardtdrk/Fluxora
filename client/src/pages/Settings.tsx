@@ -35,6 +35,7 @@ export default function Settings() {
 
   const sync = trpc.n8n.syncArchive.useMutation();
   const syncWorkspace = trpc.admin.syncGoogleWorkspace.useMutation();
+  const migrateFluxoraFirestore = trpc.admin.migrateFluxoraFirestore.useMutation();
   const preserveDetails = trpc.n8n.preserveExecutionDetails.useMutation();
   const testN8n = trpc.admin.testN8n.useQuery(undefined, { enabled: false, retry: false });
   const testFirestore = trpc.admin.testFirestore.useQuery(undefined, { enabled: false, retry: false });
@@ -128,6 +129,16 @@ export default function Settings() {
       toast.success(result.status === "partial" ? "Sincronização parcial concluída" : "Google Workspace sincronizado", { description: `${total.toLocaleString("pt-BR")} registros foram atualizados.` });
     } catch (error) {
       toast.error("A sincronização do Google Workspace falhou", { description: error instanceof Error ? error.message : "Revise a configuração e tente novamente." });
+    }
+  };
+
+  const migrateFluxoraData = async () => {
+    try {
+      const result = await migrateFluxoraFirestore.mutateAsync();
+      const complete = result.collections.filter((collection) => collection.status === "complete").length;
+      toast.success("Migração do Fluxora concluída", { description: `${complete}/${result.collections.length} coleções verificadas sem divergências.` });
+    } catch (error) {
+      toast.error("A migração do Fluxora falhou", { description: error instanceof Error ? error.message : "Nenhum dado foi removido." });
     }
   };
 
@@ -244,6 +255,7 @@ export default function Settings() {
         <Card className="border-0"><CardHeader><CardTitle className="flex items-center gap-2 text-base"><Users className="h-4 w-4" />Controle de acesso</CardTitle></CardHeader><CardContent><p className="text-sm text-[#667085]">Gerencie usuários, bloqueios e perfis em uma área administrativa dedicada.</p><Link href="/users"><Button className="mt-5 bg-[#4355D8] hover:bg-[#3546C7]">Gerenciar usuários</Button></Link></CardContent></Card>
         <Card className="border-0 lg:col-span-2"><CardHeader><CardTitle className="text-base">Manutenção</CardTitle></CardHeader><CardContent className="flex flex-wrap gap-3"><Button variant="outline" onClick={clearLocalCache}>Limpar cache local</Button><Button variant="outline" onClick={() => overview.refetch()}>Atualizar conexão n8n</Button><Button variant="outline" onClick={() => system.refetch()}>Atualizar status do histórico</Button></CardContent></Card>
         {user?.role === "admin" && <Card className="border-0 lg:col-span-2"><CardHeader><CardTitle className="text-base">Google Workspace Security</CardTitle></CardHeader><CardContent className="flex flex-wrap items-center gap-3"><p className="text-sm text-[#667085]">Execute uma coleta imediata de alertas, auditoria e postura do domínio.</p><Button variant="outline" disabled={!system.data?.googleWorkspaceSecurity?.configured || syncWorkspace.isPending} onClick={() => void synchronizeGoogleWorkspace()}>{syncWorkspace.isPending ? "Sincronizando..." : "Sincronizar agora"}</Button></CardContent></Card>}
+        {user?.role === "admin" && <Card className="border-0 lg:col-span-2"><CardHeader><CardTitle className="text-base">Organização do Firestore</CardTitle></CardHeader><CardContent className="flex flex-wrap items-center gap-3"><p className="text-sm text-[#667085]">Copia somente as coleções autorizadas do Fluxora para a estrutura organizada, sem remover os dados atuais.</p><Button variant="outline" disabled={migrateFluxoraFirestore.isPending || !system.data?.firestoreConfigured} onClick={() => void migrateFluxoraData()}>{migrateFluxoraFirestore.isPending ? "Migrando..." : "Migrar dados do Fluxora"}</Button></CardContent></Card>}
       </TabsContent>
     </Tabs>
   </div></OperationsShell>;
