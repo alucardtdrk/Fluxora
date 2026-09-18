@@ -1,4 +1,4 @@
-export type WorkspaceSecuritySource = "alert_center" | "login" | "admin" | "oauth_token" | "drive";
+export type WorkspaceSecuritySource = "alert_center" | "login" | "admin" | "oauth_token" | "drive" | "groups" | "mobile" | "rules";
 
 export type SecuritySeverity = "critical" | "high" | "medium" | "low" | "informational";
 

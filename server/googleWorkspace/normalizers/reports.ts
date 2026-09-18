@@ -8,7 +8,7 @@ import {
   type WorkspaceSecuritySource,
 } from "../types.js";
 
-export type ReportsApplicationName = "login" | "admin" | "token" | "drive";
+export type ReportsApplicationName = "login" | "admin" | "token" | "drive" | "groups" | "mobile" | "rules";
 
 export interface GoogleReportsParameter {
   readonly name: string;
@@ -83,6 +83,9 @@ function categoryFor(application: ReportsApplicationName): string {
   if (application === "login") return "identity";
   if (application === "token") return "oauth";
   if (application === "drive") return "data_protection";
+  if (application === "groups") return "identity";
+  if (application === "mobile") return "device_security";
+  if (application === "rules") return "security_policy";
   return "administration";
 }
 

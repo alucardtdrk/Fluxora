@@ -3,6 +3,7 @@ import {
   WORKSPACE_DIRECTORY_POSTURE_COLLECTION,
   WORKSPACE_SECURITY_FINDINGS_COLLECTION,
   WORKSPACE_SECURITY_EVENTS_COLLECTION,
+  WORKSPACE_SYNC_STATE_COLLECTION,
 } from "./repository.js";
 import type { SecuritySeverity, WorkspaceSecuritySource } from "./types.js";
 
@@ -27,6 +28,7 @@ export interface WorkspaceSecurityDashboard {
   readonly findings: readonly WorkspaceDashboardFinding[];
   readonly summary: { readonly recentEvents: number; readonly highOrCriticalEvents: number; readonly openFindings: number };
   readonly posture: { readonly suspendedUsers: number; readonly usersWithoutTwoStepVerification: number } | null;
+  readonly sources: readonly { readonly source: string; readonly status: string; readonly collected: number; readonly persisted: number; readonly completedAt?: string; readonly safeError?: string }[];
 }
 
 export interface WorkspaceDashboardFinding {
@@ -47,6 +49,7 @@ type DashboardDependencies = {
   readonly listEvents: () => Promise<readonly FirestoreRecord[]>;
   readonly listFindings: () => Promise<readonly FirestoreRecord[]>;
   readonly getPosture: () => Promise<FirestoreRecord | null>;
+  readonly listSources?: () => Promise<readonly FirestoreRecord[]>;
 };
 
 const EMPTY_DASHBOARD: WorkspaceSecurityDashboard = {
@@ -54,6 +57,7 @@ const EMPTY_DASHBOARD: WorkspaceSecurityDashboard = {
   findings: [],
   summary: { recentEvents: 0, highOrCriticalEvents: 0, openFindings: 0 },
   posture: null,
+  sources: [],
 };
 
 function stringValue(value: unknown): string | undefined {
@@ -107,7 +111,7 @@ function dashboardPosture(record: FirestoreRecord | null): WorkspaceSecurityDash
 export function createWorkspaceSecurityDashboard(dependencies: DashboardDependencies) {
   return {
     async load(): Promise<WorkspaceSecurityDashboard> {
-      const [records, findingRecords, posture] = await Promise.all([dependencies.listEvents(), dependencies.listFindings(), dependencies.getPosture()]);
+      const [records, findingRecords, posture, sourceRecords] = await Promise.all([dependencies.listEvents(), dependencies.listFindings(), dependencies.getPosture(), dependencies.listSources?.() ?? []]);
       const events = records.map(dashboardEvent).filter((event) => Boolean(event.id));
       const findings = findingRecords.map(dashboardFinding).filter((finding): finding is WorkspaceDashboardFinding => Boolean(finding));
       return {
@@ -119,9 +123,14 @@ export function createWorkspaceSecurityDashboard(dependencies: DashboardDependen
           openFindings: findings.length,
         },
         posture: dashboardPosture(posture),
+        sources: sourceRecords.map((record) => ({ source: String(record.source || record._documentId || "unknown"), status: String(record.lastStatus || "unknown"), collected: Number(record.lastCollected || 0), persisted: Number(record.lastPersisted || 0), completedAt: record.lastCompletedAt ? dateValue(record.lastCompletedAt) : undefined, safeError: stringValue(record.lastSafeError) })),
       };
     },
   };
+}
+
+async function listWorkspaceSourceStates(): Promise<readonly FirestoreRecord[]> {
+  return runFirestoreQuery({ from: [{ collectionId: WORKSPACE_SYNC_STATE_COLLECTION }], limit: 20 });
 }
 
 async function listWorkspaceFindings(): Promise<readonly FirestoreRecord[]> {
@@ -143,5 +152,6 @@ export async function getWorkspaceSecurityDashboard(): Promise<WorkspaceSecurity
     listEvents: listWorkspaceEvents,
     listFindings: listWorkspaceFindings,
     getPosture: () => getFirestoreDocument(WORKSPACE_DIRECTORY_POSTURE_COLLECTION, "current"),
+    listSources: listWorkspaceSourceStates,
   }).load();
 }

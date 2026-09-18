@@ -12,6 +12,9 @@ const sourceLabels: Record<string, string> = {
   admin: "Administração",
   oauth_token: "OAuth",
   drive: "Drive",
+  groups: "Grupos",
+  mobile: "Dispositivos",
+  rules: "Regras",
 };
 
 const severityLabels: Record<string, string> = {
@@ -47,6 +50,7 @@ export default function WorkspaceSecurity() {
   const summary = dashboard.data?.summary ?? { recentEvents: 0, highOrCriticalEvents: 0 };
   const posture = dashboard.data?.posture;
   const findings = dashboard.data?.findings ?? [];
+  const sources = dashboard.data?.sources ?? [];
   const [selectedEvent, setSelectedEvent] = useState<(typeof events)[number] | null>(null);
 
   return <OperationsShell><div className="mx-auto max-w-[1180px] px-5 py-8 md:px-9">
@@ -60,6 +64,8 @@ export default function WorkspaceSecurity() {
       <MetricCard icon={AlertTriangle} label="Sem 2SV" value={posture?.usersWithoutTwoStepVerification ?? 0} description="Usuários sem verificação em duas etapas." />
       <MetricCard icon={UserRoundX} label="Usuários suspensos" value={posture?.suspendedUsers ?? 0} description="Contas suspensas no diretório." />
     </div>
+
+    <Card className="mt-6 border-0"><CardHeader><CardTitle className="text-base">Fontes de auditoria</CardTitle></CardHeader><CardContent>{sources.length === 0 ? <p className="text-sm text-[#667085]">Execute uma sincronização para registrar as fontes.</p> : <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">{sources.map((item) => <div key={item.source} className="rounded-xl border p-3"><p className="font-medium">{sourceLabels[item.source] ?? item.source}</p><p className="mt-1 text-xs text-[#667085]">{item.status === "ok" ? "Ativa" : item.status === "empty" ? "Sem eventos" : item.status === "failure" ? "Requer atenção" : "Aguardando"} · {item.persisted} registros</p>{item.safeError === "permission" && <p className="mt-1 text-xs text-[#bd6338]">Revise a delegação de domínio.</p>}</div>)}</div>}</CardContent></Card>
 
     <Card className="mt-6 border-0"><CardHeader><CardTitle className="text-base">Requer atenção</CardTitle><p className="mt-1 text-xs text-[#667085]">Achados correlacionados a partir de sinais do Google Workspace.</p></CardHeader><CardContent>
       {findings.length === 0 ? <p className="py-3 text-sm text-[#667085]">Nenhum achado correlacionado no período.</p> : <div className="space-y-3">{findings.map((finding) => <div key={finding.id} className="rounded-xl border border-[#ececf3] p-4"><div className="flex flex-wrap items-center gap-2"><span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${severityClass(finding.severity)}`}>{severityLabels[finding.severity] ?? finding.severity}</span><p className="font-medium">{finding.title}</p></div><p className="mt-2 text-sm text-[#667085]">{finding.description}</p><p className="mt-3 text-xs text-[#667085]">{finding.evidenceCount} evidências · {finding.subjects.join(", ") || "Usuário não disponibilizado pelo Google"}</p></div>)}</div>}
