@@ -6,10 +6,10 @@ const FLUXORA_COLLECTION_PATHS = {
   notificationState: { legacy: "fluxora_notification_state", destination: "fluxora/data/notification-state" },
   slos: { legacy: "fluxora_slos", destination: "fluxora/data/slos" },
   system: { legacy: "fluxora_system", destination: "fluxora/data/system" },
-  workspaceDirectoryPosture: { legacy: "fluxora_workspace_directory_posture", destination: "fluxora/data/workspace/directory-posture" },
-  workspaceSecurityEvents: { legacy: "fluxora_workspace_security_events", destination: "fluxora/data/workspace/security-events" },
-  workspaceSecurityFindings: { legacy: "fluxora_workspace_security_findings", destination: "fluxora/data/workspace/security-findings" },
-  workspaceSyncState: { legacy: "fluxora_workspace_sync_state", destination: "fluxora/data/workspace/sync-state" },
+  workspaceDirectoryPosture: { legacy: "fluxora_workspace_directory_posture", destination: "fluxora/data/workspace-directory-posture" },
+  workspaceSecurityEvents: { legacy: "fluxora_workspace_security_events", destination: "fluxora/data/workspace-security-events" },
+  workspaceSecurityFindings: { legacy: "fluxora_workspace_security_findings", destination: "fluxora/data/workspace-security-findings" },
+  workspaceSyncState: { legacy: "fluxora_workspace_sync_state", destination: "fluxora/data/workspace-sync-state" },
 } as const;
 
 export type FluxoraCollectionKey = keyof typeof FLUXORA_COLLECTION_PATHS;
