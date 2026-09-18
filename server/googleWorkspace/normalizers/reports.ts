@@ -8,7 +8,7 @@ import {
   type WorkspaceSecuritySource,
 } from "../types.js";
 
-export type ReportsApplicationName = "login" | "admin" | "token" | "drive" | "groups" | "mobile" | "rules";
+export type ReportsApplicationName = "login" | "admin" | "token" | "drive" | "groups" | "mobile" | "rules" | "gmail" | "user_accounts" | "saml" | "calendar" | "chat" | "meet";
 
 export interface GoogleReportsParameter {
   readonly name: string;
@@ -71,12 +71,17 @@ function parameterMetadata(parameters: readonly GoogleReportsParameter[] | undef
 
 function severityFor(application: ReportsApplicationName, eventName: string, parameters: Record<string, unknown>): SecuritySeverity {
   const name = eventName.toLowerCase();
+  const severity = String(parameters.severity ?? "").toLowerCase();
+  const visibility = String(parameters.visibility ?? "").toLowerCase();
+  if (name.includes("account_takeover") || name.includes("leaked_password") || severity === "critical") return "critical";
+  if (application === "login" && (name.includes("2sv_disable") || name.includes("2_step_verification_disable"))) return "high";
   if (application === "login" && (parameters.is_suspicious === true || name.includes("suspicious"))) return "high";
   if (application === "login" && name.includes("failure")) return "medium";
   if (application === "token" && (name.includes("authorize") || name.includes("suspicious"))) return "high";
-  if (application === "drive" && (name.includes("access") || name.includes("share") || name.includes("download"))) return "high";
+  if (application === "drive" && (visibility.includes("external") || visibility.includes("public") || name.includes("external_share"))) return "high";
   if (application === "admin" && (name.includes("role") || name.includes("security") || name.includes("config"))) return "high";
-  return "medium";
+  if (application === "rules" && (severity === "high" || name.includes("dlp"))) return "high";
+  return "informational";
 }
 
 function categoryFor(application: ReportsApplicationName): string {
@@ -84,6 +89,9 @@ function categoryFor(application: ReportsApplicationName): string {
   if (application === "token") return "oauth";
   if (application === "drive") return "data_protection";
   if (application === "groups") return "identity";
+  if (application === "user_accounts" || application === "saml") return "identity";
+  if (application === "gmail") return "email_security";
+  if (application === "calendar" || application === "chat" || application === "meet") return "collaboration";
   if (application === "mobile") return "device_security";
   if (application === "rules") return "security_policy";
   return "administration";

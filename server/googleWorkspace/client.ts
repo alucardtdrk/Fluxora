@@ -33,6 +33,9 @@ export interface GoogleWorkspaceClientDependencies {
 
 export interface GoogleWorkspacePaginationOptions {
   readonly pageTokenQueryKey?: string;
+  readonly startPageToken?: string;
+  readonly maxPages?: number;
+  readonly onPage?: (page: { readonly pageNumber: number; readonly nextPageToken?: string }) => void;
 }
 
 class ReadOnlyGoogleWorkspaceClient implements GoogleWorkspaceClient {
@@ -107,13 +110,19 @@ class ReadOnlyGoogleWorkspaceClient implements GoogleWorkspaceClient {
     const pageUrl = new URL(url.toString());
     const pageTokenQueryKey = options.pageTokenQueryKey ?? "pageToken";
     const seenPageTokens = new Set<string>();
+    const maxPages = Math.max(1, options.maxPages ?? Number.MAX_SAFE_INTEGER);
+    let pageNumber = 0;
+    if (options.startPageToken) pageUrl.searchParams.set(pageTokenQueryKey, options.startPageToken);
 
-    while (true) {
+    while (pageNumber < maxPages) {
       const { payload: page, status } = await this.requestJson<T>(pageUrl);
+      pageNumber += 1;
       yield page;
 
       const nextPageToken = getNextPageToken(page, status);
+      options.onPage?.({ pageNumber, nextPageToken });
       if (nextPageToken === undefined) return;
+      if (pageNumber >= maxPages) return;
 
       if (seenPageTokens.has(nextPageToken)) {
         throw new GoogleWorkspaceClientError("pagination_cycle");

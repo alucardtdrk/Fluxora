@@ -26,9 +26,16 @@ export interface WorkspaceDashboardEvent {
 export interface WorkspaceSecurityDashboard {
   readonly events: readonly WorkspaceDashboardEvent[];
   readonly findings: readonly WorkspaceDashboardFinding[];
-  readonly summary: { readonly recentEvents: number; readonly highOrCriticalEvents: number; readonly openFindings: number };
-  readonly posture: { readonly suspendedUsers: number; readonly usersWithoutTwoStepVerification: number } | null;
-  readonly sources: readonly { readonly source: string; readonly status: string; readonly collected: number; readonly persisted: number; readonly completedAt?: string; readonly safeError?: string }[];
+  readonly summary: { readonly recentEvents: number; readonly highOrCriticalEvents: number; readonly openFindings: number; readonly coveragePercent: number };
+  readonly posture: { readonly suspendedUsers: number; readonly usersWithoutTwoStepVerification: number; readonly suspendedUserDetails: readonly WorkspacePostureUser[]; readonly usersWithoutTwoStepVerificationDetails: readonly WorkspacePostureUser[] } | null;
+  readonly sources: readonly { readonly source: string; readonly status: string; readonly collected: number; readonly persisted: number; readonly completedAt?: string; readonly safeError?: string; readonly coveragePercent: number; readonly rangeStart?: string; readonly rangeEnd?: string; readonly coveredThrough?: string }[];
+}
+
+export interface WorkspacePostureUser {
+  readonly id: string;
+  readonly email?: string;
+  readonly displayName?: string;
+  readonly orgUnitPath?: string;
 }
 
 export interface WorkspaceDashboardFinding {
@@ -55,7 +62,7 @@ type DashboardDependencies = {
 const EMPTY_DASHBOARD: WorkspaceSecurityDashboard = {
   events: [],
   findings: [],
-  summary: { recentEvents: 0, highOrCriticalEvents: 0, openFindings: 0 },
+  summary: { recentEvents: 0, highOrCriticalEvents: 0, openFindings: 0, coveragePercent: 0 },
   posture: null,
   sources: [],
 };
@@ -105,7 +112,28 @@ function dashboardPosture(record: FirestoreRecord | null): WorkspaceSecurityDash
   return {
     suspendedUsers: Number(users?.suspended || 0),
     usersWithoutTwoStepVerification: Number(users?.withoutTwoStepVerification || 0),
+    suspendedUserDetails: postureUsers(record.suspendedUsers),
+    usersWithoutTwoStepVerificationDetails: postureUsers(record.withoutTwoStepVerificationUsers),
   };
+}
+
+function coverage(record: FirestoreRecord) {
+  const start = record.backfillTargetStart ? new Date(dateValue(record.backfillTargetStart)) : null;
+  const end = record.backfillTargetEnd ? new Date(dateValue(record.backfillTargetEnd)) : null;
+  const covered = record.backfillCoveredThrough ? new Date(dateValue(record.backfillCoveredThrough)) : null;
+  if (!start || !end || !covered || end <= start) return { coveragePercent: 0 };
+  const coveragePercent = Math.max(0, Math.min(100, Math.round(((covered.getTime() - start.getTime()) / (end.getTime() - start.getTime())) * 100)));
+  return { coveragePercent, rangeStart: start.toISOString(), rangeEnd: end.toISOString(), coveredThrough: covered.toISOString() };
+}
+
+function postureUsers(value: unknown): readonly WorkspacePostureUser[] {
+  if (!Array.isArray(value)) return [];
+  return value.slice(0, 500).flatMap((item) => {
+    if (!item || typeof item !== "object") return [];
+    const record = item as FirestoreRecord;
+    const id = stringValue(record.id);
+    return id ? [{ id, email: stringValue(record.email), displayName: stringValue(record.displayName), orgUnitPath: stringValue(record.orgUnitPath) }] : [];
+  });
 }
 
 export function createWorkspaceSecurityDashboard(dependencies: DashboardDependencies) {
@@ -114,6 +142,7 @@ export function createWorkspaceSecurityDashboard(dependencies: DashboardDependen
       const [records, findingRecords, posture, sourceRecords] = await Promise.all([dependencies.listEvents(), dependencies.listFindings(), dependencies.getPosture(), dependencies.listSources?.() ?? []]);
       const events = records.map(dashboardEvent).filter((event) => Boolean(event.id));
       const findings = findingRecords.map(dashboardFinding).filter((finding): finding is WorkspaceDashboardFinding => Boolean(finding));
+      const sources = sourceRecords.map((record) => ({ source: String(record.source || record._documentId || "unknown"), status: String(record.lastStatus || "unknown"), collected: Number(record.lastCollected || 0), persisted: Number(record.lastPersisted || 0), completedAt: record.lastCompletedAt ? dateValue(record.lastCompletedAt) : undefined, safeError: stringValue(record.lastSafeError), ...coverage(record) }));
       return {
         events,
         findings,
@@ -121,9 +150,10 @@ export function createWorkspaceSecurityDashboard(dependencies: DashboardDependen
           recentEvents: events.length,
           highOrCriticalEvents: events.filter((event) => event.severity === "high" || event.severity === "critical").length,
           openFindings: findings.length,
+          coveragePercent: sources.length ? Math.round(sources.reduce((total, source) => total + source.coveragePercent, 0) / sources.length) : 0,
         },
         posture: dashboardPosture(posture),
-        sources: sourceRecords.map((record) => ({ source: String(record.source || record._documentId || "unknown"), status: String(record.lastStatus || "unknown"), collected: Number(record.lastCollected || 0), persisted: Number(record.lastPersisted || 0), completedAt: record.lastCompletedAt ? dateValue(record.lastCompletedAt) : undefined, safeError: stringValue(record.lastSafeError) })),
+        sources,
       };
     },
   };

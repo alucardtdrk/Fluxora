@@ -74,4 +74,15 @@ describe("Workspace security correlation", () => {
     expect(findings).toContainEqual(expect.objectContaining({ rule: "admin_change_then_identity_risk" }));
     expect(findings).toContainEqual(expect.objectContaining({ rule: "drive_activity_after_identity_risk" }));
   });
+
+  it("turns high-confidence policy signals into actionable findings", () => {
+    const findings = correlateWorkspaceSecurityEvents([
+      event({ externalId: "2sv", actor: "ana@example.com", type: "2sv_disable", severity: "high" }),
+      event({ externalId: "role", actor: "admin@example.com", source: "admin", type: "assign_role", severity: "high" }),
+      event({ externalId: "share", actor: "ana@example.com", source: "drive", type: "external_share", severity: "high" }),
+      event({ externalId: "dlp", actor: "ana@example.com", source: "rules", type: "rule_trigger", severity: "high" }),
+    ], observedAt);
+
+    expect(findings.map((finding) => finding.rule)).toEqual(expect.arrayContaining(["two_step_verification_disabled", "privilege_escalation", "external_drive_sharing", "high_severity_dlp"]));
+  });
 });
