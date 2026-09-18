@@ -7,7 +7,7 @@ import {
 import type { WorkspaceSecurityEvent } from "../types.js";
 
 const REPORTS_BASE_URL = "https://admin.googleapis.com/admin/reports/v1/activity/users/all/applications";
-const ALLOWED_APPLICATIONS = new Set<ReportsApplicationName>(["login", "admin", "token", "drive"]);
+const ALLOWED_APPLICATIONS = new Set<ReportsApplicationName>(["login", "admin", "token", "drive", "groups", "mobile", "rules"]);
 const OVERLAP_MILLISECONDS = 5 * 60 * 1_000;
 const DEFAULT_BOOTSTRAP_LOOKBACK_HOURS = 24;
 

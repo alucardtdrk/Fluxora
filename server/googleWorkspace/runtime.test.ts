@@ -26,10 +26,10 @@ describe("Google Workspace security runtime", () => {
     const summary = await sync.run();
 
     expect(summary.sources).toEqual(expect.objectContaining({
-      directory_posture: { status: "success", collected: 1, persisted: 1 },
+      directory_posture: { status: "ok", collected: 1, persisted: 1 },
     }));
     expect(Object.values(summary.sources).map((source) => source.status)).toEqual([
-      "success", "success", "success", "success", "success", "success",
+      "empty", "ok", "ok", "ok", "ok", "ok", "ok", "ok", "ok",
     ]);
     expect(summary.status).toBe("success");
     expect(saved).toEqual([
@@ -38,6 +38,9 @@ describe("Google Workspace security runtime", () => {
       { source: "admin", count: 1 },
       { source: "oauth_token", count: 1 },
       { source: "drive", count: 1 },
+      { source: "groups", count: 1 },
+      { source: "mobile", count: 1 },
+      { source: "rules", count: 1 },
     ]);
   });
 });

@@ -9,8 +9,8 @@ import { createWorkspaceSync } from "./sync.js";
 import { CORRELATION_WINDOW_MS, correlateWorkspaceSecurityEvents } from "./correlation.js";
 import type { WorkspaceSecurityEvent, WorkspaceSecuritySource } from "./types.js";
 
-type ReportApplication = "login" | "admin" | "token" | "drive";
-type Repository = Pick<typeof googleWorkspaceRepository, "getSourceState" | "saveSourceBatch" | "saveDirectoryPosture" | "listRecentEvents" | "saveFindings">;
+type ReportApplication = "login" | "admin" | "token" | "drive" | "groups" | "mobile" | "rules";
+type Repository = Pick<typeof googleWorkspaceRepository, "getSourceState" | "saveSourceBatch" | "saveDirectoryPosture" | "listRecentEvents" | "saveFindings"> & Partial<Pick<typeof googleWorkspaceRepository, "saveSourceDiagnostics">>;
 
 function latestEventAt(events: readonly WorkspaceSecurityEvent[]): string | undefined {
   const latest = events.reduce<Date | null>((current, event) =>
@@ -60,6 +60,9 @@ export function createGoogleWorkspaceSecuritySync(input: {
       eventSource("admin", "admin"),
       eventSource("oauth_token", "token"),
       eventSource("drive", "drive"),
+      eventSource("groups", "groups"),
+      eventSource("mobile", "mobile"),
+      eventSource("rules", "rules"),
       {
         name: "directory_posture",
         run: async () => {
@@ -74,6 +77,7 @@ export function createGoogleWorkspaceSecuritySync(input: {
   return {
     async run() {
       const summary = await sourceSync.run();
+      await Promise.all(Object.entries(summary.sources).filter(([source]) => source !== "directory_posture").map(([source, status]) => input.repository.saveSourceDiagnostics?.(source as WorkspaceSecuritySource, { status: status.status, collected: status.collected, persisted: status.persisted, safeError: status.safeError, completedAt: summary.finishedAt })));
       try {
         const events = await input.repository.listRecentEvents(new Date(now().getTime() - CORRELATION_WINDOW_MS));
         const findings = correlate(events, now());

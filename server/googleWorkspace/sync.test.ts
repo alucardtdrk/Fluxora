@@ -8,13 +8,25 @@ describe("Workspace sync", () => {
     const sync = createWorkspaceSync({ sources: [source("login", "ok"), source("drive", "fail")] });
     const summary = await sync.run();
     expect(summary.status).toBe("partial");
-    expect(summary.sources.login).toMatchObject({ status: "success", persisted: 2 });
+    expect(summary.sources.login).toMatchObject({ status: "ok", persisted: 2 });
     expect(summary.sources.drive).toEqual({ status: "failure", collected: 0, persisted: 0, safeError: "unknown" });
   });
 
   it("returns failure when every source fails", async () => {
     const summary = await createWorkspaceSync({ sources: [source("login", "fail")] }).run();
     expect(summary.status).toBe("failure");
+  });
+
+  it("distinguishes an empty source from a denied source without exposing its error", async () => {
+    const summary = await createWorkspaceSync({
+      sources: [
+        { name: "login", run: async () => ({ collected: 0, persisted: 0 }) },
+        { name: "admin", run: async () => Promise.reject(new Error("HTTP_403: private response")) },
+      ],
+    }).run();
+
+    expect(summary.sources.login).toMatchObject({ status: "empty", collected: 0, persisted: 0 });
+    expect(summary.sources.admin).toMatchObject({ status: "failure", safeError: "permission" });
   });
 
   it("does not run two sync cycles concurrently", async () => {

@@ -28,6 +28,6 @@ describe("Workspace security dashboard", () => {
   it("returns an empty posture when none has been synchronized", async () => {
     const dashboard = await createWorkspaceSecurityDashboard({ listEvents: async () => [], listFindings: async () => [], getPosture: async () => null }).load();
 
-    expect(dashboard).toEqual({ events: [], findings: [], summary: { recentEvents: 0, highOrCriticalEvents: 0, openFindings: 0 }, posture: null });
+    expect(dashboard).toEqual({ events: [], findings: [], summary: { recentEvents: 0, highOrCriticalEvents: 0, openFindings: 0 }, posture: null, sources: [] });
   });
 });

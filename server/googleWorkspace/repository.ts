@@ -129,6 +129,17 @@ export function createGoogleWorkspaceRepository(
       }]);
     },
 
+    async saveSourceDiagnostics(source: WorkspaceSecuritySource, diagnostic: { status: string; collected: number; persisted: number; safeError?: string; completedAt: string }): Promise<void> {
+      await adapter.merge(WORKSPACE_SYNC_STATE_COLLECTION, source, {
+        source,
+        lastStatus: diagnostic.status,
+        lastCollected: diagnostic.collected,
+        lastPersisted: diagnostic.persisted,
+        lastSafeError: diagnostic.safeError ?? null,
+        lastCompletedAt: new Date(diagnostic.completedAt),
+      });
+    },
+
     async saveFindings(findings: readonly WorkspaceSecurityFinding[]): Promise<{ insertedOrUpdated: number }> {
       for (let offset = 0; offset < findings.length; offset += 499) {
         await adapter.commit(findings.slice(offset, offset + 499).map((finding) => ({
