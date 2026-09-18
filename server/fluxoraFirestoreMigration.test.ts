@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { getFluxoraCollectionPaths, isAllowedFluxoraLegacyCollection } from "./fluxoraFirestorePaths.js";
-import { normalizeFirestorePath } from "./firestore.js";
+import { getFirestoreCollectionQueryPath, normalizeFirestorePath } from "./firestore.js";
 import { migrateFluxoraCollection } from "./fluxoraFirestoreMigration.js";
 
 describe("Fluxora Firestore collection registry", () => {
@@ -18,6 +18,13 @@ describe("Fluxora Firestore collection registry", () => {
   it("keeps valid nested Firestore paths and rejects malformed ones", () => {
     expect(normalizeFirestorePath("fluxora/data/workspace-security-events")).toBe("fluxora/data/workspace-security-events");
     expect(() => normalizeFirestorePath("fluxora//data")).toThrow("invalid Firestore path");
+  });
+
+  it("queries a nested Fluxora collection from its parent document", () => {
+    expect(getFirestoreCollectionQueryPath("fluxora/data/workspace-security-events")).toEqual({
+      endpoint: "/fluxora/data:runQuery",
+      collectionId: "workspace-security-events",
+    });
   });
 
   it("copies approved documents by the same ID without deletion", async () => {

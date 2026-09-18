@@ -1,7 +1,8 @@
 import crypto from "node:crypto";
 import { getFirestoreDocument, isFirestoreConfigured, setFirestoreDocument } from "./firestore.js";
+import { getFluxoraCollectionPaths } from "./fluxoraFirestorePaths.js";
 
-const COLLECTION = "fluxora_notification_state";
+const COLLECTION = getFluxoraCollectionPaths("notificationState").destination;
 const MAX_SEEN_EXECUTIONS = 250;
 
 function documentId(email: string) {

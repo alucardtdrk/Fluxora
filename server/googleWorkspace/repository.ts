@@ -5,12 +5,13 @@ import {
   runFirestoreQuery,
   type FirestoreRecord,
 } from "../firestore.js";
+import { getFluxoraCollectionPaths } from "../fluxoraFirestorePaths.js";
 import type { WorkspaceSecurityEvent, WorkspaceSecurityFinding, WorkspaceSecuritySource } from "./types.js";
 
-export const WORKSPACE_SECURITY_EVENTS_COLLECTION = "fluxora_workspace_security_events";
-export const WORKSPACE_SECURITY_FINDINGS_COLLECTION = "fluxora_workspace_security_findings";
-export const WORKSPACE_SYNC_STATE_COLLECTION = "fluxora_workspace_sync_state";
-export const WORKSPACE_DIRECTORY_POSTURE_COLLECTION = "fluxora_workspace_directory_posture";
+export const WORKSPACE_SECURITY_EVENTS_COLLECTION = getFluxoraCollectionPaths("workspaceSecurityEvents").destination;
+export const WORKSPACE_SECURITY_FINDINGS_COLLECTION = getFluxoraCollectionPaths("workspaceSecurityFindings").destination;
+export const WORKSPACE_SYNC_STATE_COLLECTION = getFluxoraCollectionPaths("workspaceSyncState").destination;
+export const WORKSPACE_DIRECTORY_POSTURE_COLLECTION = getFluxoraCollectionPaths("workspaceDirectoryPosture").destination;
 
 export interface WorkspaceFirestoreWrite {
   readonly collection: string;

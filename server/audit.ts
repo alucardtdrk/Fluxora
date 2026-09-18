@@ -1,5 +1,6 @@
 import crypto from "node:crypto";
 import { isFirestoreConfigured, runFirestoreQuery, setFirestoreDocument } from "./firestore.js";
+import { getFluxoraCollectionPaths } from "./fluxoraFirestorePaths.js";
 
 export type AuditCategory = "workflow" | "incident" | "configuration" | "access" | "history" | "data";
 export type AuditStatus = "success" | "failure";
@@ -20,7 +21,7 @@ export type AuditEventInput = {
   metadata?: Record<string, unknown>;
 };
 
-const COLLECTION = "fluxora_audit_events";
+const COLLECTION = getFluxoraCollectionPaths("auditEvents").destination;
 const SECRET_KEY = /(password|senha|secret|token|authorization|cookie|credential|api.?key|private.?key)/i;
 
 function safeValue(value: unknown, depth = 0): unknown {

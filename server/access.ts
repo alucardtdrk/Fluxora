@@ -6,6 +6,7 @@ import {
   setFirestoreDocument,
   type FirestoreRecord,
 } from "./firestore.js";
+import { getFluxoraCollectionPaths } from "./fluxoraFirestorePaths.js";
 
 export type FluxoraRole = "admin" | "operator" | "viewer";
 
@@ -20,7 +21,7 @@ export type FluxoraUser = {
   createdBy?: string | null;
 };
 
-const USERS_COLLECTION = "fluxora_users";
+const USERS_COLLECTION = getFluxoraCollectionPaths("users").destination;
 const CACHE_TTL_MS = 15_000;
 const accessCache = new Map<string, { user: FluxoraUser | null; expiresAt: number }>();
 
