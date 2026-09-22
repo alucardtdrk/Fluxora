@@ -141,13 +141,15 @@ export function createGoogleWorkspaceRepository(
       }]);
     },
 
-    async saveSourceDiagnostics(source: WorkspaceSecuritySource, diagnostic: { status: string; collected: number; persisted: number; safeError?: string; completedAt: string }): Promise<void> {
+    async saveSourceDiagnostics(source: WorkspaceSecuritySource, diagnostic: { status: string; received?: number; collected: number; persisted: number; safeError?: string; httpStatus?: number; completedAt: string }): Promise<void> {
       await adapter.merge(WORKSPACE_SYNC_STATE_COLLECTION, source, {
         source,
         lastStatus: diagnostic.status,
+        lastReceived: diagnostic.received ?? diagnostic.collected,
         lastCollected: diagnostic.collected,
         lastPersisted: diagnostic.persisted,
         lastSafeError: diagnostic.safeError ?? null,
+        lastHttpStatus: diagnostic.httpStatus ?? null,
         lastCompletedAt: new Date(diagnostic.completedAt),
       });
     },

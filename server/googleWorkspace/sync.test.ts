@@ -38,4 +38,12 @@ describe("Workspace sync", () => {
     release();
     await expect(first).resolves.toMatchObject({ status: "success" });
   });
+
+  it("preserves a safe HTTP status and actionable upstream error category", async () => {
+    const summary = await createWorkspaceSync({
+      sources: [{ name: "gmail", run: async () => Promise.reject(Object.assign(new Error("private payload"), { status: 429 })) }],
+    }).run();
+
+    expect(summary.sources.gmail).toMatchObject({ status: "failure", safeError: "rate_limited", httpStatus: 429 });
+  });
 });

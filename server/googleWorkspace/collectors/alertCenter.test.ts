@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { GoogleWorkspaceClient } from "../client.js";
-import { collectAlertCenterEvidence } from "./alertCenter.js";
+import { collectAlertCenterEvidence, collectAlertCenterEvidenceBatch } from "./alertCenter.js";
 import {
   isExcludedSuperadminPasswordReset,
   normalizeAlertCenterAlert,
@@ -76,6 +76,15 @@ class PageClient implements GoogleWorkspaceClient {
 }
 
 describe("Alert Center collector", () => {
+  it("reports how many raw alerts Google returned before normalization", async () => {
+    const client = new PageClient([{ alerts: [accountTakeoverAlert, superadminPasswordResetAlert] }]);
+
+    const result = await collectAlertCenterEvidenceBatch({ client, customerId: "C01234567" });
+
+    expect(result.alertsRead).toBe(2);
+    expect(result.events).toHaveLength(1);
+  });
+
   it("paginates alerts from the overlap start time", async () => {
     const client = new PageClient([
       { alerts: [accountTakeoverAlert], nextPageToken: "second-page" },
@@ -183,5 +192,26 @@ describe("Alert Center normalizer", () => {
 
     expect(isExcludedSuperadminPasswordReset(ordinaryAdminAlert)).toBe(false);
     expect(normalizeAlertCenterAlert(ordinaryAdminAlert, new Date("2026-09-16T10:10:00.000Z"))).not.toBeNull();
+  });
+
+  it("classifies suspicious login alerts as high priority and exposes safe login details", () => {
+    const normalized = normalizeAlertCenterAlert({
+      alertId: "suspicious-login-1",
+      createTime: "2026-09-21T14:17:23.000Z",
+      type: "Suspicious login",
+      source: "Google identity",
+      data: {
+        "@type": "type.googleapis.com/google.apps.alertcenter.type.AccountWarning",
+        email: "employee@example.com",
+        loginDetails: { loginTime: "2026-09-21T14:17:23.000Z", ipAddress: "203.0.113.42" },
+      },
+    }, new Date("2026-09-21T14:20:00.000Z"));
+
+    expect(normalized).toMatchObject({
+      severity: "high",
+      category: "identity",
+      target: "employee@example.com",
+      ipAddress: "203.0.113.42",
+    });
   });
 });

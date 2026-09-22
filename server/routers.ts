@@ -9,7 +9,7 @@ import { getNotificationReadState, saveNotificationReadState } from "./notificat
 import { listWorkflowAlertRules, listWorkflowRunbooks, listWorkflowSlos, saveWorkflowAlertRule, saveWorkflowRunbook, saveWorkflowSlo, updateIncidentState } from "./observability.js";
 import { z } from "zod";
 import { listAuditEvents, recordAuditEventSafe, type AuditEventInput } from "./audit.js";
-import { continueGoogleWorkspaceSecurityBackfill, syncGoogleWorkspaceSecurity } from "./googleWorkspace/runtime.js";
+import { continueGoogleWorkspaceSecurityBackfill, syncCurrentGoogleWorkspaceSecurity, syncGoogleWorkspaceSecurity } from "./googleWorkspace/runtime.js";
 import { getWorkspaceSecurityDashboard } from "./googleWorkspace/dashboard.js";
 
 const periodSchema = z.enum(["today", "7d", "30d", "90d", "all"]);
@@ -42,6 +42,7 @@ export const appRouter = router({
   }),
   workspaceSecurity: router({
     overview: protectedProcedure.query(() => getWorkspaceSecurityDashboard()),
+    refreshCurrent: adminProcedure.mutation(({ ctx }) => audited({ action: "google_workspace.refresh_current", category: "configuration", actor: ctx.user.email, actorRole: ctx.user.role, targetType: "google_workspace", summary: "Atualizou os sinais atuais de segurança do Google Workspace" }, () => syncCurrentGoogleWorkspaceSecurity())),
     continueBackfill: adminProcedure.mutation(({ ctx }) => audited({ action: "google_workspace.backfill", category: "configuration", actor: ctx.user.email, actorRole: ctx.user.role, targetType: "google_workspace", summary: "Avançou o histórico de segurança do Google Workspace" }, () => continueGoogleWorkspaceSecurityBackfill())),
   }),
   n8n: router({

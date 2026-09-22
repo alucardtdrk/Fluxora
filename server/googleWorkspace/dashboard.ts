@@ -28,7 +28,7 @@ export interface WorkspaceSecurityDashboard {
   readonly findings: readonly WorkspaceDashboardFinding[];
   readonly summary: { readonly recentEvents: number; readonly highOrCriticalEvents: number; readonly openFindings: number; readonly coveragePercent: number };
   readonly posture: { readonly suspendedUsers: number; readonly usersWithoutTwoStepVerification: number; readonly suspendedUserDetails: readonly WorkspacePostureUser[]; readonly usersWithoutTwoStepVerificationDetails: readonly WorkspacePostureUser[] } | null;
-  readonly sources: readonly { readonly source: string; readonly status: string; readonly collected: number; readonly persisted: number; readonly completedAt?: string; readonly safeError?: string; readonly coveragePercent: number; readonly rangeStart?: string; readonly rangeEnd?: string; readonly coveredThrough?: string }[];
+  readonly sources: readonly { readonly source: string; readonly status: string; readonly received: number; readonly collected: number; readonly persisted: number; readonly completedAt?: string; readonly safeError?: string; readonly httpStatus?: number; readonly coveragePercent: number; readonly rangeStart?: string; readonly rangeEnd?: string; readonly coveredThrough?: string }[];
 }
 
 export interface WorkspacePostureUser {
@@ -142,7 +142,7 @@ export function createWorkspaceSecurityDashboard(dependencies: DashboardDependen
       const [records, findingRecords, posture, sourceRecords] = await Promise.all([dependencies.listEvents(), dependencies.listFindings(), dependencies.getPosture(), dependencies.listSources?.() ?? []]);
       const events = records.map(dashboardEvent).filter((event) => Boolean(event.id));
       const findings = findingRecords.map(dashboardFinding).filter((finding): finding is WorkspaceDashboardFinding => Boolean(finding));
-      const sources = sourceRecords.map((record) => ({ source: String(record.source || record._documentId || "unknown"), status: String(record.lastStatus || "unknown"), collected: Number(record.lastCollected || 0), persisted: Number(record.lastPersisted || 0), completedAt: record.lastCompletedAt ? dateValue(record.lastCompletedAt) : undefined, safeError: stringValue(record.lastSafeError), ...coverage(record) }));
+      const sources = sourceRecords.map((record) => ({ source: String(record.source || record._documentId || "unknown"), status: String(record.lastStatus || "unknown"), received: Number(record.lastReceived ?? record.lastCollected ?? 0), collected: Number(record.lastCollected || 0), persisted: Number(record.lastPersisted || 0), httpStatus: record.lastHttpStatus ? Number(record.lastHttpStatus) : undefined, completedAt: record.lastCompletedAt ? dateValue(record.lastCompletedAt) : undefined, safeError: stringValue(record.lastSafeError), ...coverage(record) }));
       return {
         events,
         findings,

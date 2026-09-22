@@ -152,6 +152,7 @@ describe("Reports collector", () => {
     const result = await collectReportsEvidenceBatch({ client, application: "login", customerId: "customer", rangeStart: new Date("2026-06-20T00:00:00Z"), rangeEnd: new Date("2026-06-21T00:00:00Z"), maxPages: 1 });
 
     expect(result).toMatchObject({ pagesRead: 1, nextPageToken: "continue", truncated: true });
+    expect(result.recordsRead).toBe(1);
     expect(client.requestedUrls[0]).toContain("startTime=2026-06-20T00%3A00%3A00.000Z");
   });
 
@@ -161,5 +162,20 @@ describe("Reports collector", () => {
     await collectReportsEvidenceBatch({ client, application: "login", customerId: "customer", pageSize: 75, maxPages: 1 });
 
     expect(client.requestedUrls[0]).toContain("maxResults=75");
+  });
+
+  it("limits Gmail historical requests to 30 days", async () => {
+    const client = new PageClient([{ items: [] }]);
+    const result = await collectReportsEvidenceBatch({
+      client,
+      application: "gmail",
+      customerId: "customer",
+      rangeStart: new Date("2026-06-20T00:00:00.000Z"),
+      rangeEnd: new Date("2026-09-18T00:00:00.000Z"),
+      maxPages: 1,
+    });
+
+    expect(client.requestedUrls[0]).toContain("endTime=2026-07-20T00%3A00%3A00.000Z");
+    expect(result.rangeEnd).toEqual(new Date("2026-07-20T00:00:00.000Z"));
   });
 });

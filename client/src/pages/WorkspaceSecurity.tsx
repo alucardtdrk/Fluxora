@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { AlertTriangle, ShieldAlert, ShieldCheck, UserRoundX } from "lucide-react";
 import OperationsShell from "@/components/OperationsShell";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -8,6 +8,7 @@ import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { toast } from "sonner";
+import { shouldRefreshCurrentSecurity } from "@/lib/workspaceSecurityRefresh";
 
 const sourceLabels: Record<string, string> = {
   alert_center: "Alert Center",
@@ -52,6 +53,18 @@ function EventDetail({ label, value }: { label: string; value?: string }) {
 export default function WorkspaceSecurity() {
   const { user } = useAuth();
   const dashboard = trpc.workspaceSecurity.overview.useQuery(undefined, { retry: false, refetchInterval: 30_000 });
+  const automaticRefreshStarted = useRef(false);
+  const refreshCurrent = trpc.workspaceSecurity.refreshCurrent.useMutation({
+    onSuccess: async (result) => {
+      await dashboard.refetch();
+      const statuses = Object.values(result.sources);
+      const saved = statuses.reduce((total, item) => total + item.persisted, 0);
+      const failures = statuses.filter((item) => item.status === "failure").length;
+      if (failures > 0) toast.warning("Segurança atualizada parcialmente", { description: `${saved.toLocaleString("pt-BR")} eventos salvos; ${failures} fonte${failures === 1 ? "" : "s"} requer${failures === 1 ? "" : "em"} atenção.` });
+      else toast.success("Segurança atualizada", { description: `${saved.toLocaleString("pt-BR")} eventos salvos a partir dos sinais atuais.` });
+    },
+    onError: (error) => toast.error("A segurança não foi atualizada", { description: error.message || "Tente novamente em instantes." }),
+  });
   const continueBackfill = trpc.workspaceSecurity.continueBackfill.useMutation({
     onSuccess: async (result) => {
       await dashboard.refetch();
@@ -80,10 +93,17 @@ export default function WorkspaceSecurity() {
   const sources = dashboard.data?.sources ?? [];
   const [selectedEvent, setSelectedEvent] = useState<(typeof events)[number] | null>(null);
 
+  useEffect(() => {
+    if (automaticRefreshStarted.current || user?.role !== "admin" || !dashboard.data) return;
+    automaticRefreshStarted.current = true;
+    if (shouldRefreshCurrentSecurity(dashboard.data.sources)) refreshCurrent.mutate();
+  }, [dashboard.data, refreshCurrent, user?.role]);
+
   return <OperationsShell><div className="mx-auto max-w-[1180px] px-5 py-8 md:px-9">
     <p className="text-[11px] font-bold uppercase tracking-[.18em] text-[#667085]">Operação / Workspace Security</p>
     <h2 className="mt-2 text-4xl font-semibold tracking-[-.05em]">Segurança do Google Workspace</h2>
     <p className="mt-2 text-sm text-[#667085]">Eventos de segurança e postura do domínio coletados pelo Fluxora.</p>
+    {user?.role === "admin" && <div className="mt-4"><Button disabled={refreshCurrent.isPending} onClick={() => refreshCurrent.mutate()}>{refreshCurrent.isPending ? "Atualizando…" : "Atualizar segurança agora"}</Button></div>}
 
     <div className="mt-7 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
       <MetricCard icon={ShieldCheck} label="Eventos recentes" value={summary.recentEvents} description="Registros disponíveis para análise." />
@@ -94,7 +114,7 @@ export default function WorkspaceSecurity() {
 
     <Card className="mt-6 border-0"><CardContent className="flex flex-wrap items-center justify-between gap-4 p-5"><div className="min-w-[260px] flex-1"><p className="text-sm font-semibold">Cobertura histórica de 90 dias</p><p className="mt-1 text-sm text-[#667085]">{summary.coveragePercent}% concluída em lotes pequenos para preservar a CPU da Vercel.</p><div className="mt-3 h-2 max-w-md overflow-hidden rounded-full bg-[#ececf3]"><div className="h-full bg-[#4355D8]" style={{ width: `${summary.coveragePercent}%` }} /></div></div>{user?.role === "admin" && <Button variant="outline" disabled={continueBackfill.isPending} onClick={() => continueBackfill.mutate()}>{continueBackfill.isPending ? "Avançando…" : "Continuar histórico"}</Button>}</CardContent></Card>
 
-    <Card className="mt-6 border-0"><CardHeader><CardTitle className="text-base">Fontes de auditoria</CardTitle></CardHeader><CardContent>{sources.length === 0 ? <p className="text-sm text-[#667085]">Execute uma sincronização para registrar as fontes.</p> : <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">{sources.map((item) => <div key={item.source} className="rounded-xl border p-3"><p className="font-medium">{sourceLabels[item.source] ?? item.source}</p><p className="mt-1 text-xs text-[#667085]">{item.status === "ok" ? "Ativa" : item.status === "empty" ? "Sem eventos" : item.status === "failure" ? "Requer atenção" : "Aguardando"} · {item.collected} coletados · {item.persisted} salvos</p><p className="mt-1 text-xs text-[#667085]">{item.coveragePercent}% do histórico{item.completedAt ? ` · atualizado ${new Date(item.completedAt).toLocaleString("pt-BR")}` : ""}</p>{item.rangeStart && item.rangeEnd && <p className="mt-1 text-xs text-[#667085]">Período: {new Date(item.rangeStart).toLocaleDateString("pt-BR")} a {new Date(item.rangeEnd).toLocaleDateString("pt-BR")}</p>}{item.safeError === "permission" && <p className="mt-1 text-xs text-[#bd6338]">Revise a delegação de domínio.</p>}{item.safeError === "configuration" && <p className="mt-1 text-xs text-[#bd6338]">Revise a configuração da integração.</p>}{item.safeError === "unknown" && <p className="mt-1 text-xs text-[#bd6338]">A fonte não respondeu como esperado; tente novamente.</p>}</div>)}</div>}</CardContent></Card>
+    <Card className="mt-6 border-0"><CardHeader><CardTitle className="text-base">Fontes de auditoria</CardTitle></CardHeader><CardContent>{sources.length === 0 ? <p className="text-sm text-[#667085]">Execute uma sincronização para registrar as fontes.</p> : <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">{sources.map((item) => <div key={item.source} className="rounded-xl border p-3"><p className="font-medium">{sourceLabels[item.source] ?? item.source}</p><p className="mt-1 text-xs text-[#667085]">{item.status === "ok" ? "Ativa" : item.status === "empty" ? "Sem eventos" : item.status === "failure" ? "Requer atenção" : "Aguardando"} · {item.received} recebidos · {item.collected} aceitos · {item.persisted} salvos</p><p className="mt-1 text-xs text-[#667085]">{item.coveragePercent}% do histórico{item.completedAt ? ` · atualizado ${new Date(item.completedAt).toLocaleString("pt-BR")}` : ""}</p>{item.rangeStart && item.rangeEnd && <p className="mt-1 text-xs text-[#667085]">Período: {new Date(item.rangeStart).toLocaleDateString("pt-BR")} a {new Date(item.rangeEnd).toLocaleDateString("pt-BR")}</p>}{item.safeError && <p className="mt-1 text-xs text-[#bd6338]">{item.safeError === "permission" ? "Revise a delegação de domínio e os escopos desta fonte." : item.safeError === "configuration" ? "Revise a configuração da integração." : item.safeError === "invalid_request" ? "O Google rejeitou os parâmetros desta consulta." : item.safeError === "rate_limited" ? "O limite temporário do Google foi atingido; tente novamente depois." : item.safeError === "upstream" ? "O Google apresentou uma indisponibilidade temporária." : "A fonte não respondeu como esperado; tente novamente."}{item.httpStatus ? ` (HTTP ${item.httpStatus})` : ""}</p>}</div>)}</div>}</CardContent></Card>
 
     {posture && <Card className="mt-6 border-0"><CardHeader><CardTitle className="text-base">Postura acionável</CardTitle></CardHeader><CardContent className="grid gap-5 md:grid-cols-2"><div><p className="font-medium">Sem verificação em duas etapas</p><div className="mt-3 max-h-52 space-y-2 overflow-y-auto">{posture.usersWithoutTwoStepVerificationDetails.map((person) => <div key={person.id} className="rounded-lg bg-[#f8f9fc] p-3 text-sm"><p className="font-medium">{person.displayName ?? person.email ?? person.id}</p><p className="text-xs text-[#667085]">{person.email}{person.orgUnitPath ? ` · ${person.orgUnitPath}` : ""}</p></div>)}</div></div><div><p className="font-medium">Contas suspensas</p><div className="mt-3 max-h-52 space-y-2 overflow-y-auto">{posture.suspendedUserDetails.map((person) => <div key={person.id} className="rounded-lg bg-[#f8f9fc] p-3 text-sm"><p className="font-medium">{person.displayName ?? person.email ?? person.id}</p><p className="text-xs text-[#667085]">{person.email}{person.orgUnitPath ? ` · ${person.orgUnitPath}` : ""}</p></div>)}</div></div></CardContent></Card>}
 

@@ -32,8 +32,10 @@ export interface CollectReportsEvidenceInput {
 export interface CollectedReportsEvidence {
   readonly events: readonly WorkspaceSecurityEvent[];
   readonly pagesRead: number;
+  readonly recordsRead: number;
   readonly nextPageToken?: string;
   readonly truncated: boolean;
+  readonly rangeEnd?: Date;
 }
 
 function startTime(lastSuccessfulEventAt: Date | undefined, now: Date): Date {
@@ -51,19 +53,26 @@ export async function collectReportsEvidenceBatch(input: CollectReportsEvidenceI
   }
 
   const observedAt = (input.now ?? (() => new Date()))();
+  const requestedStart = input.rangeStart ?? startTime(input.lastSuccessfulEventAt, observedAt);
+  const requestedEnd = input.rangeEnd ?? observedAt;
+  const effectiveEnd = input.application === "gmail"
+    ? new Date(Math.min(requestedEnd.getTime(), requestedStart.getTime() + 30 * 24 * 60 * 60 * 1_000))
+    : requestedEnd;
   const url = new URL(`${REPORTS_BASE_URL}/${encodeURIComponent(input.application)}`);
   url.searchParams.set("customerId", input.customerId);
-  url.searchParams.set("startTime", (input.rangeStart ?? startTime(input.lastSuccessfulEventAt, observedAt)).toISOString());
-  url.searchParams.set("endTime", (input.rangeEnd ?? observedAt).toISOString());
+  url.searchParams.set("startTime", requestedStart.toISOString());
+  url.searchParams.set("endTime", effectiveEnd.toISOString());
   url.searchParams.set("maxResults", String(Math.max(1, Math.min(250, input.pageSize ?? 250))));
 
   const events: WorkspaceSecurityEvent[] = [];
   let pagesRead = 0;
+  let recordsRead = 0;
   let nextPageToken: string | undefined;
   for await (const page of input.client.paginate<ReportsPage>(url, { pageTokenQueryKey: "pageToken", startPageToken: input.startPageToken, maxPages: input.maxPages, onPage: (pageState) => { pagesRead = pageState.pageNumber; nextPageToken = pageState.nextPageToken; } })) {
     for (const activity of page.items ?? []) {
+      recordsRead += 1;
       events.push(...normalizeReportsActivity(input.application, activity, observedAt));
     }
   }
-  return { events, pagesRead, nextPageToken, truncated: Boolean(nextPageToken) };
+  return { events, pagesRead, recordsRead, nextPageToken, truncated: Boolean(nextPageToken), rangeEnd: effectiveEnd };
 }
