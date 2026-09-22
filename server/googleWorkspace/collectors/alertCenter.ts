@@ -22,6 +22,11 @@ export interface CollectAlertCenterEvidenceInput {
   readonly now?: () => Date;
 }
 
+export interface CollectedAlertCenterEvidence {
+  readonly events: readonly WorkspaceSecurityEvent[];
+  readonly alertsRead: number;
+}
+
 function collectionStart(input: CollectAlertCenterEvidenceInput, now: Date): Date {
   if (input.lastSuccessfulEventAt) {
     return new Date(input.lastSuccessfulEventAt.getTime() - OVERLAP_MILLISECONDS);
@@ -37,6 +42,12 @@ function collectionStart(input: CollectAlertCenterEvidenceInput, now: Date): Dat
 export async function collectAlertCenterEvidence(
   input: CollectAlertCenterEvidenceInput,
 ): Promise<WorkspaceSecurityEvent[]> {
+  return [...(await collectAlertCenterEvidenceBatch(input)).events];
+}
+
+export async function collectAlertCenterEvidenceBatch(
+  input: CollectAlertCenterEvidenceInput,
+): Promise<CollectedAlertCenterEvidence> {
   const observedAt = (input.now ?? (() => new Date()))();
   const start = collectionStart(input, observedAt);
   const url = new URL(ALERT_CENTER_URL);
@@ -46,11 +57,13 @@ export async function collectAlertCenterEvidence(
   url.searchParams.set("filter", `createTime >= "${start.toISOString()}"`);
 
   const events: WorkspaceSecurityEvent[] = [];
+  let alertsRead = 0;
   for await (const page of input.client.paginate<AlertCenterPage>(url)) {
     for (const alert of page.alerts ?? []) {
+      alertsRead += 1;
       const event = normalizeAlertCenterAlert(alert, observedAt);
       if (event) events.push(event);
     }
   }
-  return events;
+  return { events, alertsRead };
 }

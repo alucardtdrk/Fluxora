@@ -119,4 +119,32 @@ describe("Google Workspace security runtime", () => {
     expect(requestedPageSizes).toEqual([250, 50]);
     expect(result).toMatchObject({ eventsCollected: 300, requestsProcessed: 2 });
   });
+
+  it("refreshes current security sources without running posture or historical backfill", async () => {
+    const reportApplications: string[] = [];
+    let alertCollections = 0;
+    let postureCollections = 0;
+    let backfillCollections = 0;
+    const sync = createGoogleWorkspaceSecuritySync({
+      config: { customerId: "customer", domain: "example.com" }, client: {} as never,
+      repository: {
+        getSourceState: async () => ({ lastSuccessfulEventAt: null, backfillTargetStart: null, backfillTargetEnd: null, backfillCoveredThrough: null, backfillPageToken: null }),
+        saveSourceBatch: async (input) => ({ insertedOrUpdated: input.events.length }),
+        saveDirectoryPosture: async () => undefined, listRecentEvents: async () => [], saveFindings: async () => ({ insertedOrUpdated: 0 }),
+      },
+      collectAlertCenter: async () => { alertCollections += 1; return []; },
+      collectReports: async (input) => { reportApplications.push(input.application); return []; },
+      collectDirectory: async () => { postureCollections += 1; return { capturedAt: new Date(), domain: "example.com" } as never; },
+      collectReportsBatch: async () => { backfillCollections += 1; return { events: [], pagesRead: 1, truncated: false, rangeEnd: new Date() }; },
+      now: () => new Date("2026-09-21T15:00:00.000Z"),
+    });
+
+    const result = await sync.runCurrent();
+
+    expect(alertCollections).toBe(1);
+    expect(reportApplications).toEqual(["login", "admin", "token", "rules"]);
+    expect(postureCollections).toBe(0);
+    expect(backfillCollections).toBe(0);
+    expect(result.sources).toHaveProperty("alert_center");
+  });
 });

@@ -71,6 +71,7 @@ function phishingSafeDetails(data: Readonly<Record<string, unknown>>): Workspace
 function severityFor(alert: GoogleAlertCenterAlert): SecuritySeverity {
   const classification = `${alert.type} ${alert.source}`.toLowerCase();
   if (classification.includes("account takeover") || classification.includes("leaked password")) return "critical";
+  if (classification.includes("suspicious login") || classification.includes("suspicious programmatic login")) return "high";
   if (
     classification.includes("phishing") ||
     classification.includes("malware") ||
@@ -111,6 +112,7 @@ export function normalizeAlertCenterAlert(
   if (!alert.alertId || !alert.type || !alert.source || Number.isNaN(occurredAt.getTime())) return null;
 
   const data = alert.data ?? {};
+  const loginDetails = recordValue(data.loginDetails);
   const metadataInput: Record<string, unknown> = {
     originalType: alert.type,
     originalSource: alert.source,
@@ -134,8 +136,8 @@ export function normalizeAlertCenterAlert(
     observedAt,
     expiresAt: getDetailedEvidenceExpiry(occurredAt),
     actor: text(data.actorEmail) ?? text(data.actor),
-    target: firstText(data.affectedUserEmails) ?? text(data.targetEmail) ?? text(data.resourceName),
-    ipAddress: text(data.ipAddress),
+    target: firstText(data.affectedUserEmails) ?? text(data.email) ?? text(data.targetEmail) ?? text(data.resourceName),
+    ipAddress: text(loginDetails?.ipAddress) ?? text(data.ipAddress),
     country: text(data.country),
     safeDetails: phishingSafeDetails(data),
     metadata: sanitizeWorkspaceSecurityMetadata(metadataInput).metadata,
