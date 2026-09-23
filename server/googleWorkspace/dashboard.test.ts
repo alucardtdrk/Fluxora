@@ -1,12 +1,23 @@
 import { describe, expect, it } from "vitest";
-import { createWorkspaceSecurityDashboard } from "./dashboard.js";
+import { createWorkspaceSecurityDashboard, createWorkspaceEventPage } from "./dashboard.js";
 
 describe("Workspace security dashboard", () => {
+  it("pages filtered events without losing later matches", async () => {
+    const records = Array.from({ length: 60 }, (_, index) => ({ id: `event-${index}`, source: index % 2 ? "login" : "drive", category: "identity", severity: "high", occurredAt: new Date("2026-09-23T10:00:00Z") }));
+    const listBatch = async (offset: number, limit: number) => records.slice(offset, offset + limit);
+    const first = await createWorkspaceEventPage({ offset: 0, source: "login", pageSize: 10 }, listBatch);
+    const second = await createWorkspaceEventPage({ offset: first.nextOffset!, source: "login", pageSize: 10 }, listBatch);
+    const third = await createWorkspaceEventPage({ offset: second.nextOffset!, source: "login", pageSize: 10 }, listBatch);
+    expect(first.events.map((event) => event.id)).toEqual(Array.from({ length: 10 }, (_, index) => `event-${index * 2 + 1}`));
+    expect(second.events[0].id).toBe("event-21");
+    expect(first.nextOffset).toBe(20);
+    expect(third.nextOffset).toBeNull();
+  });
   it("maps safe event fields and derives dashboard totals", async () => {
     const dashboard = await createWorkspaceSecurityDashboard({
       listEvents: async () => [
         {
-          id: "event-high", externalId: "google-alert-123", source: "login", category: "authentication", type: "login_failure", severity: "high", title: "Falha de login", description: "Tentativa bloqueada", occurredAt: new Date("2026-09-17T10:00:00.000Z"), actor: "ana@example.com", target: "admin@example.com", ipAddress: "198.51.100.10", country: "BR", metadata: { token: "hidden" },
+          id: "event-high", externalId: "google-alert-123", source: "login", category: "authentication", type: "login_failure", severity: "high", title: "Falha de login", description: "Tentativa bloqueada", occurredAt: new Date("2026-09-17T10:00:00.000Z"), actor: "ana@example.com", target: "admin@example.com", ipAddress: "198.51.100.10", country: "BR", metadata: { token: "hidden", failure_type: "senha incorreta", login_type: "password" }, safeDetails: { affectedUsers: ["ana@example.com"] },
         },
         {
           id: "event-low", source: "drive", category: "data", type: "download", severity: "low", title: "Download", description: "Arquivo acessado", occurredAt: new Date("2026-09-17T09:00:00.000Z"), metadata: { path: "/confidential" },
@@ -24,6 +35,7 @@ describe("Workspace security dashboard", () => {
     expect(dashboard.posture).toEqual({ suspendedUsers: 2, usersWithoutTwoStepVerification: 5, suspendedUserDetails: [{ id: "u2", email: "suspenso@example.com" }], usersWithoutTwoStepVerificationDetails: [{ id: "u1", email: "ana@example.com", displayName: "Ana", orgUnitPath: "/Financeiro" }] });
     expect(dashboard.events[0]).toMatchObject({ id: "event-high", externalId: "google-alert-123", source: "login", severity: "high", actor: "ana@example.com", target: "admin@example.com", ipAddress: "198.51.100.10", country: "BR" });
     expect(dashboard.events[0]).not.toHaveProperty("metadata");
+    expect(dashboard.events[0]).toMatchObject({ details: [{ label: "Motivo da falha", value: "senha incorreta" }, { label: "Método de login", value: "password" }], safeDetails: { affectedUsers: ["ana@example.com"] } });
     expect(dashboard.summary.coveragePercent).toBe(50);
     expect(dashboard.sources[0]).toMatchObject({ source: "login", received: 3, collected: 2, persisted: 2, httpStatus: 200, coveragePercent: 50, rangeStart: "2026-06-20T00:00:00.000Z", rangeEnd: "2026-09-18T00:00:00.000Z" });
   });

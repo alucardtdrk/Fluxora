@@ -21,6 +21,8 @@ export interface WorkspaceDashboardEvent {
   readonly target?: string;
   readonly ipAddress?: string;
   readonly country?: string;
+  readonly details?: readonly { readonly label: string; readonly value: string }[];
+  readonly safeDetails?: { readonly reporterEmail?: string; readonly suspectedSender?: string; readonly subject?: string; readonly affectedUsers?: readonly string[]; readonly indicatorUrls?: readonly string[]; readonly attachmentNames?: readonly string[] };
 }
 
 export interface WorkspaceSecurityDashboard {
@@ -89,6 +91,17 @@ function dateValue(value: unknown): string {
 }
 
 function dashboardEvent(record: FirestoreRecord): WorkspaceDashboardEvent {
+  const metadata = record.metadata && typeof record.metadata === "object" ? record.metadata as FirestoreRecord : {};
+  const detailKeys: ReadonlyArray<[string, string]> = [["app_name", "Aplicativo"], ["client_name", "Aplicativo"], ["client_id", "ID do aplicativo"], ["scope", "Permissões"], ["scopes", "Permissões"], ["event_type", "Tipo de ação"], ["status", "Resultado"], ["failure_type", "Motivo da falha"], ["login_type", "Método de login"], ["role_name", "Função administrativa"], ["resource_name", "Recurso"], ["doc_title", "Documento"], ["visibility", "Visibilidade"], ["owner", "Proprietário"], ["user_email", "Usuário afetado"]];
+  const details = detailKeys.flatMap(([key, label]) => {
+    const value = metadata[key];
+    return typeof value === "string" && value.trim() ? [{ label, value: value.slice(0, 500) }] : [];
+  });
+  const safe = record.safeDetails && typeof record.safeDetails === "object" ? record.safeDetails as FirestoreRecord : null;
+  const safeDetails = safe ? {
+    reporterEmail: stringValue(safe.reporterEmail), suspectedSender: stringValue(safe.suspectedSender), subject: stringValue(safe.subject),
+    affectedUsers: stringList(safe.affectedUsers).slice(0, 20), indicatorUrls: stringList(safe.indicatorUrls).slice(0, 20), attachmentNames: stringList(safe.attachmentNames).slice(0, 20),
+  } : undefined;
   return {
     id: stringValue(record.id) ?? stringValue(record._documentId) ?? "",
     externalId: stringValue(record.externalId),
@@ -103,6 +116,8 @@ function dashboardEvent(record: FirestoreRecord): WorkspaceDashboardEvent {
     target: stringValue(record.target),
     ipAddress: stringValue(record.ipAddress),
     country: stringValue(record.country),
+    details,
+    safeDetails,
   };
 }
 
@@ -174,6 +189,40 @@ async function listWorkspaceEvents(): Promise<readonly FirestoreRecord[]> {
     orderBy: [{ field: { fieldPath: "occurredAt" }, direction: "DESCENDING" }],
     limit: 250,
   });
+}
+
+export async function createWorkspaceEventPage(
+  input: { offset: number; pageSize?: number; source?: string; severity?: string; category?: string; periodDays?: number },
+  listBatch: (offset: number, limit: number) => Promise<readonly FirestoreRecord[]>,
+): Promise<{ events: readonly WorkspaceDashboardEvent[]; nextOffset: number | null }> {
+  const pageSize = Math.min(Math.max(input.pageSize ?? 25, 1), 50);
+  const events: WorkspaceDashboardEvent[] = [];
+  let offset = input.offset;
+  const cutoff = input.periodDays ? Date.now() - input.periodDays * 86_400_000 : 0;
+  for (let batch = 0; batch < 5; batch++) {
+    const records = await listBatch(offset, 100);
+    const batchEnd = offset + records.length;
+    for (const record of records) {
+      offset++;
+      const event = dashboardEvent(record);
+      if ((input.source && event.source !== input.source) || (input.severity && event.severity !== input.severity) || (input.category && event.category !== input.category) || new Date(event.occurredAt).getTime() < cutoff) continue;
+      events.push(event);
+      if (events.length === pageSize) return { events, nextOffset: offset < batchEnd || records.length === 100 ? offset : null };
+    }
+    if (records.length < 100) return { events, nextOffset: null };
+  }
+  return { events, nextOffset: offset };
+}
+
+export async function getWorkspaceEventPage(input: { offset: number; source?: string; severity?: string; category?: string; periodDays?: number }) {
+  if (!isFirestoreConfigured()) return { events: [], nextOffset: null };
+  return createWorkspaceEventPage(input, (offset, limit) => runFirestoreQuery({
+    select: { fields: ["externalId", "source", "category", "type", "severity", "title", "description", "occurredAt", "actor", "target", "ipAddress", "country", "metadata", "safeDetails"].map((fieldPath) => ({ fieldPath })) },
+    from: [{ collectionId: WORKSPACE_SECURITY_EVENTS_COLLECTION }],
+    orderBy: [{ field: { fieldPath: "occurredAt" }, direction: "DESCENDING" }],
+    offset,
+    limit,
+  }));
 }
 
 export async function getWorkspaceSecurityDashboard(): Promise<WorkspaceSecurityDashboard> {
