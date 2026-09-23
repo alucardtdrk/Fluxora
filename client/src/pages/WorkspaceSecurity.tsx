@@ -50,13 +50,21 @@ function EventDetail({ label, value }: { label: string; value?: string }) {
   return <div><dt className="text-xs font-medium text-[#667085]">{label}</dt><dd className="mt-1 break-words text-sm text-[#1d2939]">{value}</dd></div>;
 }
 
+function eventName(source: string, type: string, fallback: string) {
+  const names: Record<string, string> = {
+    login_success: "Login realizado", login_failure: "Falha de login", login_verification: "Verificação de login", suspicious_login: "Login suspeito",
+    authorize: "Aplicativo autorizado a acessar a conta", activity: "Atividade de acesso por aplicativo", change_event: "Evento da agenda alterado", ALERT_CENTER_VIEW: "Alerta consultado no Admin Console",
+  };
+  return names[type] ?? (source === "alert_center" ? fallback : type.replaceAll("_", " ").replace(/^./, (letter) => letter.toUpperCase()));
+}
+
 export default function WorkspaceSecurity() {
   const { user } = useAuth();
   const dashboard = trpc.workspaceSecurity.overview.useQuery(undefined, { retry: false, refetchInterval: 30_000 });
   const automaticRefreshStarted = useRef(false);
   const refreshCurrent = trpc.workspaceSecurity.refreshCurrent.useMutation({
     onSuccess: async (result) => {
-      await dashboard.refetch();
+      await Promise.all([dashboard.refetch(), page.refetch()]);
       const statuses = Object.values(result.sources);
       const saved = statuses.reduce((total, item) => total + item.persisted, 0);
       const failures = statuses.filter((item) => item.status === "failure").length;
@@ -69,7 +77,7 @@ export default function WorkspaceSecurity() {
   });
   const continueBackfill = trpc.workspaceSecurity.continueBackfill.useMutation({
     onSuccess: async (result) => {
-      await dashboard.refetch();
+      await Promise.all([dashboard.refetch(), page.refetch()]);
       if (result.windowsProcessed > 0) {
         toast.success("Lote histórico concluído", { description: `${result.eventsCollected.toLocaleString("pt-BR")} eventos coletados; ${result.sourcesCompleted} fonte${result.sourcesCompleted === 1 ? "" : "s"} concluída${result.sourcesCompleted === 1 ? "" : "s"}.` });
       } else {
@@ -78,16 +86,18 @@ export default function WorkspaceSecurity() {
     },
     onError: (error) => toast.error("O histórico não avançou", { description: error.message || "Tente novamente em instantes." }),
   });
+  const fullSync = trpc.admin.syncGoogleWorkspace.useMutation({
+    onSuccess: async (result) => { await Promise.all([dashboard.refetch(), page.refetch()]); if (result.status === "failure") toast.error("A coleta não conseguiu atualizar as fontes"); else if (result.status === "partial") toast.warning("Coleta parcial: verifique as fontes com aviso"); else toast.success("Coleta completa finalizada"); },
+    onError: (error) => toast.error("A coleta completa falhou", { description: error.message }),
+  });
   const [source, setSource] = useState("all");
   const [severity, setSeverity] = useState("all");
   const [period, setPeriod] = useState("90d");
   const [category, setCategory] = useState("all");
-  const events = useMemo(() => (dashboard.data?.events ?? []).filter((event) =>
-    (source === "all" || event.source === source) &&
-    (severity === "all" || event.severity === severity) &&
-    (category === "all" || event.category === category) &&
-    new Date(event.occurredAt).getTime() >= Date.now() - Number.parseInt(period, 10) * 24 * 60 * 60 * 1_000,
-  ), [category, dashboard.data?.events, period, severity, source]);
+  const [pageOffsets, setPageOffsets] = useState([0]);
+  const page = trpc.workspaceSecurity.eventsPage.useQuery({ offset: pageOffsets[pageOffsets.length - 1], source: source === "all" ? undefined : source, severity: severity === "all" ? undefined : severity, category: category === "all" ? undefined : category, periodDays: Number.parseInt(period, 10) }, { retry: false });
+  const events = page.data?.events ?? [];
+  useEffect(() => { setPageOffsets([0]); }, [source, severity, category, period]);
   const categories = useMemo(() => [...new Set((dashboard.data?.events ?? []).map((event) => event.category))].sort(), [dashboard.data?.events]);
   const summary = dashboard.data?.summary ?? { recentEvents: 0, highOrCriticalEvents: 0, coveragePercent: 0 };
   const posture = dashboard.data?.posture;
@@ -108,15 +118,15 @@ export default function WorkspaceSecurity() {
     {user?.role === "admin" && <div className="mt-4"><Button disabled={refreshCurrent.isPending} onClick={() => refreshCurrent.mutate()}>{refreshCurrent.isPending ? "Atualizando…" : "Atualizar segurança agora"}</Button></div>}
 
     <div className="mt-7 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-      <MetricCard icon={ShieldCheck} label="Eventos recentes" value={summary.recentEvents} description="Registros disponíveis para análise." />
-      <MetricCard icon={ShieldAlert} label="Alta ou crítica" value={summary.highOrCriticalEvents} description="Eventos que exigem atenção prioritária." />
+      <MetricCard icon={ShieldCheck} label="Eventos na amostra" value={summary.recentEvents} description="Até 250 registros mais recentes; use a lista paginada para ver os anteriores." />
+      <MetricCard icon={ShieldAlert} label="Alta ou crítica na amostra" value={summary.highOrCriticalEvents} description="Eventos prioritários entre os 250 mais recentes." />
       <MetricCard icon={AlertTriangle} label="Sem 2SV" value={posture?.usersWithoutTwoStepVerification ?? 0} description="Usuários sem verificação em duas etapas." />
       <MetricCard icon={UserRoundX} label="Usuários suspensos" value={posture?.suspendedUsers ?? 0} description="Contas suspensas no diretório." />
     </div>
 
-    <Card className="mt-6 border-0"><CardContent className="flex flex-wrap items-center justify-between gap-4 p-5"><div className="min-w-[260px] flex-1"><p className="text-sm font-semibold">Cobertura histórica de 90 dias</p><p className="mt-1 text-sm text-[#667085]">{summary.coveragePercent}% concluída em lotes pequenos para preservar a CPU da Vercel.</p><div className="mt-3 h-2 max-w-md overflow-hidden rounded-full bg-[#ececf3]"><div className="h-full bg-[#4355D8]" style={{ width: `${summary.coveragePercent}%` }} /></div></div>{user?.role === "admin" && <Button variant="outline" disabled={continueBackfill.isPending} onClick={() => continueBackfill.mutate()}>{continueBackfill.isPending ? "Avançando…" : "Continuar histórico"}</Button>}</CardContent></Card>
+    <details className="mt-6 rounded-xl bg-white p-5 shadow-sm"><summary className="cursor-pointer text-sm font-semibold">Coleta completa e histórico (opcional)</summary><p className="mt-3 text-sm text-[#667085]">A coleta completa atualiza todas as fontes e a postura do domínio. É mais demorada que a atualização rápida.</p>{user?.role === "admin" && <Button className="mt-3" variant="outline" disabled={fullSync.isPending} onClick={() => fullSync.mutate()}>{fullSync.isPending ? "Coletando…" : "Coletar todas as fontes"}</Button>}<p className="mt-4 text-sm text-[#667085]">{summary.coveragePercent}% dos 90 dias importados. Isso não mede a coleta dos eventos atuais.</p><div className="mt-3 h-2 max-w-md overflow-hidden rounded-full bg-[#ececf3]"><div className="h-full bg-[#4355D8]" style={{ width: `${summary.coveragePercent}%` }} /></div>{user?.role === "admin" && <Button className="mt-4" variant="outline" disabled={continueBackfill.isPending} onClick={() => continueBackfill.mutate()}>{continueBackfill.isPending ? "Avançando…" : "Continuar histórico"}</Button>}</details>
 
-    <Card className="mt-6 border-0"><CardHeader><CardTitle className="text-base">Fontes de auditoria</CardTitle></CardHeader><CardContent>{sources.length === 0 ? <p className="text-sm text-[#667085]">Execute uma sincronização para registrar as fontes.</p> : <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">{sources.map((item) => <div key={item.source} className="rounded-xl border p-3"><p className="font-medium">{sourceLabels[item.source] ?? item.source}</p><p className="mt-1 text-xs text-[#667085]">{item.status === "ok" ? "Ativa" : item.status === "empty" ? "Sem eventos" : item.status === "incomplete" ? "Mais páginas pendentes" : item.status === "failure" ? "Requer atenção" : "Aguardando"} · {item.received} recebidos · {item.collected} aceitos · {item.persisted} salvos</p><p className="mt-1 text-xs text-[#667085]">{item.coveragePercent}% do histórico{item.completedAt ? ` · atualizado ${new Date(item.completedAt).toLocaleString("pt-BR")}` : ""}</p>{item.rangeStart && item.rangeEnd && <p className="mt-1 text-xs text-[#667085]">Período: {new Date(item.rangeStart).toLocaleDateString("pt-BR")} a {new Date(item.rangeEnd).toLocaleDateString("pt-BR")}</p>}{item.safeError && <p className="mt-1 text-xs text-[#bd6338]">{item.safeError === "permission" ? "Revise a delegação de domínio e os escopos desta fonte." : item.safeError === "configuration" ? "Revise a configuração da integração." : item.safeError === "invalid_request" ? "O Google rejeitou os parâmetros desta consulta." : item.safeError === "rate_limited" ? "O limite temporário do Google foi atingido; tente novamente depois." : item.safeError === "upstream" ? "O Google apresentou uma indisponibilidade temporária." : "A fonte não respondeu como esperado; tente novamente."}{item.httpStatus ? ` (HTTP ${item.httpStatus})` : ""}</p>}</div>)}</div>}</CardContent></Card>
+    <Card className="mt-6 border-0"><CardHeader><CardTitle className="text-base">Fontes de auditoria</CardTitle><p className="text-xs text-[#667085]">Os números abaixo mostram apenas a última coleta de cada fonte, não o total armazenado.</p></CardHeader><CardContent>{sources.length === 0 ? <p className="text-sm text-[#667085]">Execute uma sincronização para registrar as fontes.</p> : <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">{sources.map((item) => <div key={item.source} className="rounded-xl border p-3"><p className="font-medium">{sourceLabels[item.source] ?? item.source}</p><p className="mt-1 text-xs text-[#667085]">{item.status === "ok" ? "Ativa" : item.status === "empty" ? "Sem eventos no último lote" : item.status === "incomplete" ? "Mais páginas pendentes" : item.status === "failure" ? "Requer atenção" : "Aguardando"}</p><p className="mt-1 text-xs text-[#667085]">Última coleta: {item.received} recebidos · {item.collected} aceitos · {item.persisted} salvos{item.completedAt ? ` · ${new Date(item.completedAt).toLocaleString("pt-BR")}` : ""}</p>{item.safeError && <p className="mt-1 text-xs text-[#bd6338]">{item.safeError === "permission" ? "Revise a delegação de domínio e os escopos desta fonte." : item.safeError === "configuration" ? "Revise a configuração da integração." : item.safeError === "invalid_request" ? "O Google rejeitou os parâmetros desta consulta." : item.safeError === "rate_limited" ? "O limite temporário do Google foi atingido; tente novamente depois." : item.safeError === "upstream" ? "O Google apresentou uma indisponibilidade temporária." : "A fonte não respondeu como esperado; tente novamente."}{item.httpStatus ? ` (HTTP ${item.httpStatus})` : ""}</p>}</div>)}</div>}</CardContent></Card>
 
     {posture && <Card className="mt-6 border-0"><CardHeader><CardTitle className="text-base">Postura acionável</CardTitle></CardHeader><CardContent className="grid gap-5 md:grid-cols-2"><div><p className="font-medium">Sem verificação em duas etapas</p><div className="mt-3 max-h-52 space-y-2 overflow-y-auto">{posture.usersWithoutTwoStepVerificationDetails.map((person) => <div key={person.id} className="rounded-lg bg-[#f8f9fc] p-3 text-sm"><p className="font-medium">{person.displayName ?? person.email ?? person.id}</p><p className="text-xs text-[#667085]">{person.email}{person.orgUnitPath ? ` · ${person.orgUnitPath}` : ""}</p></div>)}</div></div><div><p className="font-medium">Contas suspensas</p><div className="mt-3 max-h-52 space-y-2 overflow-y-auto">{posture.suspendedUserDetails.map((person) => <div key={person.id} className="rounded-lg bg-[#f8f9fc] p-3 text-sm"><p className="font-medium">{person.displayName ?? person.email ?? person.id}</p><p className="text-xs text-[#667085]">{person.email}{person.orgUnitPath ? ` · ${person.orgUnitPath}` : ""}</p></div>)}</div></div></CardContent></Card>}
 
@@ -125,13 +135,14 @@ export default function WorkspaceSecurity() {
     </CardContent></Card>
 
     <Card className="mt-6 border-0"><CardHeader className="gap-4 sm:flex-row sm:items-center sm:justify-between"><div><CardTitle className="text-base">Eventos recentes</CardTitle><p className="mt-1 text-xs text-[#667085]">Dados somente de leitura sincronizados do Google Workspace.</p></div><div className="flex flex-wrap gap-2"><Select value={period} onValueChange={setPeriod}><SelectTrigger className="w-[110px]"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="1d">24 horas</SelectItem><SelectItem value="7d">7 dias</SelectItem><SelectItem value="30d">30 dias</SelectItem><SelectItem value="90d">90 dias</SelectItem></SelectContent></Select><Select value={source} onValueChange={setSource}><SelectTrigger className="w-[145px]"><SelectValue placeholder="Origem" /></SelectTrigger><SelectContent><SelectItem value="all">Todas as origens</SelectItem>{Object.entries(sourceLabels).map(([value, label]) => <SelectItem key={value} value={value}>{label}</SelectItem>)}</SelectContent></Select><Select value={category} onValueChange={setCategory}><SelectTrigger className="w-[145px]"><SelectValue placeholder="Categoria" /></SelectTrigger><SelectContent><SelectItem value="all">Todas categorias</SelectItem>{categories.map((value) => <SelectItem key={value} value={value}>{value}</SelectItem>)}</SelectContent></Select><Select value={severity} onValueChange={setSeverity}><SelectTrigger className="w-[135px]"><SelectValue placeholder="Severidade" /></SelectTrigger><SelectContent><SelectItem value="all">Todas</SelectItem>{Object.entries(severityLabels).map(([value, label]) => <SelectItem key={value} value={value}>{label}</SelectItem>)}</SelectContent></Select></div></CardHeader><CardContent>
-      {dashboard.isLoading ? <p className="py-10 text-center text-sm text-[#667085]">Carregando eventos de segurança…</p> : dashboard.isError ? <p className="py-10 text-center text-sm text-[#bd6338]">Não foi possível carregar os dados de segurança. Tente novamente em instantes.</p> : events.length === 0 ? <p className="py-10 text-center text-sm text-[#667085]">Nenhum evento encontrado para os filtros selecionados.</p> : <div className="overflow-x-auto"><table className="w-full min-w-[760px] text-left text-sm"><thead className="border-b text-xs text-[#667085]"><tr><th className="pb-3 font-medium">Data</th><th className="pb-3 font-medium">Origem</th><th className="pb-3 font-medium">Severidade</th><th className="pb-3 font-medium">Evento</th><th className="pb-3 font-medium">Ator</th></tr></thead><tbody>{events.map((event) => <tr key={event.id} tabIndex={0} role="button" aria-label={`Ver detalhes de ${event.title}`} className="cursor-pointer border-b outline-none transition-colors hover:bg-[#f7f8ff] focus-visible:bg-[#f7f8ff] last:border-0" onClick={() => setSelectedEvent(event)} onKeyDown={(key) => { if (key.key === "Enter" || key.key === " ") { key.preventDefault(); setSelectedEvent(event); } }}><td className="py-4 text-[#667085]">{new Date(event.occurredAt).toLocaleString("pt-BR")}</td><td className="py-4">{sourceLabels[event.source] ?? event.source}</td><td className="py-4"><span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${severityClass(event.severity)}`}>{severityLabels[event.severity] ?? event.severity}</span></td><td className="py-4"><p className="font-medium">{event.title}</p><p className="mt-1 max-w-md text-xs text-[#667085]">{event.description}</p></td><td className="py-4 text-[#667085]">{event.actor ?? "—"}</td></tr>)}</tbody></table></div>}
+      {page.isLoading ? <p className="py-10 text-center text-sm text-[#667085]">Carregando eventos de segurança…</p> : page.isError ? <p className="py-10 text-center text-sm text-[#bd6338]">Não foi possível carregar os eventos. Tente novamente em instantes.</p> : events.length === 0 ? <p className="py-10 text-center text-sm text-[#667085]">Nenhum evento encontrado nesta página.</p> : <div className="overflow-x-auto"><table className="w-full min-w-[760px] text-left text-sm"><thead className="border-b text-xs text-[#667085]"><tr><th className="pb-3 font-medium">Data</th><th className="pb-3 font-medium">Origem</th><th className="pb-3 font-medium">Severidade</th><th className="pb-3 font-medium">Evento</th><th className="pb-3 font-medium">Ator</th></tr></thead><tbody>{events.map((event) => <tr key={event.id} tabIndex={0} role="button" aria-label={`Ver detalhes de ${eventName(event.source, event.type, event.title)}`} className="cursor-pointer border-b outline-none transition-colors hover:bg-[#f7f8ff] focus-visible:bg-[#f7f8ff] last:border-0" onClick={() => setSelectedEvent(event)} onKeyDown={(key) => { if (key.key === "Enter" || key.key === " ") { key.preventDefault(); setSelectedEvent(event); } }}><td className="py-4 text-[#667085]">{new Date(event.occurredAt).toLocaleString("pt-BR")}</td><td className="py-4">{sourceLabels[event.source] ?? event.source}</td><td className="py-4"><span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${severityClass(event.severity)}`}>{severityLabels[event.severity] ?? event.severity}</span></td><td className="py-4"><p className="font-medium">{eventName(event.source, event.type, event.title)}</p><p className="mt-1 max-w-md text-xs text-[#667085]">{event.target ? `Alvo: ${event.target}` : event.details?.[0] ? `${event.details[0].label}: ${event.details[0].value}` : event.ipAddress ? `IP: ${event.ipAddress}` : event.description}</p></td><td className="py-4 text-[#667085]">{event.actor ?? "—"}</td></tr>)}</tbody></table></div>}
+      <div className="mt-4 flex items-center justify-end gap-3"><span className="text-xs text-[#667085]">Página {pageOffsets.length} · até 25 eventos</span><Button variant="outline" disabled={pageOffsets.length === 1 || page.isFetching} onClick={() => setPageOffsets((current) => current.slice(0, -1))}>Anterior</Button><Button variant="outline" disabled={page.data?.nextOffset == null || page.isFetching} onClick={() => { if (page.data?.nextOffset != null) setPageOffsets((current) => [...current, page.data!.nextOffset!]); }}>Próxima</Button></div>
     </CardContent></Card>
 
     <Dialog open={Boolean(selectedEvent)} onOpenChange={(open) => { if (!open) setSelectedEvent(null); }}>
       <DialogContent className="max-h-[88vh] overflow-y-auto sm:max-w-2xl">
         <DialogHeader>
-          <DialogTitle>{selectedEvent?.title}</DialogTitle>
+          <DialogTitle>{selectedEvent ? eventName(selectedEvent.source, selectedEvent.type, selectedEvent.title) : "Evento"}</DialogTitle>
           <DialogDescription>Detalhes seguros sincronizados do Google Workspace.</DialogDescription>
         </DialogHeader>
         {selectedEvent && <div className="space-y-5">
@@ -147,8 +158,15 @@ export default function WorkspaceSecurity() {
             <EventDetail label="Alvo" value={selectedEvent.target} />
             <EventDetail label="Endereço IP" value={selectedEvent.ipAddress} />
             <EventDetail label="País" value={selectedEvent.country} />
+            {selectedEvent.details?.map((detail) => <EventDetail key={detail.label} label={detail.label} value={detail.value} />)}
+            <EventDetail label="Usuários afetados" value={selectedEvent.safeDetails?.affectedUsers?.join(", ")} />
+            <EventDetail label="Remetente suspeito" value={selectedEvent.safeDetails?.suspectedSender} />
+            <EventDetail label="Assunto" value={selectedEvent.safeDetails?.subject} />
+            <EventDetail label="Indicadores" value={selectedEvent.safeDetails?.indicatorUrls?.join(", ")} />
+            <EventDetail label="Anexos" value={selectedEvent.safeDetails?.attachmentNames?.join(", ")} />
           </dl>
-          <div className="rounded-lg bg-[#f8f9fc] p-4 text-sm text-[#475467]">Revise o evento no Google Admin Console antes de realizar qualquer ação.</div>
+          {(!selectedEvent.details?.length && !selectedEvent.safeDetails) && <p className="text-xs text-[#667085]">O Google não forneceu mais detalhes utilizáveis para este registro.</p>}
+          <div className="rounded-lg bg-[#f8f9fc] p-4 text-sm text-[#475467]">{selectedEvent.source === "oauth_token" ? "Confirme com o usuário se reconhece o aplicativo e as permissões solicitadas. Se não reconhecer, investigue o acesso no Google Admin Console antes de revogar." : selectedEvent.source === "login" ? "Confirme o resultado, IP e conta afetada no Google Admin Console. Se houver atividade não reconhecida, siga o procedimento de resposta a incidentes." : "Revise o evento no Google Admin Console antes de realizar qualquer ação."}</div>
         </div>}
       </DialogContent>
     </Dialog>
