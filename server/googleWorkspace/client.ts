@@ -5,6 +5,7 @@ const RETRYABLE_STATUS_CODES = new Set([429, 500, 502, 503, 504]);
 const MAX_REQUEST_ATTEMPTS = 3;
 const INITIAL_BACKOFF_MILLISECONDS = 1_000;
 const MAX_BACKOFF_MILLISECONDS = 8_000;
+const REQUEST_TIMEOUT_MILLISECONDS = 15_000;
 
 export type GoogleWorkspaceClientErrorCode = "invalid_url" | "request_failed" | "upstream_error" | "invalid_response" | "pagination_cycle";
 
@@ -29,6 +30,7 @@ export interface GoogleWorkspaceClientDependencies {
   readonly fetch?: typeof fetch;
   readonly sleep?: (milliseconds: number) => Promise<void>;
   readonly now?: () => Date;
+  readonly requestTimeoutMilliseconds?: number;
 }
 
 export interface GoogleWorkspacePaginationOptions {
@@ -43,17 +45,20 @@ class ReadOnlyGoogleWorkspaceClient implements GoogleWorkspaceClient {
   #fetcher: typeof fetch;
   #sleep: (milliseconds: number) => Promise<void>;
   #now: () => Date;
+  #requestTimeoutMilliseconds: number;
 
   constructor(
     tokenProvider: GoogleWorkspaceTokenProvider,
     fetcher: typeof fetch,
     sleep: (milliseconds: number) => Promise<void>,
     now: () => Date,
+    requestTimeoutMilliseconds: number,
   ) {
     this.#tokenProvider = tokenProvider;
     this.#fetcher = fetcher;
     this.#sleep = sleep;
     this.#now = now;
+    this.#requestTimeoutMilliseconds = requestTimeoutMilliseconds;
   }
 
   async getJson<T>(url: URL): Promise<T> {
@@ -78,6 +83,7 @@ class ReadOnlyGoogleWorkspaceClient implements GoogleWorkspaceClient {
             authorization: `Bearer ${accessToken}`,
             "user-agent": "Fluxora Google Workspace Security Client",
           },
+          signal: AbortSignal.timeout(this.#requestTimeoutMilliseconds),
         });
       } catch {
         throw new GoogleWorkspaceClientError("request_failed");
@@ -193,5 +199,6 @@ export function createGoogleWorkspaceClient(
     dependencies.fetch ?? globalThis.fetch,
     dependencies.sleep ?? defaultSleep,
     dependencies.now ?? (() => new Date()),
+    dependencies.requestTimeoutMilliseconds ?? REQUEST_TIMEOUT_MILLISECONDS,
   );
 }

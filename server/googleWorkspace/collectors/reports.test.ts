@@ -100,6 +100,16 @@ describe("Reports collector", () => {
     });
   });
 
+  it("accepts an ISO activity timestamp returned by the Reports API", () => {
+    const events = normalizeReportsActivity("login", {
+      ...loginActivity,
+      id: { ...loginActivity.id, time: "2026-09-21T14:47:23.000Z" },
+    }, new Date("2026-09-21T15:00:00.000Z"));
+
+    expect(events).toHaveLength(2);
+    expect(events[0]?.occurredAt.toISOString()).toBe("2026-09-21T14:47:23.000Z");
+  });
+
   it("drops only superadministrator password reset events", () => {
     expect(normalizeReportsActivity("admin", adminPasswordResetActivity, new Date("2026-09-17T12:10:00.000Z"))).toEqual([]);
     expect(normalizeReportsActivity("admin", adminRoleActivity, new Date("2026-09-17T12:10:00.000Z"))).toHaveLength(1);

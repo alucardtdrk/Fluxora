@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { GoogleWorkspaceClient } from "../client.js";
+import type { GoogleWorkspaceClient, GoogleWorkspacePaginationOptions } from "../client.js";
 import { collectAlertCenterEvidence, collectAlertCenterEvidenceBatch } from "./alertCenter.js";
 import {
   isExcludedSuperadminPasswordReset,
@@ -69,13 +69,24 @@ class PageClient implements GoogleWorkspaceClient {
     throw new Error("Alert Center collection must use pagination");
   }
 
-  async *paginate<T>(url: URL): AsyncIterable<T> {
+  async *paginate<T>(url: URL, options: GoogleWorkspacePaginationOptions = {}): AsyncIterable<T> {
     this.requestedUrls.push(url.toString());
-    for (const page of this.pages) yield page as T;
+    for (const [index, page] of this.pages.slice(0, options.maxPages).entries()) {
+      yield page as T;
+      options.onPage?.({ pageNumber: index + 1, nextPageToken: (page as { nextPageToken?: string }).nextPageToken });
+    }
   }
 }
 
 describe("Alert Center collector", () => {
+  it("collects only one current page and returns a cursor for the next refresh", async () => {
+    const client = new PageClient([{ alerts: [accountTakeoverAlert], nextPageToken: "second-page" }, { alerts: [phishingAlert] }]);
+    const result = await collectAlertCenterEvidenceBatch({ client, customerId: "C01234567", rangeStart: new Date("2026-09-16T09:00:00.000Z"), rangeEnd: new Date("2026-09-16T12:00:00.000Z"), maxPages: 1, pageSize: 100 });
+
+    expect(result).toMatchObject({ alertsRead: 1, truncated: true, nextPageToken: "second-page" });
+    expect(client.requestedUrls[0]).toContain("pageSize=100");
+    expect(new URL(client.requestedUrls[0]!).searchParams.get("filter")).toContain('createTime <= "2026-09-16T12:00:00.000Z"');
+  });
   it("reports how many raw alerts Google returned before normalization", async () => {
     const client = new PageClient([{ alerts: [accountTakeoverAlert, superadminPasswordResetAlert] }]);
 

@@ -11,4 +11,8 @@ describe("Workspace security refresh policy", () => {
     expect(shouldRefreshCurrentSecurity(sources, new Date("2026-09-21T15:00:00.000Z"))).toBe(true);
     expect(shouldRefreshCurrentSecurity([{ ...sources[0], completedAt: "2026-09-21T14:56:00.000Z" }], new Date("2026-09-21T15:00:00.000Z"))).toBe(false);
   });
+
+  it("continues an unfinished Alert Center page even when it just ran", () => {
+    expect(shouldRefreshCurrentSecurity([{ source: "alert_center", status: "incomplete", completedAt: "2026-09-21T14:59:00.000Z" }], new Date("2026-09-21T15:00:00.000Z"))).toBe(true);
+  });
 });

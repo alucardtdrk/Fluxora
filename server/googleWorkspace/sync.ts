@@ -1,5 +1,5 @@
-export interface WorkspaceSyncSource { readonly name: string; run(): Promise<{ collected: number; persisted: number; received?: number }> }
-export type WorkspaceSourceStatus = "ok" | "empty" | "failure";
+export interface WorkspaceSyncSource { readonly name: string; run(): Promise<{ collected: number; persisted: number; received?: number; incomplete?: boolean }> }
+export type WorkspaceSourceStatus = "ok" | "empty" | "incomplete" | "failure";
 export type WorkspaceSourceSafeError = "permission" | "configuration" | "invalid_request" | "rate_limited" | "upstream" | "unknown";
 export interface WorkspaceSyncSummary { status: "success" | "partial" | "failure" | "skipped_locked"; startedAt: string; finishedAt: string; sources: Record<string, { status: WorkspaceSourceStatus; collected: number; persisted: number; received?: number; safeError?: WorkspaceSourceSafeError; httpStatus?: number }>; expiredEventsRemoved: number }
 
@@ -29,11 +29,11 @@ export function createWorkspaceSync(input: { readonly sources: readonly Workspac
       settled.forEach((result, index) => {
         const name = input.sources[index]!.name;
         sources[name] = result.status === "fulfilled"
-          ? { status: result.value.collected === 0 ? "empty" : "ok", ...result.value }
+          ? { status: result.value.incomplete ? "incomplete" : result.value.collected === 0 ? "empty" : "ok", ...result.value }
           : { status: "failure", collected: 0, persisted: 0, ...safeFailure(result.reason) };
       });
       const successes = Object.values(sources).filter((item) => item.status !== "failure").length;
-      return { status: successes === input.sources.length ? "success" : successes ? "partial" : "failure", startedAt, finishedAt: now().toISOString(), sources, expiredEventsRemoved: 0 };
+      return { status: successes === input.sources.length && !Object.values(sources).some((item) => item.status === "incomplete") ? "success" : successes ? "partial" : "failure", startedAt, finishedAt: now().toISOString(), sources, expiredEventsRemoved: 0 };
     } finally { running = false; }
   } };
 }

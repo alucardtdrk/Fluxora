@@ -124,7 +124,7 @@ describe("Google Workspace security runtime", () => {
     const reportApplications: string[] = [];
     let alertCollections = 0;
     let postureCollections = 0;
-    let backfillCollections = 0;
+    let reportCollections = 0;
     const sync = createGoogleWorkspaceSecuritySync({
       config: { customerId: "customer", domain: "example.com" }, client: {} as never,
       repository: {
@@ -132,10 +132,9 @@ describe("Google Workspace security runtime", () => {
         saveSourceBatch: async (input) => ({ insertedOrUpdated: input.events.length }),
         saveDirectoryPosture: async () => undefined, listRecentEvents: async () => [], saveFindings: async () => ({ insertedOrUpdated: 0 }),
       },
-      collectAlertCenter: async () => { alertCollections += 1; return []; },
-      collectReports: async (input) => { reportApplications.push(input.application); return []; },
+      collectAlertCenterBatch: async () => { alertCollections += 1; return { events: [], alertsRead: 0, truncated: false }; },
       collectDirectory: async () => { postureCollections += 1; return { capturedAt: new Date(), domain: "example.com" } as never; },
-      collectReportsBatch: async () => { backfillCollections += 1; return { events: [], pagesRead: 1, truncated: false, rangeEnd: new Date() }; },
+      collectReportsBatch: async (input) => { reportApplications.push(input.application); reportCollections += 1; return { events: [], pagesRead: 1, recordsRead: 0, truncated: false, rangeEnd: new Date() }; },
       now: () => new Date("2026-09-21T15:00:00.000Z"),
     });
 
@@ -144,7 +143,47 @@ describe("Google Workspace security runtime", () => {
     expect(alertCollections).toBe(1);
     expect(reportApplications).toEqual(["login", "admin", "token", "rules"]);
     expect(postureCollections).toBe(0);
-    expect(backfillCollections).toBe(0);
+    expect(reportCollections).toBe(4);
     expect(result.sources).toHaveProperty("alert_center");
+  });
+
+  it("finishes a current refresh after one page per source and resumes remaining pages", async () => {
+    const saved: Array<{ source: string; current?: { start: string; end: string; pageToken?: string }; lastSuccessfulEventAt?: string }> = [];
+    const reportRequests: Array<{ application: string; maxPages?: number; startPageToken?: string; rangeStart?: Date; rangeEnd?: Date }> = [];
+    const state = new Map<string, { lastSuccessfulEventAt: Date | null; currentStart?: Date | null; currentEnd?: Date | null; currentPageToken?: string | null }>();
+    const sync = createGoogleWorkspaceSecuritySync({
+      config: { customerId: "customer", domain: "example.com" }, client: {} as never,
+      repository: {
+        getSourceState: async (source) => state.get(source) ?? null,
+        saveSourceBatch: async (input) => {
+          saved.push(input);
+          state.set(input.source, {
+            lastSuccessfulEventAt: input.lastSuccessfulEventAt ? new Date(input.lastSuccessfulEventAt) : null,
+            currentStart: input.current?.pageToken ? new Date(input.current.start) : null,
+            currentEnd: input.current?.pageToken ? new Date(input.current.end) : null,
+            currentPageToken: input.current?.pageToken ?? null,
+          });
+          return { insertedOrUpdated: input.events.length };
+        },
+        saveDirectoryPosture: async () => undefined, listRecentEvents: async () => [], saveFindings: async () => ({ insertedOrUpdated: 0 }),
+      },
+      collectAlertCenterBatch: async () => ({ events: [], alertsRead: 0, truncated: false }),
+      collectReportsBatch: async (request) => {
+        reportRequests.push(request);
+        return { events: [], pagesRead: 1, recordsRead: 0, truncated: !request.startPageToken, nextPageToken: request.startPageToken ? undefined : "second", rangeEnd: request.rangeEnd };
+      },
+      now: () => new Date("2026-09-23T12:00:00.000Z"),
+    });
+
+    const first = await sync.runCurrent();
+    const second = await sync.runCurrent();
+
+    expect(first.sources.login).toMatchObject({ status: "incomplete" });
+    expect(reportRequests.filter((request) => request.application === "login")).toEqual([
+      expect.objectContaining({ maxPages: 1, startPageToken: undefined }),
+      expect.objectContaining({ maxPages: 1, startPageToken: "second", rangeStart: reportRequests[0]?.rangeStart, rangeEnd: reportRequests[0]?.rangeEnd }),
+    ]);
+    expect(second.sources.login).toMatchObject({ status: "empty" });
+    expect(saved.filter((item) => item.source === "login").at(-1)?.lastSuccessfulEventAt).toBe("2026-09-23T12:00:00.000Z");
   });
 });

@@ -99,8 +99,7 @@ function categoryFor(application: ReportsApplicationName): string {
 
 function activityTime(time: string): Date | null {
   const epochSeconds = Number(time);
-  if (!Number.isFinite(epochSeconds)) return null;
-  const occurredAt = new Date(epochSeconds * 1_000);
+  const occurredAt = Number.isFinite(epochSeconds) ? new Date(epochSeconds * 1_000) : new Date(time);
   return Number.isNaN(occurredAt.getTime()) ? null : occurredAt;
 }
 

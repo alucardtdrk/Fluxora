@@ -7,6 +7,7 @@ const GOOGLE_OAUTH_TOKEN_ENDPOINT = "https://oauth2.googleapis.com/token";
 const JWT_BEARER_GRANT_TYPE = "urn:ietf:params:oauth:grant-type:jwt-bearer";
 const ASSERTION_LIFETIME_SECONDS = 60 * 60;
 const TOKEN_RENEWAL_WINDOW_MILLISECONDS = 60 * 1000;
+const TOKEN_REQUEST_TIMEOUT_MILLISECONDS = 15_000;
 
 interface GoogleWorkspaceAssertionClaims extends JWTPayload {
   readonly iss: string;
@@ -54,6 +55,7 @@ export interface GoogleWorkspaceTokenProviderDependencies {
   readonly fetch?: typeof fetch;
   readonly now?: () => Date;
   readonly signAssertion?: GoogleWorkspaceAssertionSigner;
+  readonly requestTimeoutMilliseconds?: number;
 }
 
 function createJoseAssertionSigner(privateKey: string): GoogleWorkspaceAssertionSigner {
@@ -102,17 +104,20 @@ class CachedGoogleWorkspaceTokenProvider implements GoogleWorkspaceTokenProvider
   #fetcher: typeof fetch;
   #now: () => Date;
   #signAssertion: GoogleWorkspaceAssertionSigner;
+  #requestTimeoutMilliseconds: number;
 
   constructor(
     config: GoogleWorkspaceConfig,
     fetcher: typeof fetch,
     now: () => Date,
     signAssertion: GoogleWorkspaceAssertionSigner,
+    requestTimeoutMilliseconds: number,
   ) {
     this.#config = config;
     this.#fetcher = fetcher;
     this.#now = now;
     this.#signAssertion = signAssertion;
+    this.#requestTimeoutMilliseconds = requestTimeoutMilliseconds;
   }
 
   getAccessToken(): Promise<string> {
@@ -152,6 +157,7 @@ class CachedGoogleWorkspaceTokenProvider implements GoogleWorkspaceTokenProvider
         method: "POST",
         headers: { "content-type": "application/x-www-form-urlencoded" },
         body: new URLSearchParams({ grant_type: JWT_BEARER_GRANT_TYPE, assertion }).toString(),
+        signal: AbortSignal.timeout(this.#requestTimeoutMilliseconds),
       });
     } catch {
       throw new GoogleWorkspaceAuthenticationError("token_exchange_failed");
@@ -194,5 +200,6 @@ export function createGoogleWorkspaceTokenProvider(
     dependencies.fetch ?? globalThis.fetch,
     dependencies.now ?? (() => new Date()),
     dependencies.signAssertion ?? createJoseAssertionSigner(config.privateKey),
+    dependencies.requestTimeoutMilliseconds ?? TOKEN_REQUEST_TIMEOUT_MILLISECONDS,
   );
 }

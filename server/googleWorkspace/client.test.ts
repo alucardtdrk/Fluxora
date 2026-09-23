@@ -301,6 +301,16 @@ describe("Google Workspace GET-only client", () => {
     expect(sleep).not.toHaveBeenCalled();
   });
 
+  it("stops a stalled Google request within the configured timeout", async () => {
+    const fetcher = vi.fn<typeof fetch>(async (_url, options) => new Promise<Response>((_resolve, reject) => {
+      options?.signal?.addEventListener("abort", () => reject(new Error("aborted")), { once: true });
+    }));
+    const client = createGoogleWorkspaceClient(tokenProvider(), { fetch: fetcher, requestTimeoutMilliseconds: 10 });
+
+    await expect(client.getJson(new URL("https://alertcenter.googleapis.com/v1beta1/alerts"))).rejects.toMatchObject({ code: "request_failed" });
+    expect(fetcher).toHaveBeenCalledTimes(1);
+  });
+
   it("redacts the bearer token, query values, and upstream body from errors", async () => {
     const bearerToken = "bearer-token-must-not-leak";
     const queryValue = "customer-secret-must-not-leak";

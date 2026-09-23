@@ -20,11 +20,18 @@ export interface CollectAlertCenterEvidenceInput {
   readonly lastSuccessfulEventAt?: Date;
   readonly bootstrapLookbackHours?: number;
   readonly now?: () => Date;
+  readonly rangeStart?: Date;
+  readonly rangeEnd?: Date;
+  readonly startPageToken?: string;
+  readonly maxPages?: number;
+  readonly pageSize?: number;
 }
 
 export interface CollectedAlertCenterEvidence {
   readonly events: readonly WorkspaceSecurityEvent[];
   readonly alertsRead: number;
+  readonly nextPageToken?: string;
+  readonly truncated: boolean;
 }
 
 function collectionStart(input: CollectAlertCenterEvidenceInput, now: Date): Date {
@@ -49,21 +56,22 @@ export async function collectAlertCenterEvidenceBatch(
   input: CollectAlertCenterEvidenceInput,
 ): Promise<CollectedAlertCenterEvidence> {
   const observedAt = (input.now ?? (() => new Date()))();
-  const start = collectionStart(input, observedAt);
+  const start = input.rangeStart ?? collectionStart(input, observedAt);
   const url = new URL(ALERT_CENTER_URL);
   url.searchParams.set("customerId", input.customerId.replace(/^C/, ""));
-  url.searchParams.set("pageSize", "1000");
+  url.searchParams.set("pageSize", String(input.pageSize ?? 1000));
   url.searchParams.set("orderBy", "createTime asc");
-  url.searchParams.set("filter", `createTime >= "${start.toISOString()}"`);
+  url.searchParams.set("filter", `createTime >= "${start.toISOString()}"${input.rangeEnd ? ` AND createTime <= "${input.rangeEnd.toISOString()}"` : ""}`);
 
   const events: WorkspaceSecurityEvent[] = [];
   let alertsRead = 0;
-  for await (const page of input.client.paginate<AlertCenterPage>(url)) {
+  let nextPageToken: string | undefined;
+  for await (const page of input.client.paginate<AlertCenterPage>(url, { startPageToken: input.startPageToken, maxPages: input.maxPages, onPage: (pageState) => { nextPageToken = pageState.nextPageToken; } })) {
     for (const alert of page.alerts ?? []) {
       alertsRead += 1;
       const event = normalizeAlertCenterAlert(alert, observedAt);
       if (event) events.push(event);
     }
   }
-  return { events, alertsRead };
+  return { events, alertsRead, nextPageToken, truncated: Boolean(nextPageToken) };
 }

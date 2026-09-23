@@ -139,6 +139,16 @@ describe("Google Workspace delegated token provider", () => {
     expect(signer).toHaveBeenCalledTimes(1);
   });
 
+  it("stops a stalled OAuth token exchange within the configured timeout", async () => {
+    const fetcher = vi.fn<typeof fetch>(async (_url, options) => new Promise<Response>((_resolve, reject) => {
+      options?.signal?.addEventListener("abort", () => reject(new Error("aborted")), { once: true });
+    }));
+    const provider = createGoogleWorkspaceTokenProvider(createConfig(), { fetch: fetcher, signAssertion: async () => "signed-assertion", requestTimeoutMilliseconds: 10 });
+
+    await expect(provider.getAccessToken()).rejects.toMatchObject({ code: "token_exchange_failed" });
+    expect(fetcher).toHaveBeenCalledTimes(1);
+  });
+
   it("rejects malformed success payloads with a safe typed error", async () => {
     const provider = createGoogleWorkspaceTokenProvider(createConfig(), {
       fetch: async () => new Response(JSON.stringify({ expires_in: 3_600 }), { status: 200 }),

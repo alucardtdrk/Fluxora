@@ -41,12 +41,19 @@ export function createGoogleWorkspaceSecuritySync(input: {
   const collectDirectory = input.collectDirectory ?? collectDirectoryPosture;
   const correlate = input.correlate ?? correlateWorkspaceSecurityEvents;
 
-  const eventSource = (source: WorkspaceSecuritySource, application?: ReportApplication) => ({
+  const eventSource = (source: WorkspaceSecuritySource, application?: ReportApplication, current = false) => ({
     name: source,
     run: async () => {
       const attemptedAt = now();
       const state = await input.repository.getSourceState(source) ?? { lastSuccessfulEventAt: null };
-      const collected = application
+      const resume = current && state.currentPageToken && state.currentStart && state.currentEnd;
+      const rangeStart = resume ? state.currentStart! : new Date((state.lastSuccessfulEventAt ?? new Date(attemptedAt.getTime() - 24 * 60 * 60 * 1_000)).getTime() - 5 * 60 * 1_000);
+      const rangeEnd = resume ? state.currentEnd! : attemptedAt;
+      const collected = current
+        ? application
+          ? await collectReportsBatch({ client: input.client, application, customerId: input.config.customerId, rangeStart, rangeEnd, startPageToken: state.currentPageToken ?? undefined, maxPages: 1, pageSize: 100, now })
+          : await collectAlertsBatch({ client: input.client, customerId: input.config.customerId, rangeStart, rangeEnd, startPageToken: state.currentPageToken ?? undefined, maxPages: 1, pageSize: 100, now })
+        : application
         ? input.collectReports
           ? { events: await collectReports({ client: input.client, application, customerId: input.config.customerId, lastSuccessfulEventAt: state.lastSuccessfulEventAt ?? undefined, now }), recordsRead: undefined }
           : await collectReportsBatch({ client: input.client, application, customerId: input.config.customerId, lastSuccessfulEventAt: state.lastSuccessfulEventAt ?? undefined, now })
@@ -54,14 +61,18 @@ export function createGoogleWorkspaceSecuritySync(input: {
           ? { events: await collectAlerts({ client: input.client, customerId: input.config.customerId, lastSuccessfulEventAt: state.lastSuccessfulEventAt ?? undefined, now }), alertsRead: undefined }
           : await collectAlertsBatch({ client: input.client, customerId: input.config.customerId, lastSuccessfulEventAt: state.lastSuccessfulEventAt ?? undefined, now });
       const events = collected.events;
+      const incomplete = current && "truncated" in collected && collected.truncated;
       const saved = await input.repository.saveSourceBatch({
         source,
         events,
-        lastSuccessfulEventAt: latestEventAt(events) ?? state.lastSuccessfulEventAt?.toISOString(),
+        lastSuccessfulEventAt: current ? (incomplete ? state.lastSuccessfulEventAt?.toISOString() : rangeEnd.toISOString()) : latestEventAt(events) ?? state.lastSuccessfulEventAt?.toISOString(),
         attemptedAt: attemptedAt.toISOString(),
+        ...(current ? { current: { start: rangeStart.toISOString(), end: rangeEnd.toISOString(), pageToken: incomplete && "nextPageToken" in collected ? collected.nextPageToken : undefined } } : {}),
       });
       const received = "recordsRead" in collected ? collected.recordsRead : collected.alertsRead;
-      return { received: received ?? events.length, collected: events.length, persisted: saved.insertedOrUpdated };
+      const result = { received: received ?? events.length, collected: events.length, persisted: saved.insertedOrUpdated, incomplete };
+      if (current) await input.repository.saveSourceDiagnostics?.(source, { status: incomplete ? "incomplete" : events.length ? "ok" : "empty", ...result, completedAt: now().toISOString() });
+      return result;
     },
   });
 
@@ -96,11 +107,11 @@ export function createGoogleWorkspaceSecuritySync(input: {
   const currentSourceSync = createWorkspaceSync({
     now,
     sources: [
-      eventSource("alert_center"),
-      eventSource("login", "login"),
-      eventSource("admin", "admin"),
-      eventSource("oauth_token", "token"),
-      eventSource("rules", "rules"),
+      eventSource("alert_center", undefined, true),
+      eventSource("login", "login", true),
+      eventSource("admin", "admin", true),
+      eventSource("oauth_token", "token", true),
+      eventSource("rules", "rules", true),
     ],
   });
 

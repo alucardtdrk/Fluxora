@@ -32,10 +32,14 @@ export interface SaveSourceBatchInput {
   readonly lastSuccessfulEventAt?: string;
   readonly attemptedAt: string;
   readonly backfill?: { readonly targetStart: string; readonly targetEnd: string; readonly coveredThrough: string; readonly pageToken?: string };
+  readonly current?: { readonly start: string; readonly end: string; readonly pageToken?: string };
 }
 
 export interface WorkspaceSourceState {
   readonly lastSuccessfulEventAt: Date | null;
+  readonly currentStart?: Date | null;
+  readonly currentEnd?: Date | null;
+  readonly currentPageToken?: string | null;
   readonly backfillTargetStart: Date | null;
   readonly backfillTargetEnd: Date | null;
   readonly backfillCoveredThrough: Date | null;
@@ -83,7 +87,7 @@ export function createGoogleWorkspaceRepository(
         const parsed = value instanceof Date ? value : typeof value === "string" ? new Date(value) : null;
         return parsed && Number.isFinite(parsed.getTime()) ? parsed : null;
       };
-      return { lastSuccessfulEventAt: date(record?.lastSuccessfulEventAt), backfillTargetStart: date(record?.backfillTargetStart), backfillTargetEnd: date(record?.backfillTargetEnd), backfillCoveredThrough: date(record?.backfillCoveredThrough), backfillPageToken: typeof record?.backfillPageToken === "string" ? record.backfillPageToken : null };
+      return { lastSuccessfulEventAt: date(record?.lastSuccessfulEventAt), currentStart: date(record?.currentStart), currentEnd: date(record?.currentEnd), currentPageToken: typeof record?.currentPageToken === "string" ? record.currentPageToken : null, backfillTargetStart: date(record?.backfillTargetStart), backfillTargetEnd: date(record?.backfillTargetEnd), backfillCoveredThrough: date(record?.backfillCoveredThrough), backfillPageToken: typeof record?.backfillPageToken === "string" ? record.backfillPageToken : null };
     },
 
     async saveSourceBatch(input: SaveSourceBatchInput): Promise<{ insertedOrUpdated: number }> {
@@ -103,6 +107,7 @@ export function createGoogleWorkspaceRepository(
           : null,
         lastError: null,
         ...(input.backfill ? { backfillTargetStart: new Date(input.backfill.targetStart), backfillTargetEnd: new Date(input.backfill.targetEnd), backfillCoveredThrough: new Date(input.backfill.coveredThrough), backfillPageToken: input.backfill.pageToken ?? null } : {}),
+        ...(input.current ? { currentStart: input.current.pageToken ? new Date(input.current.start) : null, currentEnd: input.current.pageToken ? new Date(input.current.end) : null, currentPageToken: input.current.pageToken ?? null } : {}),
       };
 
       try {
