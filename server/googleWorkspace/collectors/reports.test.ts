@@ -152,6 +152,7 @@ describe("Reports collector", () => {
     expect(normalizeReportsActivity("login", activity("login", "2sv_disable"), now)[0]?.severity).toBe("high");
     expect(normalizeReportsActivity("rules", activity("rules", "rule_trigger", [{ name: "severity", value: "HIGH" }]), now)[0]?.severity).toBe("high");
     expect(normalizeReportsActivity("drive", activity("drive", "change_user_access", [{ name: "visibility", value: "shared_externally" }]), now)[0]?.severity).toBe("high");
+    expect(normalizeReportsActivity("drive", activity("drive", "access_item_content", [{ name: "visibility", value: "shared_externally" }]), now)[0]?.severity).toBe("informational");
     expect(normalizeReportsActivity("calendar", activity("calendar", "event_viewed"), now)[0]).toMatchObject({ source: "calendar", severity: "informational" });
     expect(normalizeReportsActivity("gmail", activity("gmail", "email_log_search"), now)[0]).toMatchObject({ source: "gmail" });
     expect(normalizeReportsActivity("saml", activity("saml", "login_success"), now)[0]).toMatchObject({ source: "saml", category: "identity" });

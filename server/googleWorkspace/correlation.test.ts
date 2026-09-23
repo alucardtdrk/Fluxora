@@ -85,4 +85,12 @@ describe("Workspace security correlation", () => {
 
     expect(findings.map((finding) => finding.rule)).toEqual(expect.arrayContaining(["two_step_verification_disabled", "privilege_escalation", "external_drive_sharing", "high_severity_dlp"]));
   });
+
+  it("does not treat reading an externally shared Drive item as a new exposure", () => {
+    const findings = correlateWorkspaceSecurityEvents([
+      event({ externalId: "risk", actor: "ana@example.com", source: "login", type: "suspicious_login", severity: "high" }),
+      event({ externalId: "read", actor: "ana@example.com", source: "drive", type: "access_item_content", severity: "high", metadata: { visibility: "shared_externally" }, occurredAt: new Date("2026-09-17T11:20:00.000Z") }),
+    ], observedAt);
+    expect(findings.some((finding) => finding.rule === "external_drive_sharing" || finding.rule === "drive_activity_after_identity_risk")).toBe(false);
+  });
 });

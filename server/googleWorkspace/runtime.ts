@@ -115,6 +115,23 @@ export function createGoogleWorkspaceSecuritySync(input: {
     ],
   });
 
+  const fullSources = [
+    eventSource("alert_center", undefined, true),
+    eventSource("login", "login", true),
+    eventSource("admin", "admin", true),
+    eventSource("oauth_token", "token", true),
+    eventSource("drive", "drive", true),
+    eventSource("groups", "groups", true),
+    eventSource("mobile", "mobile", true),
+    eventSource("rules", "rules", true),
+    eventSource("gmail", "gmail", true),
+    eventSource("user_accounts", "user_accounts", true),
+    eventSource("saml", "saml", true),
+    eventSource("calendar", "calendar", true),
+    eventSource("chat", "chat", true),
+    eventSource("meet", "meet", true),
+  ];
+
   const saveDiagnostics = async (summary: Awaited<ReturnType<typeof sourceSync.run>>) => {
     await Promise.all(Object.entries(summary.sources).filter(([source]) => source !== "directory_posture").map(([source, status]) => input.repository.saveSourceDiagnostics?.(source as WorkspaceSecuritySource, { status: status.status, received: status.received, collected: status.collected, persisted: status.persisted, safeError: status.safeError, httpStatus: status.httpStatus, completedAt: summary.finishedAt })));
   };
@@ -143,7 +160,7 @@ export function createGoogleWorkspaceSecuritySync(input: {
       if (window.start >= targetEnd) continue;
       try {
         const collected = await collectReportsBatch({ client: input.client, application: item.application, customerId: input.config.customerId, rangeStart: window.start, rangeEnd: window.end, startPageToken: state?.backfillPageToken ?? undefined, maxPages: 1, pageSize: Math.min(250, maxEvents - backfill.eventsCollected), now });
-        const saved = await input.repository.saveSourceBatch({ source: item.source, events: collected.events, attemptedAt: now().toISOString(), lastSuccessfulEventAt: state?.lastSuccessfulEventAt?.toISOString(), backfill: { targetStart: targetStart.toISOString(), targetEnd: targetEnd.toISOString(), coveredThrough: (collected.truncated ? window.start : (collected.rangeEnd ?? window.end)).toISOString(), pageToken: collected.nextPageToken } });
+        const saved = await input.repository.saveSourceBatch({ source: item.source, events: collected.events, attemptedAt: now().toISOString(), lastSuccessfulEventAt: state?.lastSuccessfulEventAt?.toISOString(), backfill: { targetStart: targetStart.toISOString(), targetEnd: targetEnd.toISOString(), coveredThrough: (collected.truncated ? window.start : (collected.rangeEnd ?? window.end)).toISOString(), pageToken: collected.nextPageToken, pagesProcessed: (state?.backfillPagesProcessed ?? 0) + collected.pagesRead } });
         await input.repository.saveSourceDiagnostics?.(item.source, { status: collected.events.length ? "ok" : "empty", received: collected.recordsRead, collected: collected.events.length, persisted: saved.insertedOrUpdated, completedAt: now().toISOString() });
         backfill.windowsProcessed += 1;
         backfill.requestsProcessed += 1;
@@ -160,6 +177,18 @@ export function createGoogleWorkspaceSecuritySync(input: {
 
   return {
     continueBackfill,
+    async runFullBatch(startIndex: number) {
+      if (startIndex === fullSources.length) {
+        const posture = await collectDirectory({ client: input.client, customerId: input.config.customerId, domain: input.config.domain, capturedAt: now() });
+        await input.repository.saveDirectoryPosture({ ...posture, id: "current" });
+        try { await saveCurrentFindings(); } catch { /* The posture result remains available when correlation fails. */ }
+        return { status: "success" as const, startedAt: now().toISOString(), finishedAt: now().toISOString(), sources: { directory_posture: { status: "ok" as const, collected: 1, persisted: 1 } }, expiredEventsRemoved: 0, nextIndex: null };
+      }
+      const batch = createWorkspaceSync({ now, sources: fullSources.slice(startIndex, startIndex + 3) });
+      const summary = await batch.run();
+      await saveDiagnostics(summary);
+      return { ...summary, nextIndex: Math.min(startIndex + 3, fullSources.length) };
+    },
     async runCurrent() {
       const summary = await currentSourceSync.run();
       await saveDiagnostics(summary);
@@ -185,11 +214,11 @@ export function createGoogleWorkspaceSecuritySync(input: {
   };
 }
 
-export async function syncGoogleWorkspaceSecurity() {
+export async function syncGoogleWorkspaceSecurity(startIndex = 0) {
   const config = loadGoogleWorkspaceConfig();
   const tokenProvider = createGoogleWorkspaceTokenProvider(config);
   const client = createGoogleWorkspaceClient(tokenProvider);
-  return createGoogleWorkspaceSecuritySync({ config, client, repository: googleWorkspaceRepository, enableBackfill: true, maxBackfillWindows: 4 }).run();
+  return createGoogleWorkspaceSecuritySync({ config, client, repository: googleWorkspaceRepository }).runFullBatch(startIndex);
 }
 
 export async function continueGoogleWorkspaceSecurityBackfill() {

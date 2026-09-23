@@ -197,6 +197,7 @@ describe("Google Workspace repository", () => {
         targetStart: "2026-06-20T10:00:00.000Z",
         targetEnd: "2026-09-18T10:00:00.000Z",
         coveredThrough: "2026-06-21T10:00:00.000Z",
+        pagesProcessed: 3,
       },
     });
 
@@ -204,6 +205,7 @@ describe("Google Workspace repository", () => {
       backfillTargetStart: new Date("2026-06-20T10:00:00.000Z"),
       backfillTargetEnd: new Date("2026-09-18T10:00:00.000Z"),
       backfillCoveredThrough: new Date("2026-06-21T10:00:00.000Z"),
+      backfillPagesProcessed: 3,
     });
   });
 

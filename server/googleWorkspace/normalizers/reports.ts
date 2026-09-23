@@ -78,7 +78,7 @@ function severityFor(application: ReportsApplicationName, eventName: string, par
   if (application === "login" && (parameters.is_suspicious === true || name.includes("suspicious"))) return "high";
   if (application === "login" && name.includes("failure")) return "medium";
   if (application === "token" && (name.includes("authorize") || name.includes("suspicious"))) return "high";
-  if (application === "drive" && (visibility.includes("external") || visibility.includes("public") || name.includes("external_share"))) return "high";
+  if (application === "drive" && (name.includes("external_share") || ((name.includes("change_user_access") || name.includes("change_document_visibility")) && (visibility.includes("external") || visibility.includes("public"))))) return "high";
   if (application === "admin" && (name.includes("role") || name.includes("security") || name.includes("config"))) return "high";
   if (application === "rules" && (severity === "high" || name.includes("dlp"))) return "high";
   return "informational";

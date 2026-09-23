@@ -95,7 +95,7 @@ export function correlateWorkspaceSecurityEvents(events: readonly WorkspaceSecur
       });
     }
 
-    const driveEvent = actorEvents.find((event) => event.source === "drive" && (event.severity === "high" || event.severity === "critical") && event.occurredAt >= identityRisk.occurredAt);
+    const driveEvent = actorEvents.find((event) => event.source === "drive" && /change_user_access|change_document_visibility|external_share/.test(event.type.toLowerCase()) && (event.severity === "high" || event.severity === "critical") && event.occurredAt >= identityRisk.occurredAt);
     if (driveEvent) {
       const evidence = [identityRisk, driveEvent];
       findings.push({
@@ -111,7 +111,7 @@ export function correlateWorkspaceSecurityEvents(events: readonly WorkspaceSecur
   const singleSignalRules = [
     { rule: "two_step_verification_disabled", matches: (event: WorkspaceSecurityEvent) => event.source === "login" && event.type.toLowerCase().includes("2sv_disable"), title: "Verificação em duas etapas desativada", description: "Uma conta teve a verificação em duas etapas desativada." },
     { rule: "privilege_escalation", matches: (event: WorkspaceSecurityEvent) => event.source === "admin" && /assign.*role|role.*assign|privilege/.test(event.type.toLowerCase()), title: "Alteração de privilégio administrativo", description: "Uma função ou privilégio administrativo sensível foi alterado." },
-    { rule: "external_drive_sharing", matches: (event: WorkspaceSecurityEvent) => event.source === "drive" && /external|public/.test(`${event.type} ${JSON.stringify(event.metadata)}`.toLowerCase()), title: "Compartilhamento externo no Drive", description: "Um recurso do Drive foi exposto externamente ou publicamente." },
+    { rule: "external_drive_sharing", matches: (event: WorkspaceSecurityEvent) => event.source === "drive" && (event.type.toLowerCase().includes("external_share") || (/change_user_access|change_document_visibility/.test(event.type.toLowerCase()) && /external|public/.test(String(event.metadata.visibility || "").toLowerCase()))), title: "Compartilhamento externo no Drive", description: "Um recurso do Drive foi exposto externamente ou publicamente." },
     { rule: "high_severity_dlp", matches: (event: WorkspaceSecurityEvent) => event.source === "rules" && event.severity === "high", title: "Regra de proteção de dados acionada", description: "Uma regra de alta severidade foi acionada no Google Workspace." },
   ] as const;
   for (const definition of singleSignalRules) {

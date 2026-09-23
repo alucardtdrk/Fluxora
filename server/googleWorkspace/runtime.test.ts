@@ -2,6 +2,31 @@ import { describe, expect, it } from "vitest";
 import { createGoogleWorkspaceSecuritySync } from "./runtime.js";
 
 describe("Google Workspace security runtime", () => {
+  it("collects the full set in bounded batches of at most three one-page sources", async () => {
+    const reports: Array<{ application: string; maxPages?: number }> = [];
+    let postureRuns = 0;
+    const sync = createGoogleWorkspaceSecuritySync({
+      config: { customerId: "customer", domain: "example.com" }, client: {} as never,
+      repository: {
+        getSourceState: async () => null,
+        saveSourceBatch: async (input) => ({ insertedOrUpdated: input.events.length }),
+        saveDirectoryPosture: async () => undefined, listRecentEvents: async () => [], saveFindings: async () => ({ insertedOrUpdated: 0 }),
+      },
+      collectAlertCenterBatch: async () => ({ events: [], alertsRead: 0, truncated: false }),
+      collectReportsBatch: async (input) => { reports.push({ application: input.application, maxPages: input.maxPages }); return { events: [], pagesRead: 1, recordsRead: 0, truncated: false }; },
+      collectDirectory: async () => { postureRuns++; return { capturedAt: new Date(), domain: "example.com" } as never; },
+    });
+    const first = await sync.runFullBatch(0);
+    const lastSources = await sync.runFullBatch(12);
+    const last = await sync.runFullBatch(14);
+    expect(first.nextIndex).toBe(3);
+    expect(first.sources).toHaveProperty("alert_center");
+    expect(reports.slice(0, 2)).toEqual([{ application: "login", maxPages: 1 }, { application: "admin", maxPages: 1 }]);
+    expect(lastSources.nextIndex).toBe(14);
+    expect(last.nextIndex).toBeNull();
+    expect(last.sources).toHaveProperty("directory_posture");
+    expect(postureRuns).toBe(1);
+  });
   it("collects each audit source and persists its checkpoint only after the batch", async () => {
     const saved: Array<{ source: string; count: number }> = [];
     const sync = createGoogleWorkspaceSecuritySync({
