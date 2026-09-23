@@ -206,4 +206,13 @@ describe("Google Workspace repository", () => {
       backfillCoveredThrough: new Date("2026-06-21T10:00:00.000Z"),
     });
   });
+
+  it("persists a current-sync page cursor and clears it after the last page", async () => {
+    const repository = createGoogleWorkspaceRepository(new MemoryFirestoreAdapter());
+    await repository.saveSourceBatch({ source: "login", events: [], attemptedAt: "2026-09-23T12:00:00.000Z", current: { start: "2026-09-22T12:00:00.000Z", end: "2026-09-23T12:00:00.000Z", pageToken: "next" } });
+    expect(await repository.getSourceState("login")).toMatchObject({ currentStart: new Date("2026-09-22T12:00:00.000Z"), currentEnd: new Date("2026-09-23T12:00:00.000Z"), currentPageToken: "next" });
+
+    await repository.saveSourceBatch({ source: "login", events: [], attemptedAt: "2026-09-23T12:01:00.000Z", lastSuccessfulEventAt: "2026-09-23T12:00:00.000Z", current: { start: "2026-09-22T12:00:00.000Z", end: "2026-09-23T12:00:00.000Z" } });
+    expect(await repository.getSourceState("login")).toMatchObject({ lastSuccessfulEventAt: new Date("2026-09-23T12:00:00.000Z"), currentStart: null, currentEnd: null, currentPageToken: null });
+  });
 });
