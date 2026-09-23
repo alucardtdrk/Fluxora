@@ -28,9 +28,9 @@ export interface WorkspaceDashboardEvent {
 export interface WorkspaceSecurityDashboard {
   readonly events: readonly WorkspaceDashboardEvent[];
   readonly findings: readonly WorkspaceDashboardFinding[];
-  readonly summary: { readonly recentEvents: number; readonly highOrCriticalEvents: number; readonly openFindings: number; readonly coveragePercent: number };
+  readonly summary: { readonly recentEvents: number; readonly highOrCriticalEvents: number; readonly openFindings: number; readonly coveragePercent: number; readonly backfillPagesProcessed: number };
   readonly posture: { readonly suspendedUsers: number; readonly usersWithoutTwoStepVerification: number; readonly suspendedUserDetails: readonly WorkspacePostureUser[]; readonly usersWithoutTwoStepVerificationDetails: readonly WorkspacePostureUser[] } | null;
-  readonly sources: readonly { readonly source: string; readonly status: string; readonly received: number; readonly collected: number; readonly persisted: number; readonly completedAt?: string; readonly safeError?: string; readonly httpStatus?: number; readonly coveragePercent: number; readonly rangeStart?: string; readonly rangeEnd?: string; readonly coveredThrough?: string }[];
+  readonly sources: readonly { readonly source: string; readonly status: string; readonly received: number; readonly collected: number; readonly persisted: number; readonly completedAt?: string; readonly safeError?: string; readonly httpStatus?: number; readonly coveragePercent: number; readonly backfillPagesProcessed: number; readonly rangeStart?: string; readonly rangeEnd?: string; readonly coveredThrough?: string }[];
 }
 
 export interface WorkspacePostureUser {
@@ -64,7 +64,7 @@ type DashboardDependencies = {
 const EMPTY_DASHBOARD: WorkspaceSecurityDashboard = {
   events: [],
   findings: [],
-  summary: { recentEvents: 0, highOrCriticalEvents: 0, openFindings: 0, coveragePercent: 0 },
+  summary: { recentEvents: 0, highOrCriticalEvents: 0, openFindings: 0, coveragePercent: 0, backfillPagesProcessed: 0 },
   posture: null,
   sources: [],
 };
@@ -108,7 +108,7 @@ function dashboardEvent(record: FirestoreRecord): WorkspaceDashboardEvent {
     source: String(record.source || "alert_center") as WorkspaceSecuritySource,
     category: String(record.category || "workspace_security"),
     type: String(record.type || "unknown"),
-    severity: String(record.severity || "informational") as SecuritySeverity,
+    severity: record.source === "drive" && record.type === "access_item_content" ? "informational" : String(record.severity || "informational") as SecuritySeverity,
     title: String(record.title || "Evento do Google Workspace"),
     description: String(record.description || ""),
     occurredAt: dateValue(record.occurredAt),
@@ -157,7 +157,7 @@ export function createWorkspaceSecurityDashboard(dependencies: DashboardDependen
       const [records, findingRecords, posture, sourceRecords] = await Promise.all([dependencies.listEvents(), dependencies.listFindings(), dependencies.getPosture(), dependencies.listSources?.() ?? []]);
       const events = records.map(dashboardEvent).filter((event) => Boolean(event.id));
       const findings = findingRecords.map(dashboardFinding).filter((finding): finding is WorkspaceDashboardFinding => Boolean(finding));
-      const sources = sourceRecords.map((record) => ({ source: String(record.source || record._documentId || "unknown"), status: String(record.lastStatus || "unknown"), received: Number(record.lastReceived ?? record.lastCollected ?? 0), collected: Number(record.lastCollected || 0), persisted: Number(record.lastPersisted || 0), httpStatus: record.lastHttpStatus ? Number(record.lastHttpStatus) : undefined, completedAt: record.lastCompletedAt ? dateValue(record.lastCompletedAt) : undefined, safeError: stringValue(record.lastSafeError), ...coverage(record) }));
+      const sources = sourceRecords.map((record) => ({ source: String(record.source || record._documentId || "unknown"), status: String(record.lastStatus || "unknown"), received: Number(record.lastReceived ?? record.lastCollected ?? 0), collected: Number(record.lastCollected || 0), persisted: Number(record.lastPersisted || 0), httpStatus: record.lastHttpStatus ? Number(record.lastHttpStatus) : undefined, completedAt: record.lastCompletedAt ? dateValue(record.lastCompletedAt) : undefined, safeError: stringValue(record.lastSafeError), backfillPagesProcessed: Number(record.backfillPagesProcessed || 0), ...coverage(record) }));
       return {
         events,
         findings,
@@ -166,6 +166,7 @@ export function createWorkspaceSecurityDashboard(dependencies: DashboardDependen
           highOrCriticalEvents: events.filter((event) => event.severity === "high" || event.severity === "critical").length,
           openFindings: findings.length,
           coveragePercent: sources.length ? Math.round(sources.reduce((total, source) => total + source.coveragePercent, 0) / sources.length) : 0,
+          backfillPagesProcessed: sources.reduce((total, source) => total + source.backfillPagesProcessed, 0),
         },
         posture: dashboardPosture(posture),
         sources,

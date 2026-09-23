@@ -31,7 +31,7 @@ export interface SaveSourceBatchInput {
   readonly nextCursor?: string;
   readonly lastSuccessfulEventAt?: string;
   readonly attemptedAt: string;
-  readonly backfill?: { readonly targetStart: string; readonly targetEnd: string; readonly coveredThrough: string; readonly pageToken?: string };
+  readonly backfill?: { readonly targetStart: string; readonly targetEnd: string; readonly coveredThrough: string; readonly pageToken?: string; readonly pagesProcessed?: number };
   readonly current?: { readonly start: string; readonly end: string; readonly pageToken?: string };
 }
 
@@ -44,6 +44,7 @@ export interface WorkspaceSourceState {
   readonly backfillTargetEnd: Date | null;
   readonly backfillCoveredThrough: Date | null;
   readonly backfillPageToken: string | null;
+  readonly backfillPagesProcessed?: number;
 }
 
 export interface DirectoryPostureSnapshot extends FirestoreRecord {
@@ -87,7 +88,7 @@ export function createGoogleWorkspaceRepository(
         const parsed = value instanceof Date ? value : typeof value === "string" ? new Date(value) : null;
         return parsed && Number.isFinite(parsed.getTime()) ? parsed : null;
       };
-      return { lastSuccessfulEventAt: date(record?.lastSuccessfulEventAt), currentStart: date(record?.currentStart), currentEnd: date(record?.currentEnd), currentPageToken: typeof record?.currentPageToken === "string" ? record.currentPageToken : null, backfillTargetStart: date(record?.backfillTargetStart), backfillTargetEnd: date(record?.backfillTargetEnd), backfillCoveredThrough: date(record?.backfillCoveredThrough), backfillPageToken: typeof record?.backfillPageToken === "string" ? record.backfillPageToken : null };
+      return { lastSuccessfulEventAt: date(record?.lastSuccessfulEventAt), currentStart: date(record?.currentStart), currentEnd: date(record?.currentEnd), currentPageToken: typeof record?.currentPageToken === "string" ? record.currentPageToken : null, backfillTargetStart: date(record?.backfillTargetStart), backfillTargetEnd: date(record?.backfillTargetEnd), backfillCoveredThrough: date(record?.backfillCoveredThrough), backfillPageToken: typeof record?.backfillPageToken === "string" ? record.backfillPageToken : null, backfillPagesProcessed: Number(record?.backfillPagesProcessed || 0) };
     },
 
     async saveSourceBatch(input: SaveSourceBatchInput): Promise<{ insertedOrUpdated: number }> {
@@ -106,7 +107,7 @@ export function createGoogleWorkspaceRepository(
           ? new Date(input.lastSuccessfulEventAt)
           : null,
         lastError: null,
-        ...(input.backfill ? { backfillTargetStart: new Date(input.backfill.targetStart), backfillTargetEnd: new Date(input.backfill.targetEnd), backfillCoveredThrough: new Date(input.backfill.coveredThrough), backfillPageToken: input.backfill.pageToken ?? null } : {}),
+        ...(input.backfill ? { backfillTargetStart: new Date(input.backfill.targetStart), backfillTargetEnd: new Date(input.backfill.targetEnd), backfillCoveredThrough: new Date(input.backfill.coveredThrough), backfillPageToken: input.backfill.pageToken ?? null, backfillPagesProcessed: input.backfill.pagesProcessed ?? 0 } : {}),
         ...(input.current ? { currentStart: input.current.pageToken ? new Date(input.current.start) : null, currentEnd: input.current.pageToken ? new Date(input.current.end) : null, currentPageToken: input.current.pageToken ?? null } : {}),
       };
 

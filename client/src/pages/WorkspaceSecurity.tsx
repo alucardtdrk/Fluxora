@@ -79,17 +79,40 @@ export default function WorkspaceSecurity() {
     onSuccess: async (result) => {
       await Promise.all([dashboard.refetch(), page.refetch()]);
       if (result.windowsProcessed > 0) {
-        toast.success("Lote histórico concluído", { description: `${result.eventsCollected.toLocaleString("pt-BR")} eventos coletados; ${result.sourcesCompleted} fonte${result.sourcesCompleted === 1 ? "" : "s"} concluída${result.sourcesCompleted === 1 ? "" : "s"}.` });
+        toast.success("Lote histórico processado", { description: `${result.eventsCollected.toLocaleString("pt-BR")} eventos coletados; ${result.sourcesCompleted} fonte${result.sourcesCompleted === 1 ? "" : "s"} concluiu${result.sourcesCompleted === 1 ? "" : "íram"} a cobertura.` });
       } else {
         toast.warning("Nenhum lote conseguiu avançar", { description: result.failedSources.length ? "Algumas fontes do Google Workspace não responderam. Consulte os avisos nas fontes de auditoria." : "A cobertura disponível já foi processada." });
       }
     },
     onError: (error) => toast.error("O histórico não avançou", { description: error.message || "Tente novamente em instantes." }),
   });
-  const fullSync = trpc.admin.syncGoogleWorkspace.useMutation({
-    onSuccess: async (result) => { await Promise.all([dashboard.refetch(), page.refetch()]); if (result.status === "failure") toast.error("A coleta não conseguiu atualizar as fontes"); else if (result.status === "partial") toast.warning("Coleta parcial: verifique as fontes com aviso"); else toast.success("Coleta completa finalizada"); },
-    onError: (error) => toast.error("A coleta completa falhou", { description: error.message }),
-  });
+  const fullSync = trpc.admin.syncGoogleWorkspace.useMutation();
+  const [fullSyncIndex, setFullSyncIndex] = useState(0);
+  const [collectingAll, setCollectingAll] = useState(false);
+  const collectAll = async () => {
+    setCollectingAll(true);
+    let index: number | null = fullSyncIndex;
+    let failures = 0;
+    let pending = 0;
+    try {
+      while (index !== null) {
+        const result = await fullSync.mutateAsync({ startIndex: index });
+        failures += Object.values(result.sources).filter((item) => item.status === "failure").length;
+        pending += Object.values(result.sources).filter((item) => item.status === "incomplete").length;
+        index = result.nextIndex;
+        setFullSyncIndex(index ?? 0);
+        await dashboard.refetch();
+      }
+      await page.refetch();
+      if (failures) toast.warning("Coleta parcial: verifique as fontes com aviso");
+      else if (pending) toast.message("Todas as fontes consultadas", { description: `${pending} fonte(s) ainda têm páginas pendentes. Clique novamente para continuar.` });
+      else toast.success("Coleta completa finalizada");
+    } catch (error) {
+      toast.error("A coleta foi interrompida", { description: error instanceof Error && !/Unexpected token|not valid JSON/i.test(error.message) ? error.message : "Uma chamada falhou ou excedeu o tempo. Clique novamente para retomar do lote interrompido." });
+    } finally {
+      setCollectingAll(false);
+    }
+  };
   const [source, setSource] = useState("all");
   const [severity, setSeverity] = useState("all");
   const [period, setPeriod] = useState("90d");
@@ -99,7 +122,7 @@ export default function WorkspaceSecurity() {
   const events = page.data?.events ?? [];
   useEffect(() => { setPageOffsets([0]); }, [source, severity, category, period]);
   const categories = useMemo(() => [...new Set((dashboard.data?.events ?? []).map((event) => event.category))].sort(), [dashboard.data?.events]);
-  const summary = dashboard.data?.summary ?? { recentEvents: 0, highOrCriticalEvents: 0, coveragePercent: 0 };
+  const summary = dashboard.data?.summary ?? { recentEvents: 0, highOrCriticalEvents: 0, coveragePercent: 0, backfillPagesProcessed: 0 };
   const posture = dashboard.data?.posture;
   const findings = dashboard.data?.findings ?? [];
   const sources = dashboard.data?.sources ?? [];
@@ -124,14 +147,14 @@ export default function WorkspaceSecurity() {
       <MetricCard icon={UserRoundX} label="Usuários suspensos" value={posture?.suspendedUsers ?? 0} description="Contas suspensas no diretório." />
     </div>
 
-    <details className="mt-6 rounded-xl bg-white p-5 shadow-sm"><summary className="cursor-pointer text-sm font-semibold">Coleta completa e histórico (opcional)</summary><p className="mt-3 text-sm text-[#667085]">A coleta completa atualiza todas as fontes e a postura do domínio. É mais demorada que a atualização rápida.</p>{user?.role === "admin" && <Button className="mt-3" variant="outline" disabled={fullSync.isPending} onClick={() => fullSync.mutate()}>{fullSync.isPending ? "Coletando…" : "Coletar todas as fontes"}</Button>}<p className="mt-4 text-sm text-[#667085]">{summary.coveragePercent}% dos 90 dias importados. Isso não mede a coleta dos eventos atuais.</p><div className="mt-3 h-2 max-w-md overflow-hidden rounded-full bg-[#ececf3]"><div className="h-full bg-[#4355D8]" style={{ width: `${summary.coveragePercent}%` }} /></div>{user?.role === "admin" && <Button className="mt-4" variant="outline" disabled={continueBackfill.isPending} onClick={() => continueBackfill.mutate()}>{continueBackfill.isPending ? "Avançando…" : "Continuar histórico"}</Button>}</details>
+    <details className="mt-6 rounded-xl bg-white p-5 shadow-sm"><summary className="cursor-pointer text-sm font-semibold">Coleta completa e histórico (opcional)</summary><p className="mt-3 text-sm text-[#667085]">A coleta completa atualiza todas as fontes e a postura do domínio em lotes menores. É mais demorada que a atualização rápida.</p>{user?.role === "admin" && <Button className="mt-3" variant="outline" disabled={collectingAll} onClick={() => { void collectAll(); }}>{collectingAll ? "Coletando…" : "Coletar todas as fontes"}</Button>}<p className="mt-4 text-sm text-[#667085]">{summary.coveragePercent}% dos 90 dias cobertos · {summary.backfillPagesProcessed ?? 0} páginas históricas processadas. A porcentagem só avança quando uma fonte termina suas páginas.</p><div className="mt-3 h-2 max-w-md overflow-hidden rounded-full bg-[#ececf3]"><div className="h-full bg-[#4355D8]" style={{ width: `${summary.coveragePercent}%` }} /></div>{user?.role === "admin" && <Button className="mt-4" variant="outline" disabled={continueBackfill.isPending} onClick={() => continueBackfill.mutate()}>{continueBackfill.isPending ? "Avançando…" : "Continuar histórico"}</Button>}</details>
 
     <Card className="mt-6 border-0"><CardHeader><CardTitle className="text-base">Fontes de auditoria</CardTitle><p className="text-xs text-[#667085]">Os números abaixo mostram apenas a última coleta de cada fonte, não o total armazenado.</p></CardHeader><CardContent>{sources.length === 0 ? <p className="text-sm text-[#667085]">Execute uma sincronização para registrar as fontes.</p> : <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">{sources.map((item) => <div key={item.source} className="rounded-xl border p-3"><p className="font-medium">{sourceLabels[item.source] ?? item.source}</p><p className="mt-1 text-xs text-[#667085]">{item.status === "ok" ? "Ativa" : item.status === "empty" ? "Sem eventos no último lote" : item.status === "incomplete" ? "Mais páginas pendentes" : item.status === "failure" ? "Requer atenção" : "Aguardando"}</p><p className="mt-1 text-xs text-[#667085]">Última coleta: {item.received} recebidos · {item.collected} aceitos · {item.persisted} salvos{item.completedAt ? ` · ${new Date(item.completedAt).toLocaleString("pt-BR")}` : ""}</p>{item.safeError && <p className="mt-1 text-xs text-[#bd6338]">{item.safeError === "permission" ? "Revise a delegação de domínio e os escopos desta fonte." : item.safeError === "configuration" ? "Revise a configuração da integração." : item.safeError === "invalid_request" ? "O Google rejeitou os parâmetros desta consulta." : item.safeError === "rate_limited" ? "O limite temporário do Google foi atingido; tente novamente depois." : item.safeError === "upstream" ? "O Google apresentou uma indisponibilidade temporária." : "A fonte não respondeu como esperado; tente novamente."}{item.httpStatus ? ` (HTTP ${item.httpStatus})` : ""}</p>}</div>)}</div>}</CardContent></Card>
 
     {posture && <Card className="mt-6 border-0"><CardHeader><CardTitle className="text-base">Postura acionável</CardTitle></CardHeader><CardContent className="grid gap-5 md:grid-cols-2"><div><p className="font-medium">Sem verificação em duas etapas</p><div className="mt-3 max-h-52 space-y-2 overflow-y-auto">{posture.usersWithoutTwoStepVerificationDetails.map((person) => <div key={person.id} className="rounded-lg bg-[#f8f9fc] p-3 text-sm"><p className="font-medium">{person.displayName ?? person.email ?? person.id}</p><p className="text-xs text-[#667085]">{person.email}{person.orgUnitPath ? ` · ${person.orgUnitPath}` : ""}</p></div>)}</div></div><div><p className="font-medium">Contas suspensas</p><div className="mt-3 max-h-52 space-y-2 overflow-y-auto">{posture.suspendedUserDetails.map((person) => <div key={person.id} className="rounded-lg bg-[#f8f9fc] p-3 text-sm"><p className="font-medium">{person.displayName ?? person.email ?? person.id}</p><p className="text-xs text-[#667085]">{person.email}{person.orgUnitPath ? ` · ${person.orgUnitPath}` : ""}</p></div>)}</div></div></CardContent></Card>}
 
     <Card className="mt-6 border-0"><CardHeader><CardTitle className="text-base">Requer atenção</CardTitle><p className="mt-1 text-xs text-[#667085]">Achados correlacionados a partir de sinais do Google Workspace.</p></CardHeader><CardContent>
-      {findings.length === 0 ? <p className="py-3 text-sm text-[#667085]">Nenhum achado correlacionado no período.</p> : <div className="space-y-3">{findings.map((finding) => <div key={finding.id} className="rounded-xl border border-[#ececf3] p-4"><div className="flex flex-wrap items-center gap-2"><span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${severityClass(finding.severity)}`}>{severityLabels[finding.severity] ?? finding.severity}</span><p className="font-medium">{finding.title}</p></div><p className="mt-2 text-sm text-[#667085]">{finding.description}</p><p className="mt-3 text-xs text-[#667085]">{finding.evidenceCount} evidências · {finding.subjects.join(", ") || "Usuário não disponibilizado pelo Google"}</p></div>)}</div>}
+      {findings.length === 0 ? <p className="py-3 text-sm text-[#667085]">Nenhum padrão de risco correlacionado nas últimas 24 horas. Eventos individuais de alta severidade aparecem na lista abaixo e não geram necessariamente um achado.</p> : <div className="space-y-3">{findings.map((finding) => <div key={finding.id} className="rounded-xl border border-[#ececf3] p-4"><div className="flex flex-wrap items-center gap-2"><span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${severityClass(finding.severity)}`}>{severityLabels[finding.severity] ?? finding.severity}</span><p className="font-medium">{finding.title}</p></div><p className="mt-2 text-sm text-[#667085]">{finding.description}</p><p className="mt-3 text-xs text-[#667085]">{finding.evidenceCount} evidências · {finding.subjects.join(", ") || "Usuário não disponibilizado pelo Google"}</p></div>)}</div>}
     </CardContent></Card>
 
     <Card className="mt-6 border-0"><CardHeader className="gap-4 sm:flex-row sm:items-center sm:justify-between"><div><CardTitle className="text-base">Eventos recentes</CardTitle><p className="mt-1 text-xs text-[#667085]">Dados somente de leitura sincronizados do Google Workspace.</p></div><div className="flex flex-wrap gap-2"><Select value={period} onValueChange={setPeriod}><SelectTrigger className="w-[110px]"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="1d">24 horas</SelectItem><SelectItem value="7d">7 dias</SelectItem><SelectItem value="30d">30 dias</SelectItem><SelectItem value="90d">90 dias</SelectItem></SelectContent></Select><Select value={source} onValueChange={setSource}><SelectTrigger className="w-[145px]"><SelectValue placeholder="Origem" /></SelectTrigger><SelectContent><SelectItem value="all">Todas as origens</SelectItem>{Object.entries(sourceLabels).map(([value, label]) => <SelectItem key={value} value={value}>{label}</SelectItem>)}</SelectContent></Select><Select value={category} onValueChange={setCategory}><SelectTrigger className="w-[145px]"><SelectValue placeholder="Categoria" /></SelectTrigger><SelectContent><SelectItem value="all">Todas categorias</SelectItem>{categories.map((value) => <SelectItem key={value} value={value}>{value}</SelectItem>)}</SelectContent></Select><Select value={severity} onValueChange={setSeverity}><SelectTrigger className="w-[135px]"><SelectValue placeholder="Severidade" /></SelectTrigger><SelectContent><SelectItem value="all">Todas</SelectItem>{Object.entries(severityLabels).map(([value, label]) => <SelectItem key={value} value={value}>{label}</SelectItem>)}</SelectContent></Select></div></CardHeader><CardContent>
