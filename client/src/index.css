@@ -307,9 +307,12 @@ button:active { transform: scale(0.98); }
 .dark .fluxora-app [class*="bg-[#F5F7FB]/"] { background-color: rgb(18 7 35 / .88) !important; }
 .dark .fluxora-app .bg-white { background-color: #21103e !important; }
 .dark .fluxora-app [class*="bg-[#EEF1FF]"] { background-color: #2b1950 !important; }
+.dark .fluxora-app [class*="bg-[#EEF3FF]"] { background-color: #2b1950 !important; }
 .dark .fluxora-app [class*="bg-[#def8f7]"] { background-color: rgb(40 110 247 / .16) !important; }
 .dark .fluxora-app [class*="bg-[#edf0f7]"],
 .dark .fluxora-app [class*="bg-[#eef0f6]"] { background-color: #2a1650 !important; }
+.dark .fluxora-app [class*="bg-[#F8F9FC]"],
+.dark .fluxora-app [class*="bg-[#f8f9fc]"],
 .dark .fluxora-app [class*="bg-[#F8F9FD]"] { background-color: #2a1650 !important; }
 .dark .fluxora-app [class*="text-[#11183D]"] { color: #f6f0ff !important; }
 .dark .fluxora-app [class*="text-[#667085]"] { color: #c0b4d1 !important; }
