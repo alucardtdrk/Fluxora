@@ -120,6 +120,7 @@ describe("Google Workspace security runtime", () => {
     expect(incrementalCollections).toBe(0);
     expect(result).toMatchObject({ windowsProcessed: 1, failedSources: [], targetDays: 90 });
     expect(saved).toHaveLength(1);
+    expect(saved[0]).not.toHaveProperty("lastSuccessfulEventAt");
   });
 
   it("caps a manual cycle at 300 events while checkpointing each page", async () => {

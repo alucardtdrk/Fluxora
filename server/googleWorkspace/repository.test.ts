@@ -20,7 +20,8 @@ class MemoryFirestoreAdapter implements WorkspaceFirestoreAdapter {
     }
 
     for (const write of writes) {
-      this.documents.set(`${write.collection}/${write.id}`, structuredClone(write.data));
+      const key = `${write.collection}/${write.id}`;
+      this.documents.set(key, write.merge ? { ...this.documents.get(key), ...structuredClone(write.data) } : structuredClone(write.data));
     }
   }
 
@@ -207,6 +208,18 @@ describe("Google Workspace repository", () => {
       backfillCoveredThrough: new Date("2026-06-21T10:00:00.000Z"),
       backfillPagesProcessed: 3,
     });
+  });
+
+  it("preserves historical and current page cursors across alternating collections", async () => {
+    const repository = createGoogleWorkspaceRepository(new MemoryFirestoreAdapter());
+    const start = "2026-06-20T10:00:00.000Z";
+    const end = "2026-09-18T10:00:00.000Z";
+    await repository.saveSourceBatch({ source: "login", events: [], attemptedAt: end, backfill: { targetStart: start, targetEnd: end, coveredThrough: start, pageToken: "historical-next", pagesProcessed: 2 } });
+    await repository.saveSourceBatch({ source: "login", events: [], attemptedAt: end, lastSuccessfulEventAt: end, current: { start: end, end: "2026-09-19T10:00:00.000Z", pageToken: "current-next" } });
+    expect(await repository.getSourceState("login")).toMatchObject({ backfillPageToken: "historical-next", backfillPagesProcessed: 2, currentPageToken: "current-next" });
+
+    await repository.saveSourceBatch({ source: "login", events: [], attemptedAt: end, backfill: { targetStart: start, targetEnd: end, coveredThrough: start, pageToken: "historical-third", pagesProcessed: 3 } });
+    expect(await repository.getSourceState("login")).toMatchObject({ backfillPageToken: "historical-third", backfillPagesProcessed: 3, currentPageToken: "current-next", lastSuccessfulEventAt: new Date(end) });
   });
 
   it("persists a current-sync page cursor and clears it after the last page", async () => {
