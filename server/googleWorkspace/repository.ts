@@ -17,6 +17,7 @@ export interface WorkspaceFirestoreWrite {
   readonly collection: string;
   readonly id: string;
   readonly data: FirestoreRecord;
+  readonly merge?: boolean;
 }
 
 export interface WorkspaceFirestoreAdapter {
@@ -103,9 +104,7 @@ export function createGoogleWorkspaceRepository(
         cursor: input.nextCursor ?? null,
         lastAttemptedAt: new Date(input.attemptedAt),
         lastSucceededAt: ingestedAt,
-        lastSuccessfulEventAt: input.lastSuccessfulEventAt
-          ? new Date(input.lastSuccessfulEventAt)
-          : null,
+        ...(input.lastSuccessfulEventAt ? { lastSuccessfulEventAt: new Date(input.lastSuccessfulEventAt) } : {}),
         lastError: null,
         ...(input.backfill ? { backfillTargetStart: new Date(input.backfill.targetStart), backfillTargetEnd: new Date(input.backfill.targetEnd), backfillCoveredThrough: new Date(input.backfill.coveredThrough), backfillPageToken: input.backfill.pageToken ?? null, backfillPagesProcessed: input.backfill.pagesProcessed ?? 0 } : {}),
         ...(input.current ? { currentStart: input.current.pageToken ? new Date(input.current.start) : null, currentEnd: input.current.pageToken ? new Date(input.current.end) : null, currentPageToken: input.current.pageToken ?? null } : {}),
@@ -123,6 +122,7 @@ export function createGoogleWorkspaceRepository(
               collection: WORKSPACE_SYNC_STATE_COLLECTION,
               id: input.source,
               data: successfulState,
+              merge: true,
             }] : []),
           ]);
         }

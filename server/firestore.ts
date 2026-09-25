@@ -279,6 +279,7 @@ export interface FirestoreWrite {
   collection: string;
   id: string;
   data: FirestoreRecord;
+  merge?: boolean;
 }
 
 export async function commitFirestoreWrites(documents: readonly FirestoreWrite[]) {
@@ -290,11 +291,12 @@ export async function commitFirestoreWrites(documents: readonly FirestoreWrite[]
   const response = await firestoreFetch(":commit", {
     method: "POST",
     body: JSON.stringify({
-      writes: documents.map(({ collection, id, data }) => ({
+      writes: documents.map(({ collection, id, data, merge }) => ({
         update: {
           name: resourceName(config.projectId, collection, id),
           fields: encodeFields(data),
         },
+        ...(merge ? { updateMask: { fieldPaths: Object.keys(data) } } : {}),
       })),
     }),
   });
