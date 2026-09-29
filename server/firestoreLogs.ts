@@ -174,6 +174,14 @@ export async function listArchivedExecutions(period: ArchivePeriod, includeLegac
   }
 
   const rows = await runFirestoreQuery(structuredQuery);
+  if (period === "all") {
+    let pageSize = rows.length;
+    while (pageSize === structuredQuery.limit) {
+      const page = await runFirestoreQuery({ ...structuredQuery, offset: rows.length });
+      rows.push(...page);
+      pageSize = page.length;
+    }
+  }
   const items = rows
     .map((row) => ({
       id: String(row.executionId || row._documentId || ""),
@@ -197,7 +205,7 @@ export async function listArchivedExecutions(period: ArchivePeriod, includeLegac
     }))
     .filter((row) => row.id && row.id !== "teste_inicial" && (!activeArchiveRunId || row.archiveRunId === activeArchiveRunId));
 
-  return { items, truncated: rows.length >= readLimit() };
+  return { items, truncated: period !== "all" && rows.length >= readLimit() };
 }
 
 export async function getArchiveSyncState(): Promise<ArchiveSyncState> {
