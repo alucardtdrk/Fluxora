@@ -4,7 +4,7 @@ import { collectAlertCenterEvidence, collectAlertCenterEvidenceBatch } from "./c
 import { collectDirectoryPosture } from "./collectors/directory.js";
 import { collectReportsEvidence, collectReportsEvidenceBatch } from "./collectors/reports.js";
 import { loadGoogleWorkspaceConfig, type GoogleWorkspaceConfig } from "./config.js";
-import { googleWorkspaceRepository } from "./repository.js";
+import { googleWorkspaceRepository, pruneExpiredWorkspaceEvents } from "./repository.js";
 import { createWorkspaceSync } from "./sync.js";
 import { CORRELATION_WINDOW_MS, correlateWorkspaceSecurityEvents } from "./correlation.js";
 import type { WorkspaceSecurityEvent, WorkspaceSecuritySource } from "./types.js";
@@ -218,19 +218,25 @@ export async function syncGoogleWorkspaceSecurity(startIndex = 0) {
   const config = loadGoogleWorkspaceConfig();
   const tokenProvider = createGoogleWorkspaceTokenProvider(config);
   const client = createGoogleWorkspaceClient(tokenProvider);
-  return createGoogleWorkspaceSecuritySync({ config, client, repository: googleWorkspaceRepository }).runFullBatch(startIndex);
+  const result = await createGoogleWorkspaceSecuritySync({ config, client, repository: googleWorkspaceRepository }).runFullBatch(startIndex);
+  await pruneExpiredWorkspaceEvents().catch(() => console.warn("Workspace security retention cleanup failed"));
+  return result;
 }
 
 export async function continueGoogleWorkspaceSecurityBackfill() {
   const config = loadGoogleWorkspaceConfig();
   const tokenProvider = createGoogleWorkspaceTokenProvider(config);
   const client = createGoogleWorkspaceClient(tokenProvider);
-  return createGoogleWorkspaceSecuritySync({ config, client, repository: googleWorkspaceRepository }).continueBackfill();
+  const result = await createGoogleWorkspaceSecuritySync({ config, client, repository: googleWorkspaceRepository }).continueBackfill();
+  await pruneExpiredWorkspaceEvents().catch(() => console.warn("Workspace security retention cleanup failed"));
+  return result;
 }
 
 export async function syncCurrentGoogleWorkspaceSecurity() {
   const config = loadGoogleWorkspaceConfig();
   const tokenProvider = createGoogleWorkspaceTokenProvider(config);
   const client = createGoogleWorkspaceClient(tokenProvider);
-  return createGoogleWorkspaceSecuritySync({ config, client, repository: googleWorkspaceRepository }).runCurrent();
+  const result = await createGoogleWorkspaceSecuritySync({ config, client, repository: googleWorkspaceRepository }).runCurrent();
+  await pruneExpiredWorkspaceEvents().catch(() => console.warn("Workspace security retention cleanup failed"));
+  return result;
 }
