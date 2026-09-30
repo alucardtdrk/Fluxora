@@ -40,6 +40,15 @@
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-ring: var(--sidebar-ring);
+  --color-feedback-error: var(--feedback-error);
+  --color-feedback-error-surface: var(--feedback-error-surface);
+  --color-feedback-error-border: var(--feedback-error-border);
+  --color-feedback-success: var(--feedback-success);
+  --color-feedback-success-surface: var(--feedback-success-surface);
+  --color-feedback-info: var(--feedback-info);
+  --color-feedback-info-surface: var(--feedback-info-surface);
+  --color-code-background: var(--code-background);
+  --color-code-foreground: var(--code-foreground);
 }
 
 :root {
@@ -209,6 +218,15 @@
   --card-foreground: var(--fluxora-ink);
   --ring: var(--fluxora-curacao);
   --radius: 0.9rem;
+  --feedback-error: #a83b19;
+  --feedback-error-surface: #fff8f2;
+  --feedback-error-border: #f3d5bf;
+  --feedback-success: #187348;
+  --feedback-success-surface: #e3f6eb;
+  --feedback-info: #286ef7;
+  --feedback-info-surface: #e8f0ff;
+  --code-background: #1b0b35;
+  --code-foreground: #e8e2f5;
 }
 
 html { background: var(--fluxora-vanilla); }
@@ -224,33 +242,6 @@ button, a, input { transition: color 160ms ease, background-color 160ms ease, bo
 button:active { transform: scale(0.98); }
 ::selection { background: rgb(40 110 247 / .2); color: var(--fluxora-mirtilo); }
 .fluxora-card { border: 1px solid rgb(40 14 89 / .09); box-shadow: 0 14px 35px rgb(40 14 89 / .06); }
-
-/* The operational screens were built with the previous palette as utility
-   classes. Map those semantics to the new identity without changing behavior. */
-.fluxora-app [class*="bg-[#11183D]"] { background-color: var(--fluxora-mirtilo) !important; }
-.fluxora-app [class*="text-[#11183D]"] { color: var(--fluxora-ink) !important; }
-.fluxora-app [class*="border-[#11183D]"] { border-color: var(--fluxora-mirtilo) !important; }
-.fluxora-app [class*="bg-[#4355D8]"] { background-color: var(--fluxora-curacao) !important; }
-.fluxora-app [class*="text-[#4355D8]"] { color: var(--fluxora-curacao) !important; }
-.fluxora-app [class*="border-[#4355D8]"] { border-color: var(--fluxora-curacao) !important; }
-.fluxora-app [class*="bg-[#6675F0]"] { background-color: #5b91ff !important; }
-.fluxora-app [class*="text-[#6675F0]"] { color: #286ef7 !important; }
-.fluxora-app [class*="bg-[#19D3C5]"] { background-color: var(--fluxora-curacao) !important; }
-.fluxora-app [class*="text-[#19D3C5]"] { color: var(--fluxora-curacao) !important; }
-.fluxora-app [class*="border-[#19D3C5]"] { border-color: var(--fluxora-curacao) !important; }
-.fluxora-app [class*="bg-[#F5F7FB]"] { background-color: var(--fluxora-vanilla) !important; }
-.fluxora-app [class*="text-[#667085]"] { color: var(--fluxora-muted) !important; }
-.fluxora-app [class*="text-[#98A2B3]"] { color: #978aa4 !important; }
-.fluxora-app [class*="bg-[#EEF1FF]"] { background-color: #e8f0ff !important; }
-.fluxora-app [class*="text-[#5D6EE8]"] { color: var(--fluxora-curacao) !important; }
-.fluxora-app [class*="bg-[#fff0e7]"],
-.fluxora-app [class*="bg-[#FFF5F1]"] { background-color: #fff1eb !important; }
-.fluxora-app [class*="text-[#bd6338]"],
-.fluxora-app [class*="text-[#A14E36]"] { color: #ca3e1b !important; }
-.fluxora-app .bg-white { background-color: var(--fluxora-card) !important; }
-.fluxora-app [class*="border-[#e8eaf3]"],
-.fluxora-app [class*="border-[#e7e9f1]"],
-.fluxora-app [class*="border-[#f1f2f7]"] { border-color: rgb(40 14 89 / .1) !important; }
 
 .fluxora-login { background: #280e59; }
 .fluxora-login-aurora {
@@ -293,6 +284,15 @@ button:active { transform: scale(0.98); }
   --border: rgb(232 218 255 / .13);
   --input: #301a59;
   --ring: #5b91ff;
+  --feedback-error: #ffb18a;
+  --feedback-error-surface: #302039;
+  --feedback-error-border: rgb(255 177 138 / .28);
+  --feedback-success: #8be2b2;
+  --feedback-success-surface: #183b35;
+  --feedback-info: #89b2ff;
+  --feedback-info-surface: #2b1950;
+  --code-background: #120723;
+  --code-foreground: #e8e2f5;
 }
 .dark,
 .dark body { background: #120723; color: #f6f0ff; }
@@ -303,51 +303,17 @@ button:active { transform: scale(0.98); }
     radial-gradient(circle at 0 42%, rgb(112 65 208 / .12), transparent 27rem),
     #120723 !important;
 }
-.dark .fluxora-app [class*="bg-[#F5F7FB]"] { background-color: #120723 !important; }
-.dark .fluxora-app [class*="bg-[#F5F7FB]/"] { background-color: rgb(18 7 35 / .88) !important; }
-.dark .fluxora-app .bg-white { background-color: #21103e !important; }
-.dark .fluxora-app [class*="bg-[#EEF1FF]"] { background-color: #2b1950 !important; }
-.dark .fluxora-app [class*="bg-[#EEF3FF]"] { background-color: #2b1950 !important; }
-.dark .fluxora-app [class*="bg-[#def8f7]"] { background-color: rgb(40 110 247 / .16) !important; }
-.dark .fluxora-app [class*="bg-[#edf0f7]"],
-.dark .fluxora-app [class*="bg-[#eef0f6]"] { background-color: #2a1650 !important; }
-.dark .fluxora-app [class*="bg-[#F8F9FC]"],
-.dark .fluxora-app [class*="bg-[#f8f9fc]"],
-.dark .fluxora-app [class*="bg-[#F8F9FD]"] { background-color: #2a1650 !important; }
-.dark .fluxora-app [class*="text-[#11183D]"] { color: #f6f0ff !important; }
-.dark .fluxora-app [class*="text-[#667085]"] { color: #c0b4d1 !important; }
-.dark .fluxora-app [class*="text-[#98A2B3]"] { color: #ac9fc0 !important; }
-.dark .fluxora-app [class*="text-[#B8C2E3]"] { color: #cec4dd !important; }
-.dark .fluxora-app [class*="text-[#AAB4DA]"] { color: #d6cdec !important; }
-.dark .fluxora-app [class*="text-[#19D3C5]"] { color: #75a5ff !important; }
-.dark .fluxora-app [class*="border-[#e8eaf3]"],
-.dark .fluxora-app [class*="border-[#e7e9f1]"],
-.dark .fluxora-app [class*="border-[#f1f2f7]"],
-.dark .fluxora-app [class*="border-[#E5E8F2]"] { border-color: rgb(232 218 255 / .13) !important; }
 .dark .fluxora-app input,
 .dark .fluxora-app textarea,
-.dark .fluxora-app button[role="combobox"] { color: #f6f0ff; background-color: #2a1650; border-color: rgb(232 218 255 / .16); }
+.dark .fluxora-app button[role="combobox"] { color: var(--foreground); background-color: var(--secondary); border-color: var(--border); }
 .dark .fluxora-app input::placeholder,
-.dark .fluxora-app textarea::placeholder { color: #a99aba; }
+.dark .fluxora-app textarea::placeholder { color: var(--muted-foreground); }
 
 /* Dialogs are rendered in a portal, outside .fluxora-app. Keep execution
    details aligned with the same dark palette used by the application. */
 .dark [role="dialog"] {
-  background-color: #21103e;
-  color: #f6f0ff;
-  border-color: rgb(232 218 255 / .13);
+  background-color: var(--card);
+  color: var(--foreground);
+  border-color: var(--border);
 }
-.dark [role="dialog"] .bg-white { background-color: #21103e !important; }
-.dark [role="dialog"] [class*="bg-[#F5F7FB]"],
-.dark [role="dialog"] [class*="bg-[#F8F9FD]"],
-.dark [role="dialog"] [class*="bg-[#FBFCFE]"] { background-color: #2a1650 !important; }
-.dark [role="dialog"] [class*="text-[#11183D]"] { color: #f6f0ff !important; }
-.dark [role="dialog"] [class*="text-[#667085]"] { color: #c0b4d1 !important; }
-.dark [role="dialog"] [class*="text-[#98A2B3]"] { color: #ac9fc0 !important; }
-.dark [role="dialog"] [class*="text-[#E8ECFF]"] { color: #e8e2f5 !important; }
-.dark [role="dialog"] [class*="border-[#eef0f6]"],
-.dark [role="dialog"] [class*="border-[#e9ebf3]"],
-.dark [role="dialog"] [class*="border-[#E8EBF4]"],
-.dark [role="dialog"] [class*="border-[#DDE2EE]"] { border-color: rgb(232 218 255 / .14) !important; }
-
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { scroll-behavior: auto !important; transition-duration: 0.01ms !important; animation-duration: 0.01ms !important; } }

@@ -10,7 +10,7 @@ import { PREFERENCES_UPDATED_EVENT, readOperationalAlertPreferences, readPreferr
 import { trpc } from "@/lib/trpc";
 
 function MonitoringMetric({ icon: Icon, label, loading, children }: { icon: LucideIcon; label: string; loading: boolean; children: React.ReactNode }) {
-  return <Card className="border-0"><CardContent className="p-6"><Icon className="h-5 w-5 text-[#4355D8]" /><p className="mt-4 text-xs uppercase tracking-[.14em] text-[#667085]">{label}</p>{loading ? <MetricSkeleton /> : <p className="mt-2 text-3xl font-semibold">{children}</p>}</CardContent></Card>;
+  return <Card className="border-0"><CardContent className="p-6"><Icon className="h-5 w-5 text-feedback-info" /><p className="mt-4 text-xs uppercase tracking-[.14em] text-muted-foreground">{label}</p>{loading ? <MetricSkeleton /> : <p className="mt-2 text-3xl font-semibold">{children}</p>}</CardContent></Card>;
 }
 
 function MonitoringAlerts({ loading, metrics, errorThreshold, inactiveHours }: { loading: boolean; metrics: any; errorThreshold: number; inactiveHours: number }) {
@@ -22,7 +22,7 @@ function MonitoringAlerts({ loading, metrics, errorThreshold, inactiveHours }: {
     metrics.inactiveActiveWorkflows > 0 ? `${metrics.inactiveActiveWorkflows} workflow(s) ativo(s) está(ão) sem execução há pelo menos ${inactiveHours}h.` : null,
   ].filter((alert): alert is string => Boolean(alert));
   if (!alerts.length) return null;
-  return <Card className="mt-6 border border-amber-200 bg-amber-50 dark:border-amber-400/20 dark:bg-amber-500/10"><CardContent className="flex gap-3 p-4"><AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-amber-600 dark:text-amber-300"/><div><p className="font-semibold">Atenção operacional</p><ul className="mt-1 space-y-1 text-sm text-[#667085] dark:text-slate-300">{alerts.map((alert) => <li key={alert}>{alert}</li>)}</ul></div></CardContent></Card>;
+  return <Card className="mt-6 border border-feedback-error-border bg-feedback-error-surface"><CardContent className="flex gap-3 p-4"><AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-feedback-error"/><div><p className="font-semibold">Atenção operacional</p><ul className="mt-1 space-y-1 text-sm text-muted-foreground">{alerts.map((alert) => <li key={alert}>{alert}</li>)}</ul></div></CardContent></Card>;
 }
 
 function ReliabilityPanel({ analytics, loading }: { analytics: any; loading: boolean }) {
@@ -36,9 +36,9 @@ function ReliabilityPanel({ analytics, loading }: { analytics: any; loading: boo
       <MonitoringMetric icon={Clock3} label="Intervalo médio entre falhas" loading={loading}>{reliability?.meanTimeBetweenFailuresHours == null ? "Sem dados" : `${reliability.meanTimeBetweenFailuresHours.toFixed(1)} h`}</MonitoringMetric>
       <MonitoringMetric icon={AlertTriangle} label="Maior sequência de falhas" loading={loading}>{reliability?.longestFailureStreak ?? 0}</MonitoringMetric>
     </div>
-    {(anomalies.length > 0 || workflowAlerts.length > 0) ? <Card className="mt-6 border border-amber-200 bg-amber-50 dark:border-amber-400/20 dark:bg-amber-500/10"><CardHeader><CardTitle className="flex items-center gap-2 text-base"><Activity className="h-5 w-5 text-amber-600" />Sinais que merecem atenção</CardTitle></CardHeader><CardContent className="grid gap-3 md:grid-cols-2">
-      {anomalies.map((item: any) => <div key={`${item.type}-${item.description}`} className="rounded-xl bg-white/70 p-4 dark:bg-white/5"><p className="text-sm font-semibold">{item.title}</p><p className="mt-1 text-xs leading-5 text-[#667085] dark:text-slate-300">{item.description}</p></div>)}
-      {workflowAlerts.map((item: any) => <div key={item.id} className="rounded-xl bg-white/70 p-4 dark:bg-white/5"><p className="text-sm font-semibold">{item.name}</p><p className="mt-1 text-xs leading-5 text-[#667085] dark:text-slate-300">{item.alertReasons.join(" · ")}</p></div>)}
+    {(anomalies.length > 0 || workflowAlerts.length > 0) ? <Card className="mt-6 border border-feedback-error-border bg-feedback-error-surface"><CardHeader><CardTitle className="flex items-center gap-2 text-base"><Activity className="h-5 w-5 text-feedback-error" />Sinais que merecem atenção</CardTitle></CardHeader><CardContent className="grid gap-3 md:grid-cols-2">
+      {anomalies.map((item: any) => <div key={`${item.type}-${item.description}`} className="rounded-xl bg-card p-4"><p className="text-sm font-semibold">{item.title}</p><p className="mt-1 text-xs leading-5 text-muted-foreground">{item.description}</p></div>)}
+      {workflowAlerts.map((item: any) => <div key={item.id} className="rounded-xl bg-card p-4"><p className="text-sm font-semibold">{item.name}</p><p className="mt-1 text-xs leading-5 text-muted-foreground">{item.alertReasons.join(" · ")}</p></div>)}
     </CardContent></Card> : null}
   </>;
 }
@@ -66,7 +66,7 @@ function FluxoraHealthPanel({ archive, loading }: { archive: any; loading: boole
   const failed = state?.lastRunStatus === "failure" || Boolean(state?.lastError);
   const healthy = archive?.configured && !failed && !stuck && !delayed;
   const status = !archive?.configured ? "Não configurado" : stuck ? "Possível travamento" : failed ? "Último ciclo falhou" : delayed ? "Rotina atrasada" : state?.lastRunStatus === "running" ? "Em execução" : "Operação normal";
-  const statusClass = healthy ? "bg-emerald-50 text-emerald-700" : state?.lastRunStatus === "running" && !stuck ? "bg-blue-50 text-blue-700" : "bg-amber-50 text-amber-700";
+  const statusClass = healthy ? "bg-feedback-success-surface text-feedback-success" : state?.lastRunStatus === "running" && !stuck ? "bg-feedback-info-surface text-feedback-info" : "bg-feedback-error-surface text-feedback-error";
   const trigger = state?.lastRunTrigger === "scheduled" ? "Automático pelo Vercel" : state?.lastRunTrigger === "manual" ? "Manual" : "Sistema";
 
   return <Card className="mt-6 border-0">
@@ -78,7 +78,7 @@ function FluxoraHealthPanel({ archive, loading }: { archive: any; loading: boole
         <div className="rounded-xl border p-4"><p className="flex items-center gap-2 text-xs text-muted-foreground"><Activity className="h-4 w-4" />Último ciclo</p><p className="mt-3 text-lg font-semibold">{Number(state?.lastRunProcessed || 0).toLocaleString("pt-BR")} verificados</p><p className="mt-1 text-xs text-muted-foreground">{Number(state?.lastRunSaved || 0).toLocaleString("pt-BR")} novos protegidos</p></div>
         <div className="rounded-xl border p-4"><p className="flex items-center gap-2 text-xs text-muted-foreground"><Database className="h-4 w-4" />Origem do ciclo</p><p className="mt-3 text-lg font-semibold">{trigger}</p><p className="mt-1 text-xs text-muted-foreground">Firestore {archive?.configured ? "conectado" : "não configurado"}</p></div>
       </div>}
-      {!loading && (failed || stuck || delayed) && <div className="mt-4 flex gap-3 rounded-xl border border-amber-200 bg-amber-50 p-4 text-amber-800"><AlertTriangle className="mt-0.5 h-5 w-5 shrink-0" /><div><p className="text-sm font-semibold">A rotina precisa de atenção</p><p className="mt-1 text-xs leading-5">{stuck ? "O ciclo está marcado como ativo há mais de 10 minutos." : failed ? state?.lastError || "O último ciclo não terminou corretamente." : "Nenhuma sincronização bem-sucedida foi registrada nas últimas 36 horas."}</p></div></div>}
+      {!loading && (failed || stuck || delayed) && <div className="mt-4 flex gap-3 rounded-xl border border-feedback-error-border bg-feedback-error-surface p-4 text-feedback-error"><AlertTriangle className="mt-0.5 h-5 w-5 shrink-0" /><div><p className="text-sm font-semibold">A rotina precisa de atenção</p><p className="mt-1 text-xs leading-5">{stuck ? "O ciclo está marcado como ativo há mais de 10 minutos." : failed ? state?.lastError || "O último ciclo não terminou corretamente." : "Nenhuma sincronização bem-sucedida foi registrada nas últimas 36 horas."}</p></div></div>}
     </CardContent>
   </Card>;
 }
@@ -103,10 +103,10 @@ export default function Monitoring() {
   }, []);
 
   return <OperationsShell><div className="mx-auto max-w-[1280px] px-5 py-8 md:px-9">
-    <div className="flex flex-col justify-between gap-4 md:flex-row md:items-end"><div><p className="text-[11px] font-bold uppercase tracking-[.18em] text-[#667085]">Gestão / Monitoramento</p><h2 className="mt-2 text-4xl font-semibold tracking-[-.05em]">Saúde do ambiente</h2><p className="mt-2 text-sm text-[#667085]">Acompanhe disponibilidade, falhas e estado operacional do n8n em tempo quase real.</p></div><Button variant="outline" onClick={refresh}><RefreshCw className={`mr-2 h-4 w-4 ${overview.isFetching ? "animate-spin" : ""}`}/>Atualizar</Button></div>
+    <div className="flex flex-col justify-between gap-4 md:flex-row md:items-end"><div><p className="text-[11px] font-bold uppercase tracking-[.18em] text-muted-foreground">Gestão / Monitoramento</p><h2 className="mt-2 text-4xl font-semibold tracking-[-.05em]">Saúde do ambiente</h2><p className="mt-2 text-sm text-muted-foreground">Acompanhe disponibilidade, falhas e estado operacional do n8n em tempo quase real.</p></div><Button variant="outline" onClick={refresh}><RefreshCw className={`mr-2 h-4 w-4 ${overview.isFetching ? "animate-spin" : ""}`}/>Atualizar</Button></div>
     <div className="mt-7 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
       <MonitoringMetric icon={DatabaseZap} label="Conexão n8n" loading={overviewLoading}>{overview.data?.connected ? "Online" : "Offline"}</MonitoringMetric>
-      <MonitoringMetric icon={Workflow} label="Workflows ativos" loading={overviewLoading}>{metrics?.active ?? 0}<span className="text-sm font-normal text-[#98A2B3]"> / {metrics?.workflows ?? 0}</span></MonitoringMetric>
+      <MonitoringMetric icon={Workflow} label="Workflows ativos" loading={overviewLoading}>{metrics?.active ?? 0}<span className="text-sm font-normal text-muted-foreground"> / {metrics?.workflows ?? 0}</span></MonitoringMetric>
       <MonitoringMetric icon={CheckCircle2} label="Taxa de sucesso · 7 dias" loading={overviewLoading}>{metrics?.successRate != null ? `${metrics.successRate}%` : "—"}</MonitoringMetric>
       <MonitoringMetric icon={AlertTriangle} label="Falhas 7 dias" loading={overviewLoading}>{metrics?.errors ?? 0}</MonitoringMetric>
     </div>
@@ -115,8 +115,8 @@ export default function Monitoring() {
     <FluxoraHealthPanel archive={archiveStatus.data} loading={archiveStatus.isPending && !archiveStatus.data} />
     <ReliabilityPanel analytics={analytics.data} loading={analytics.isPending && !analytics.data} />
     <div className="mt-6 grid gap-6 lg:grid-cols-2">
-      <Card className="border-0"><CardHeader><CardTitle className="text-base">Estado dos workflows</CardTitle></CardHeader><CardContent className="space-y-3">{workflowsLoading ? <div className="space-y-3">{Array.from({ length: 4 }, (_, index) => <div key={index} className="h-16 animate-pulse rounded-xl bg-[#eef0f6] dark:bg-white/10" />)}</div> : (workflows.data?.items ?? []).map((workflow: any) => <div key={workflow.id} className="flex items-center justify-between rounded-xl bg-[#F5F7FB] px-4 py-3"><div><p className="text-sm font-semibold">{workflow.name}</p><p className="mt-1 text-xs text-[#98A2B3]">{workflow.nodeCount} nodes</p></div><span className={`rounded-full px-2.5 py-1 text-[10px] font-bold ${workflow.active ? "bg-[#e3f6eb] text-[#258b57]" : "bg-[#eef0f6] text-[#667085]"}`}>{workflow.active ? "Ativo" : "Inativo"}</span></div>)}</CardContent></Card>
-      <Card className="border-0 bg-[#11183D] text-white"><CardHeader><CardTitle className="flex items-center gap-2 text-base"><ShieldCheck className="h-5 w-5 text-[#19D3C5]"/>Monitoramento automático</CardTitle></CardHeader><CardContent><p className="text-sm leading-6 text-[#C7CEE8]">O painel consulta o backend periodicamente. Novas falhas aparecem no sino de notificações e podem gerar um alerta visual.</p><div className="mt-6 rounded-xl bg-white/10 p-4"><Activity className="h-4 w-4 text-[#19D3C5]"/><p className="mt-3 text-2xl font-semibold">{refreshSeconds}s</p><p className="text-xs text-[#AAB4DA]">intervalo configurado para todas as consultas</p></div></CardContent></Card>
+      <Card className="border-0"><CardHeader><CardTitle className="text-base">Estado dos workflows</CardTitle></CardHeader><CardContent className="space-y-3">{workflowsLoading ? <div className="space-y-3">{Array.from({ length: 4 }, (_, index) => <div key={index} className="h-16 animate-pulse rounded-xl bg-muted" />)}</div> : (workflows.data?.items ?? []).map((workflow: any) => <div key={workflow.id} className="flex items-center justify-between rounded-xl bg-background px-4 py-3"><div><p className="text-sm font-semibold">{workflow.name}</p><p className="mt-1 text-xs text-muted-foreground">{workflow.nodeCount} nodes</p></div><span className={`rounded-full px-2.5 py-1 text-[10px] font-bold ${workflow.active ? "bg-feedback-success-surface text-feedback-success" : "bg-muted text-muted-foreground"}`}>{workflow.active ? "Ativo" : "Inativo"}</span></div>)}</CardContent></Card>
+      <Card className="border-0 bg-code-background text-code-foreground"><CardHeader><CardTitle className="flex items-center gap-2 text-base"><ShieldCheck className="h-5 w-5 text-feedback-info"/>Monitoramento automático</CardTitle></CardHeader><CardContent><p className="text-sm leading-6 text-code-foreground/80">O painel consulta o backend periodicamente. Novas falhas aparecem no sino de notificações e podem gerar um alerta visual.</p><div className="mt-6 rounded-xl bg-white/10 p-4"><Activity className="h-4 w-4 text-feedback-info"/><p className="mt-3 text-2xl font-semibold">{refreshSeconds}s</p><p className="text-xs text-code-foreground/70">intervalo configurado para todas as consultas</p></div></CardContent></Card>
     </div>
   </div></OperationsShell>;
 }
