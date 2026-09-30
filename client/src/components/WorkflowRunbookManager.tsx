@@ -40,13 +40,13 @@ export default function WorkflowRunbookManager() {
   };
 
   return <Card className="border-0 lg:col-span-2">
-    <CardHeader><CardTitle className="flex items-center gap-2 text-base"><BookOpen className="h-4 w-4 text-[#4355D8]" />Orientações de resposta por workflow</CardTitle><p className="text-xs text-[#667085]">Registre quem deve atuar e o passo a passo que aparecerá junto aos incidentes desse workflow.</p></CardHeader>
+    <CardHeader><CardTitle className="flex items-center gap-2 text-base"><BookOpen className="h-4 w-4 text-feedback-info" />Orientações de resposta por workflow</CardTitle><p className="text-xs text-muted-foreground">Registre quem deve atuar e o passo a passo que aparecerá junto aos incidentes desse workflow.</p></CardHeader>
     <CardContent className="grid gap-5 md:grid-cols-2">
       <div className="md:col-span-2"><Label>Workflow</Label><Select value={workflowId} onValueChange={setWorkflowId}><SelectTrigger className="mt-2"><SelectValue placeholder="Selecione um workflow" /></SelectTrigger><SelectContent>{items.map((workflow) => <SelectItem key={workflow.id} value={workflow.id}>{workflow.name}</SelectItem>)}</SelectContent></Select></div>
       <div><Label>Responsável ou equipe</Label><Input className="mt-2" value={owner} onChange={(event) => setOwner(event.target.value)} placeholder="Ex.: Facilities" /></div>
       <div><Label>Link de apoio</Label><Input className="mt-2" type="url" value={url} onChange={(event) => setUrl(event.target.value)} placeholder="https://..." /></div>
       <div className="md:col-span-2"><Label>Como responder</Label><Textarea className="mt-2 min-h-28" value={instructions} onChange={(event) => setInstructions(event.target.value)} placeholder="Passos de diagnóstico, contatos e ação segura..." /></div>
-      <Button className="w-fit bg-[#4355D8] hover:bg-[#3546C7]" disabled={!workflowId || save.isPending} onClick={submit}>{save.isPending ? "Salvando..." : "Salvar orientações"}</Button>
+      <Button className="w-fit bg-primary hover:bg-primary/90" disabled={!workflowId || save.isPending} onClick={submit}>{save.isPending ? "Salvando..." : "Salvar orientações"}</Button>
     </CardContent>
   </Card>;
 }

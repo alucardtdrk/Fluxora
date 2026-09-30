@@ -26,10 +26,10 @@ type DiagramProps = {
 };
 
 function nodeStatusClass(status?: string) {
-  if (status === "success") return "fill-[#DBF7EA] stroke-[#258B57]";
-  if (status === "error") return "fill-[#FFF0E7] stroke-[#BD6338]";
-  if (status === "running") return "fill-[#E8ECFF] stroke-[#4355D8]";
-  return "fill-white stroke-[#CFD5E6]";
+  if (status === "success") return "bg-feedback-success-surface text-feedback-success";
+  if (status === "error") return "bg-feedback-error-surface text-feedback-error";
+  if (status === "running") return "bg-feedback-info-surface text-feedback-info";
+  return "bg-card text-muted-foreground";
 }
 
 function buildEdges(connections: Record<string, unknown>) {
@@ -111,15 +111,15 @@ export default function WorkflowDiagram({ nodes, connections, selectedNodeName, 
   const contentHeight = Math.max(viewportHeight, layout.height + 40);
 
   return (
-    <div className="rounded-[28px] border border-[#E5E8F2] bg-white shadow-sm">
-      <div className="flex flex-col gap-3 border-b border-[#EEF0F6] px-5 py-4 lg:flex-row lg:items-center lg:justify-between">
+    <div className="rounded-[28px] border border-border bg-card shadow-sm">
+      <div className="flex flex-col gap-3 border-b border-border px-5 py-4 lg:flex-row lg:items-center lg:justify-between">
         <div>
-          <p className="text-sm font-semibold text-[#11183D]">Diagrama operacional</p>
-          <p className="mt-1 text-xs text-[#667085]">Layout real do n8n com busca, zoom, navegacao e selecao de nodes.</p>
+          <p className="text-sm font-semibold text-foreground">Diagrama operacional</p>
+          <p className="mt-1 text-xs text-muted-foreground">Layout real do n8n com busca, zoom, navegacao e selecao de nodes.</p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <div className="relative">
-            <Search className="absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-[#98A2B3]" />
+            <Search className="absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
             <Input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Buscar node" className="h-9 w-[220px] pl-9 text-xs" />
           </div>
           <Button variant="outline" size="sm" onClick={() => setZoom((value) => Math.max(0.4, Number((value - 0.15).toFixed(2))))}><Minus className="h-4 w-4" /></Button>
@@ -129,7 +129,7 @@ export default function WorkflowDiagram({ nodes, connections, selectedNodeName, 
       </div>
 
       <div
-        className={`relative overflow-hidden rounded-b-[28px] bg-[radial-gradient(circle_at_top,#F8FAFF,transparent_42%),linear-gradient(180deg,#FCFDFF_0%,#F4F7FC_100%)] select-none ${dragStart ? "cursor-grabbing" : "cursor-grab"}`}
+        className={`relative overflow-hidden rounded-b-[28px] bg-background select-none ${dragStart ? "cursor-grabbing" : "cursor-grab"}`}
         style={{ height: viewportHeight }}
         onMouseDown={(event) => {
           if ((event.target as HTMLElement)?.closest("button")) return;
@@ -144,7 +144,7 @@ export default function WorkflowDiagram({ nodes, connections, selectedNodeName, 
         onMouseUp={() => setDragStart(null)}
         onMouseLeave={() => setDragStart(null)}
       >
-        <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(rgba(67,85,216,0.05)_1px,transparent_1px),linear-gradient(90deg,rgba(67,85,216,0.05)_1px,transparent_1px)] bg-[size:32px_32px]" />
+        <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(var(--border)_1px,transparent_1px),linear-gradient(90deg,var(--border)_1px,transparent_1px)] bg-[size:32px_32px]" />
         <svg className="absolute inset-0 h-full w-full">
           <g transform={`translate(${pan.x} ${pan.y}) scale(${zoom})`}>
             {edges.map((edge, index) => {
@@ -158,7 +158,7 @@ export default function WorkflowDiagram({ nodes, connections, selectedNodeName, 
               const toX = toPosition.x + NODE_IN_X;
               const toY = toPosition.y + NODE_MIDDLE_Y;
               const curve = Math.max(40, Math.abs(toX - fromX) / 2);
-              return <path key={`${edge.from}-${edge.to}-${index}`} d={`M ${fromX} ${fromY} C ${fromX + curve} ${fromY}, ${toX - curve} ${toY}, ${toX} ${toY}`} fill="none" stroke="#8FA0E8" strokeWidth={3} strokeLinecap="round" opacity={0.9} />;
+              return <path key={`${edge.from}-${edge.to}-${index}`} d={`M ${fromX} ${fromY} C ${fromX + curve} ${fromY}, ${toX - curve} ${toY}, ${toX} ${toY}`} fill="none" stroke="var(--feedback-info)" strokeWidth={3} strokeLinecap="round" opacity={0.9} />;
             })}
           </g>
         </svg>
@@ -175,20 +175,20 @@ export default function WorkflowDiagram({ nodes, connections, selectedNodeName, 
                     key={node.name}
                     type="button"
                     onClick={() => onSelectNode(node.name)}
-                    className={`absolute w-[180px] rounded-2xl border bg-white p-2.5 text-left shadow-[0_6px_16px_rgba(17,24,61,0.08)] transition ${selected ? "border-[#4355D8] ring-2 ring-[#DDE3FF]" : "border-[#D9DEEB]"}`}
+                    className={`absolute w-[180px] rounded-2xl border bg-card p-2.5 text-left shadow-[0_6px_16px_rgba(17,24,61,0.08)] transition ${selected ? "border-feedback-info ring-2 ring-feedback-info/30" : "border-border"}`}
                     style={{ left: position.x, top: position.y }}
                   >
                     <div className="flex items-start justify-between gap-2">
                       <div className={`grid h-7 w-7 place-items-center rounded-lg border ${nodeStatusClass(status)}`}>
                         <Workflow className="h-3 w-3" />
                       </div>
-                      <div className="rounded-full bg-[#F3F5FA] px-1.5 py-0.5 text-[8px] font-bold uppercase tracking-[0.14em] text-[#667085]">
+                      <div className="rounded-full bg-muted px-1.5 py-0.5 text-[8px] font-bold uppercase tracking-[0.14em] text-muted-foreground">
                         {status === "success" ? "sucesso" : status === "error" ? "erro" : status === "running" ? "ao vivo" : node.disabled ? "pausado" : "node"}
                       </div>
                     </div>
-                    <p className="mt-2 line-clamp-2 text-[12px] font-semibold leading-4 text-[#11183D]">{node.name}</p>
-                    <p className="mt-1 truncate text-[10px] text-[#667085]">{node.type}</p>
-                    <div className="mt-2 flex items-center gap-2 text-[9px] text-[#98A2B3]">
+                    <p className="mt-2 line-clamp-2 text-[12px] font-semibold leading-4 text-foreground">{node.name}</p>
+                    <p className="mt-1 truncate text-[10px] text-muted-foreground">{node.type}</p>
+                    <div className="mt-2 flex items-center gap-2 text-[9px] text-muted-foreground">
                       <span>{node.incoming?.length || 0} entrada(s)</span>
                       <span>{node.outgoing?.length || 0} saida(s)</span>
                     </div>

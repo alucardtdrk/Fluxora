@@ -43,13 +43,13 @@ export default function WorkflowSloManager() {
   };
 
   return <Card className="border-0 lg:col-span-2">
-    <CardHeader><CardTitle className="flex items-center gap-2 text-base"><Gauge className="h-4 w-4 text-[#4355D8]" />Metas de confiabilidade por workflow</CardTitle><p className="text-xs text-[#667085]">Defina o nível mínimo de sucesso e o tempo máximo aceitável para 95% das execuções. O Analytics sinaliza automaticamente quando a meta não é cumprida.</p></CardHeader>
+    <CardHeader><CardTitle className="flex items-center gap-2 text-base"><Gauge className="h-4 w-4 text-feedback-info" />Metas de confiabilidade por workflow</CardTitle><p className="text-xs text-muted-foreground">Defina o nível mínimo de sucesso e o tempo máximo aceitável para 95% das execuções. O Analytics sinaliza automaticamente quando a meta não é cumprida.</p></CardHeader>
     <CardContent className="grid gap-5 md:grid-cols-[1.6fr_1fr_1fr_auto] md:items-end">
       <div><Label>Workflow</Label><Select value={workflowId} onValueChange={setWorkflowId}><SelectTrigger className="mt-2"><SelectValue placeholder="Selecione um workflow" /></SelectTrigger><SelectContent>{items.map((workflow) => <SelectItem key={workflow.id} value={workflow.id}>{workflow.name}</SelectItem>)}</SelectContent></Select></div>
       <div><Label>Sucesso mínimo (%)</Label><Input className="mt-2" type="number" min="0" max="100" step="0.1" value={successTarget} onChange={(event) => setSuccessTarget(event.target.value)} /></div>
       <div><Label>Tempo máximo para 95% (segundos)</Label><Input className="mt-2" type="number" min="0.1" step="0.1" value={p95Target} onChange={(event) => setP95Target(event.target.value)} /></div>
       <div className="flex items-center gap-3 md:pb-2"><Switch checked={enabled} onCheckedChange={setEnabled} /><Label>Ativa</Label></div>
-      <Button className="bg-[#4355D8] hover:bg-[#3546C7] md:col-span-full md:w-fit" disabled={!workflowId || save.isPending} onClick={submit}>{save.isPending ? "Salvando…" : "Salvar meta"}</Button>
+      <Button className="bg-primary hover:bg-primary/90 md:col-span-full md:w-fit" disabled={!workflowId || save.isPending} onClick={submit}>{save.isPending ? "Salvando…" : "Salvar meta"}</Button>
     </CardContent>
   </Card>;
 }

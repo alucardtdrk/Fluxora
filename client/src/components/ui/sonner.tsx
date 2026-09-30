@@ -1,23 +1,25 @@
 import { Toaster as Sonner, type ToasterProps } from "sonner";
+import { useTheme } from "@/contexts/ThemeContext";
 
 const Toaster = ({ ...props }: ToasterProps) => {
+  const { theme } = useTheme();
   return (
     <Sonner
-      theme="light"
+      theme={theme}
       className="toaster group"
       richColors
       toastOptions={{
         classNames: {
-          toast: "!border-[#DDE2EE] !bg-white !text-[#11183D] !shadow-lg",
-          title: "!text-[#11183D]",
-          description: "!text-[#667085]",
+          toast: "!border-border !bg-card !text-foreground !shadow-lg",
+          title: "!text-foreground",
+          description: "!text-muted-foreground",
         },
       }}
       style={
         {
-          "--normal-bg": "#ffffff",
-          "--normal-text": "#11183D",
-          "--normal-border": "#DDE2EE",
+          "--normal-bg": "var(--card)",
+          "--normal-text": "var(--foreground)",
+          "--normal-border": "var(--border)",
         } as React.CSSProperties
       }
       {...props}

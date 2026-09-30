@@ -189,13 +189,13 @@ export default function OperationsShell({ children }: { children: React.ReactNod
     toast.error(`Falha detectada: ${newest.workflowName || "Workflow"}`, { description: `Execução #${newest.id}` });
   }, [notificationState.data?.initialized, unread]);
 
-  if (loading) return <div className="grid min-h-screen place-items-center bg-[#F5F7FB] dark:bg-[#10051F]">
+  if (loading) return <div className="grid min-h-screen place-items-center bg-background ">
     <div role="status" aria-live="polite" className="flex flex-col items-center gap-4">
-      <div className="relative grid h-20 w-20 place-items-center rounded-2xl border border-[#DDE2EE] bg-white shadow-[0_12px_35px_rgba(40,14,89,0.12)] dark:border-white/15 dark:bg-white/10">
+      <div className="relative grid h-20 w-20 place-items-center rounded-2xl border border-border bg-card shadow-[0_12px_35px_rgba(40,14,89,0.12)] ">
         <FluxoraMark className="h-14 w-14 dark:brightness-0 dark:invert" />
-        <span className="absolute -bottom-1 h-2 w-8 animate-pulse rounded-full bg-[#2F74F6]" aria-hidden="true" />
+        <span className="absolute -bottom-1 h-2 w-8 animate-pulse rounded-full bg-primary" aria-hidden="true" />
       </div>
-      <div className="text-center"><p className="text-sm font-semibold text-[#280E59] dark:text-white">Carregando Fluxora</p><p className="mt-1 text-xs text-[#667085] dark:text-[#B9B1C9]">Validando sua sessão…</p></div>
+      <div className="text-center"><p className="text-sm font-semibold text-foreground">Carregando Fluxora</p><p className="mt-1 text-xs text-muted-foreground">Validando sua sessão…</p></div>
     </div>
   </div>;
   if (!user) return <LoginScreen />;
@@ -216,30 +216,30 @@ export default function OperationsShell({ children }: { children: React.ReactNod
   };
 
   const navLink = ({ label, path, icon: Icon }: typeof allItems[number]) => (
-    <Link key={path} href={path} title={collapsed ? label : undefined} className={`mb-1 flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm transition-colors ${currentPath === path ? "bg-[#4355D8] text-white shadow-lg shadow-[#11183D]/25" : "text-[#b8c0e3] hover:bg-white/10"}`}>
+    <Link key={path} href={path} title={collapsed ? label : undefined} className={`mb-1 flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm transition-colors ${currentPath === path ? "bg-primary text-white shadow-lg shadow-[#11183D]/25" : "text-code-foreground/80 hover:bg-white/10"}`}>
       <Icon className="h-[17px] w-[17px] shrink-0" />
       {!collapsed && <span>{label}</span>}
-      {currentPath === path && !collapsed && <span className="ml-auto h-1.5 w-1.5 rounded-full bg-[#19D3C5]" />}
+      {currentPath === path && !collapsed && <span className="ml-auto h-1.5 w-1.5 rounded-full bg-feedback-info" />}
     </Link>
   );
 
   return (
-    <div className="fluxora-app min-h-screen bg-background text-[#11183D]">
-      <aside className={`fixed inset-y-0 left-0 z-30 hidden flex-col overflow-visible bg-[#11183D] text-white transition-all duration-200 lg:flex ${collapsed ? "w-[78px]" : "w-[252px]"}`}>
+    <div className="fluxora-app min-h-screen bg-background text-foreground">
+      <aside className={`fixed inset-y-0 left-0 z-30 hidden flex-col overflow-visible bg-[var(--fluxora-mirtilo)] text-white transition-all duration-200 lg:flex ${collapsed ? "w-[78px]" : "w-[252px]"}`}>
         <div className={`relative flex h-[86px] items-center ${collapsed ? "justify-center px-3" : "px-5"}`}>
           <Link href="/" className="shrink-0" aria-label="Fluxora"><FluxoraMark light className="h-8 w-8" /></Link>
-          {!collapsed && <div className="ml-2.5 min-w-0"><p className="truncate text-[15px] font-semibold tracking-[-0.03em]">Fluxora</p><p className="truncate text-[10px] font-medium text-[#AAB4DA]">Automation Control Center</p></div>}
+          {!collapsed && <div className="ml-2.5 min-w-0"><p className="truncate text-[15px] font-semibold tracking-[-0.03em]">Fluxora</p><p className="truncate text-[10px] font-medium text-code-foreground/70">Automation Control Center</p></div>}
           <button
             onClick={() => setCollapsed((value) => !value)}
-            className={`${collapsed ? "absolute right-1 top-1/2 -translate-y-1/2" : "ml-auto"} grid h-8 w-8 place-items-center rounded-lg text-[#AAB4DA] hover:bg-white/10 hover:text-white`}
+            className={`${collapsed ? "absolute right-1 top-1/2 -translate-y-1/2" : "ml-auto"} grid h-8 w-8 place-items-center rounded-lg text-code-foreground/70 hover:bg-white/10 hover:text-white`}
             aria-label={collapsed ? "Expandir sidebar" : "Recolher sidebar"}
           >{collapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronLeft className="h-4 w-4" />}</button>
         </div>
 
         <nav className="flex-1 overflow-y-auto px-3 pt-5">
-          {!collapsed && <p className="mb-2 px-3 text-[10px] font-bold uppercase tracking-[0.18em] text-[#7F8CC8]">Operação</p>}
+          {!collapsed && <p className="mb-2 px-3 text-[10px] font-bold uppercase tracking-[0.18em] text-code-foreground/60">Operação</p>}
           {operationItems.map(navLink)}
-          {!collapsed && <p className="mb-2 mt-8 px-3 text-[10px] font-bold uppercase tracking-[0.18em] text-[#7F8CC8]">Gestão</p>}
+          {!collapsed && <p className="mb-2 mt-8 px-3 text-[10px] font-bold uppercase tracking-[0.18em] text-code-foreground/60">Gestão</p>}
           {visibleManagementItems.map(navLink)}
         </nav>
 
@@ -247,8 +247,8 @@ export default function OperationsShell({ children }: { children: React.ReactNod
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <button type="button" className={`flex w-full items-center rounded-xl py-1 text-left transition-colors hover:bg-white/10 focus:outline-none focus-visible:ring-2 focus-visible:ring-white/60 ${collapsed ? "justify-center px-0" : "gap-3 px-1"}`} aria-label="Abrir menu da conta">
-                <div className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-[#4355D8] text-xs font-semibold">{user.name?.slice(0, 1).toUpperCase() || "F"}</div>
-                {!collapsed && <div className="min-w-0 flex-1"><p className="truncate text-xs font-semibold">{user.name}</p><p className="truncate text-[11px] text-[#AAB4DA]">{user.role === "admin" ? "Administrador" : user.role === "operator" ? "Operador" : "Visualizador"}</p></div>}
+                <div className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-primary text-xs font-semibold">{user.name?.slice(0, 1).toUpperCase() || "F"}</div>
+                {!collapsed && <div className="min-w-0 flex-1"><p className="truncate text-xs font-semibold">{user.name}</p><p className="truncate text-[11px] text-code-foreground/70">{user.role === "admin" ? "Administrador" : user.role === "operator" ? "Operador" : "Visualizador"}</p></div>}
               </button>
             </DropdownMenuTrigger>
             <DropdownMenuContent side="top" align={collapsed ? "center" : "end"} className="w-56">
@@ -262,37 +262,37 @@ export default function OperationsShell({ children }: { children: React.ReactNod
       </aside>
 
       <main className={`min-h-screen transition-[margin] duration-200 ${collapsed ? "lg:ml-[78px]" : "lg:ml-[252px]"}`}>
-        <header className="sticky top-0 z-20 flex h-[86px] items-center justify-between border-b border-[#e8eaf3] bg-[#F5F7FB]/90 px-5 backdrop-blur-xl md:px-9">
-          <div><p className="text-[11px] font-bold uppercase tracking-[0.18em] text-[#667085]">Fluxora</p><h1 className="mt-1 text-xl font-semibold tracking-[-0.03em] text-[#11183D]">{currentTitle}</h1></div>
+        <header className="sticky top-0 z-20 flex h-[86px] items-center justify-between border-b border-border bg-background/90 px-5 backdrop-blur-xl md:px-9">
+          <div><p className="text-[11px] font-bold uppercase tracking-[0.18em] text-muted-foreground">Fluxora</p><h1 className="mt-1 text-xl font-semibold tracking-[-0.03em] text-foreground">{currentTitle}</h1></div>
           <div className="flex items-center gap-2">
-            <Button type="button" variant="ghost" size="icon" onClick={() => setCommandOpen(true)} className="rounded-xl text-[#667085] md:hidden" aria-label="Abrir busca global">
+            <Button type="button" variant="ghost" size="icon" onClick={() => setCommandOpen(true)} className="rounded-xl text-muted-foreground md:hidden" aria-label="Abrir busca global">
               <Search className="h-[18px] w-[18px]" />
             </Button>
             <Button
               type="button"
               variant="outline"
               onClick={() => setCommandOpen(true)}
-              className="hidden h-10 min-w-[210px] justify-between rounded-xl bg-white text-[#667085] md:flex"
+              className="hidden h-10 min-w-[210px] justify-between rounded-xl bg-card text-muted-foreground md:flex"
             >
               <span className="flex items-center gap-2"><Search className="h-4 w-4" />Buscar no Fluxora</span>
-              <kbd className="rounded-md border bg-[#F5F7FB] px-1.5 py-0.5 text-[10px]">Ctrl K</kbd>
+              <kbd className="rounded-md border bg-background px-1.5 py-0.5 text-[10px]">Ctrl K</kbd>
             </Button>
-            <Button type="button" variant="ghost" size="icon" onClick={toggleTheme} className="rounded-xl text-[#667085]" aria-label={theme === "dark" ? "Usar tema claro" : "Usar tema escuro"}>
+            <Button type="button" variant="ghost" size="icon" onClick={toggleTheme} className="rounded-xl text-muted-foreground" aria-label={theme === "dark" ? "Usar tema claro" : "Usar tema escuro"}>
               {theme === "dark" ? <Sun className="h-[18px] w-[18px]" /> : <Moon className="h-[18px] w-[18px]" />}
             </Button>
             <Popover onOpenChange={(open) => open && markNotificationsRead()}>
               <PopoverTrigger asChild>
-                <Button variant="ghost" size="icon" className="relative rounded-xl text-[#667085]">
+                <Button variant="ghost" size="icon" className="relative rounded-xl text-muted-foreground">
                   <Bell className="h-[18px] w-[18px]" />
-                  {unread.length > 0 && <span className="absolute right-1 top-1 min-w-[16px] rounded-full bg-[#ef6b57] px-1 text-center text-[9px] font-bold leading-4 text-white">{Math.min(unread.length, 99)}</span>}
+                  {unread.length > 0 && <span className="absolute right-1 top-1 min-w-[16px] rounded-full bg-feedback-error px-1 text-center text-[9px] font-bold leading-4 text-white">{Math.min(unread.length, 99)}</span>}
                 </Button>
               </PopoverTrigger>
               <PopoverContent align="end" className="w-[360px] p-0">
-                <div className="border-b px-4 py-3"><p className="text-sm font-semibold text-[#11183D]">Notificações</p><p className="mt-1 text-xs text-[#667085]">Falhas recentes detectadas pelo n8n.</p></div>
+                <div className="border-b px-4 py-3"><p className="text-sm font-semibold text-foreground">Notificações</p><p className="mt-1 text-xs text-muted-foreground">Falhas recentes detectadas pelo n8n.</p></div>
                 <div className="max-h-[360px] overflow-y-auto">
-                  {recentErrors.length === 0 ? <div className="px-4 py-8 text-center text-xs text-[#98A2B3]">Nenhuma falha recente.</div> : recentErrors.map((item: any) => (
-                    <Link key={item.id} href={`/executions?execution=${encodeURIComponent(String(item.id))}`} className="block border-b px-4 py-3 hover:bg-[#F5F7FB]">
-                      <div className="flex items-start gap-3"><span className="mt-1 h-2 w-2 shrink-0 rounded-full bg-[#ef6b57]"/><div><p className="text-xs font-semibold text-[#11183D]">{item.workflowName}</p><p className="mt-1 text-[11px] text-[#667085]">Execução #{item.id} · {item.startedAt ? new Date(item.startedAt).toLocaleString("pt-BR") : "sem horário"}</p></div></div>
+                  {recentErrors.length === 0 ? <div className="px-4 py-8 text-center text-xs text-muted-foreground">Nenhuma falha recente.</div> : recentErrors.map((item: any) => (
+                    <Link key={item.id} href={`/executions?execution=${encodeURIComponent(String(item.id))}`} className="block border-b px-4 py-3 hover:bg-background">
+                      <div className="flex items-start gap-3"><span className="mt-1 h-2 w-2 shrink-0 rounded-full bg-feedback-error"/><div><p className="text-xs font-semibold text-foreground">{item.workflowName}</p><p className="mt-1 text-[11px] text-muted-foreground">Execução #{item.id} · {item.startedAt ? new Date(item.startedAt).toLocaleString("pt-BR") : "sem horário"}</p></div></div>
                     </Link>
                   ))}
                 </div>
@@ -300,7 +300,7 @@ export default function OperationsShell({ children }: { children: React.ReactNod
             </Popover>
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <button type="button" className="ml-1 grid h-9 w-9 place-items-center rounded-full bg-[#E8ECFF] text-xs font-bold text-[#4355D8] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#4355D8] lg:hidden" aria-label="Abrir menu da conta">{user.name?.slice(0, 1).toUpperCase() || "F"}</button>
+                <button type="button" className="ml-1 grid h-9 w-9 place-items-center rounded-full bg-feedback-info-surface text-xs font-bold text-feedback-info focus:outline-none focus-visible:ring-2 focus-visible:ring-primary lg:hidden" aria-label="Abrir menu da conta">{user.name?.slice(0, 1).toUpperCase() || "F"}</button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-56 lg:hidden">
                 <DropdownMenuLabel className="font-normal"><p className="truncate text-sm font-semibold">{user.name}</p><p className="mt-1 truncate text-xs text-muted-foreground">{user.email}</p></DropdownMenuLabel>
@@ -311,7 +311,7 @@ export default function OperationsShell({ children }: { children: React.ReactNod
             </DropdownMenu>
           </div>
         </header>
-        <nav className="flex gap-1 overflow-x-auto border-b border-[#e8eaf3] bg-white px-5 py-2 lg:hidden">{visibleItems.map(({ label, path }) => <Link key={path} href={path} className={`whitespace-nowrap rounded-lg px-3 py-2 text-xs font-semibold ${currentPath === path ? "bg-[#EEF1FF] text-[#4355D8]" : "text-[#667085]"}`}>{label}</Link>)}</nav>
+        <nav className="flex gap-1 overflow-x-auto border-b border-border bg-card px-5 py-2 lg:hidden">{visibleItems.map(({ label, path }) => <Link key={path} href={path} className={`whitespace-nowrap rounded-lg px-3 py-2 text-xs font-semibold ${currentPath === path ? "bg-feedback-info-surface text-feedback-info" : "text-muted-foreground"}`}>{label}</Link>)}</nav>
         {children}
       </main>
       <CommandDialog open={commandOpen} onOpenChange={setCommandOpen} title="Busca global" description="Encontre páginas, workflows e execuções.">

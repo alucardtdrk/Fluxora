@@ -16,10 +16,10 @@ import { PREFERENCES_UPDATED_EVENT, readPreferredPageSize } from "@/lib/preferen
 import { trpc } from "@/lib/trpc";
 
 function statusBadge(status?: string) {
-  if (status === "success") return "bg-[#e3f6eb] text-[#258b57]";
-  if (["error", "failed", "crashed"].includes(String(status || ""))) return "bg-[#fff0e7] text-[#bd6338]";
-  if (["running", "new"].includes(String(status || ""))) return "bg-[#EEF1FF] text-[#4355D8]";
-  return "bg-[#f1f2f6] text-[#667085]";
+  if (status === "success") return "bg-feedback-success-surface text-feedback-success";
+  if (["error", "failed", "crashed"].includes(String(status || ""))) return "bg-feedback-error-surface text-feedback-error";
+  if (["running", "new"].includes(String(status || ""))) return "bg-feedback-info-surface text-feedback-info";
+  return "bg-muted text-muted-foreground";
 }
 
 function statusLabel(status?: string) {
@@ -31,8 +31,8 @@ function statusLabel(status?: string) {
 }
 
 function JsonBlock({ value }: { value: unknown }) {
-  if (value == null) return <p className="text-xs text-[#98A2B3]">Sem dados registrados.</p>;
-  return <pre className="max-h-72 overflow-auto whitespace-pre-wrap break-all rounded-xl bg-[#11183D] p-4 text-[11px] leading-5 text-[#E8ECFF]">{JSON.stringify(value, null, 2)}</pre>;
+  if (value == null) return <p className="text-xs text-muted-foreground">Sem dados registrados.</p>;
+  return <pre className="max-h-72 overflow-auto whitespace-pre-wrap break-all rounded-xl bg-code-background p-4 text-[11px] leading-5 text-code-foreground">{JSON.stringify(value, null, 2)}</pre>;
 }
 
 export default function WorkflowDetail() {
@@ -158,19 +158,19 @@ export default function WorkflowDetail() {
 
   return (
     <OperationsShell>
-      <div className="min-h-[calc(100vh-86px)] bg-[#F5F7FB] px-5 py-7 md:px-9">
+      <div className="min-h-[calc(100vh-86px)] bg-background px-5 py-7 md:px-9">
         <div className="mx-auto max-w-[1540px]">
-          <Link href="/workflows" className="mb-6 inline-flex items-center gap-2 text-xs font-semibold text-[#667085]"><ArrowLeft className="h-3.5 w-3.5" />Voltar para workflows</Link>
+          <Link href="/workflows" className="mb-6 inline-flex items-center gap-2 text-xs font-semibold text-muted-foreground"><ArrowLeft className="h-3.5 w-3.5" />Voltar para workflows</Link>
           <div className="mb-7 flex flex-col justify-between gap-4 xl:flex-row xl:items-end">
             <div>
-              <p className="text-[11px] font-bold uppercase tracking-[.18em] text-[#667085]">Operação / Workflow</p>
-              <h2 className="mt-3 text-4xl font-semibold tracking-[-.06em] text-[#11183D]">{workflow.name}</h2>
-              <p className="mt-2 text-sm text-[#667085]">ID {id} · {workflow.nodeCount} nodes · {workflow.active ? "ativo" : "inativo"}</p>
+              <p className="text-[11px] font-bold uppercase tracking-[.18em] text-muted-foreground">Operação / Workflow</p>
+              <h2 className="mt-3 text-4xl font-semibold tracking-[-.06em] text-foreground">{workflow.name}</h2>
+              <p className="mt-2 text-sm text-muted-foreground">ID {id} · {workflow.nodeCount} nodes · {workflow.active ? "ativo" : "inativo"}</p>
             </div>
             <div className="flex flex-wrap gap-2">
               {workflowDetail.data?.editorUrl ? <Button variant="outline" onClick={() => window.open(workflowDetail.data?.editorUrl || "", "_blank", "noopener,noreferrer")}><ExternalLink className="mr-2 h-4 w-4" />Abrir no n8n</Button> : null}
               {canOperate ? <Button variant="outline" onClick={toggle}><Play className="mr-2 h-4 w-4" />{workflow.active ? "Desativar" : "Ativar"}</Button> : null}
-              <Button onClick={refreshAll} className="bg-[#4355D8] text-white"><RefreshCw className="mr-2 h-4 w-4" />Atualizar</Button>
+              <Button onClick={refreshAll} className="bg-primary text-primary-foreground"><RefreshCw className="mr-2 h-4 w-4" />Atualizar</Button>
             </div>
           </div>
 
@@ -182,7 +182,7 @@ export default function WorkflowDetail() {
           </div>
 
           <Tabs defaultValue="overview" className="mt-6">
-            <TabsList className="h-auto flex-wrap rounded-2xl bg-white p-1.5">
+            <TabsList className="h-auto flex-wrap rounded-2xl bg-card p-1.5">
               <TabsTrigger value="overview" className="rounded-xl px-4 py-2 text-xs">Visão geral</TabsTrigger>
               <TabsTrigger value="diagram" className="rounded-xl px-4 py-2 text-xs">Diagrama</TabsTrigger>
               <TabsTrigger value="executions" className="rounded-xl px-4 py-2 text-xs">Execuções</TabsTrigger>
@@ -191,21 +191,21 @@ export default function WorkflowDetail() {
 
             <TabsContent value="overview" className="mt-6 space-y-6">
               <div className="grid gap-6 xl:grid-cols-[1.55fr_.75fr]">
-                <Card className="border-0 bg-white shadow-sm">
+                <Card className="border-0 bg-card shadow-sm">
                   <CardHeader>
-                    <CardTitle className="flex items-center gap-2 text-base"><Workflow className="h-4 w-4 text-[#4355D8]" />Últimas execuções</CardTitle>
-                    <p className="text-xs text-[#667085]">As 12 execuções mais recentes continuam em destaque com acesso ao detalhe técnico.</p>
+                    <CardTitle className="flex items-center gap-2 text-base"><Workflow className="h-4 w-4 text-feedback-info" />Últimas execuções</CardTitle>
+                    <p className="text-xs text-muted-foreground">As 12 execuções mais recentes continuam em destaque com acesso ao detalhe técnico.</p>
                   </CardHeader>
                   <CardContent className="p-0">
                     <div className="divide-y">
                       {history.slice(0, 12).map((item) => (
                         <div key={item.id} className="grid gap-3 px-6 py-4 md:grid-cols-[1.2fr_.7fr_.5fr_auto] md:items-center">
                           <div>
-                            <p className="truncate text-sm font-semibold text-[#11183D]">{item.sectionName || "Fluxo principal"}</p>
-                            <p className="mt-1 text-[11px] text-[#98A2B3]">#{item.id} · {item.startedAt ? new Date(item.startedAt).toLocaleString("pt-BR") : "-"}</p>
+                            <p className="truncate text-sm font-semibold text-foreground">{item.sectionName || "Fluxo principal"}</p>
+                            <p className="mt-1 text-[11px] text-muted-foreground">#{item.id} · {item.startedAt ? new Date(item.startedAt).toLocaleString("pt-BR") : "-"}</p>
                           </div>
                           <Badge className={`w-fit ${statusBadge(item.status)}`}>{statusLabel(item.status)}</Badge>
-                          <span className="text-xs text-[#667085]">{item.duration != null ? `${item.duration}s` : "-"}</span>
+                          <span className="text-xs text-muted-foreground">{item.duration != null ? `${item.duration}s` : "-"}</span>
                           <Button variant="outline" size="sm" onClick={() => setSelectedExecutionId(item.id)}><Eye className="mr-2 h-3.5 w-3.5" />Ver detalhes</Button>
                         </div>
                       ))}
@@ -214,17 +214,17 @@ export default function WorkflowDetail() {
                   </CardContent>
                 </Card>
 
-                <Card className="border-0 bg-[#F0FBFA] shadow-none">
+                <Card className="border-0 bg-feedback-success-surface shadow-none">
                   <CardHeader>
-                    <CardTitle className="flex items-center gap-2 text-base text-[#286A4A]"><ShieldCheck className="h-4 w-4" />Ações e estrutura</CardTitle>
+                    <CardTitle className="flex items-center gap-2 text-base text-feedback-success"><ShieldCheck className="h-4 w-4" />Ações e estrutura</CardTitle>
                   </CardHeader>
                   <CardContent className="space-y-3">
-                    {canOperate ? <Button variant="outline" onClick={toggle} className="w-full justify-start"><Play className="mr-2 h-4 w-4" />{workflow.active ? "Desativar workflow" : "Ativar workflow"}</Button> : <div className="rounded-xl border border-[#DDE2EE] bg-white p-3 text-xs text-[#667085]">Perfil visualizador: ações operacionais e edições ficam bloqueadas.</div>}
+                    {canOperate ? <Button variant="outline" onClick={toggle} className="w-full justify-start"><Play className="mr-2 h-4 w-4" />{workflow.active ? "Desativar workflow" : "Ativar workflow"}</Button> : <div className="rounded-xl border border-border bg-card p-3 text-xs text-muted-foreground">Perfil visualizador: ações operacionais e edições ficam bloqueadas.</div>}
                     <Button variant="outline" onClick={() => navigator.clipboard?.writeText(id).then(() => toast.success("ID copiado"))} className="w-full justify-start"><CheckCircle2 className="mr-2 h-4 w-4" />Copiar ID</Button>
-                    <div className="rounded-xl bg-white p-4 text-xs text-[#5A9275]">
+                    <div className="rounded-xl bg-card p-4 text-xs text-feedback-success">
                       <p className="font-semibold">Nodes configurados</p>
                       <div className="mt-3 max-h-56 space-y-2 overflow-auto">
-                        {workflow.nodes?.map((node: any, index: number) => <div key={`${node.name}-${index}`} className="flex justify-between gap-3"><span>{node.name}</span><span className="truncate text-[#667085]">{node.type}</span></div>)}
+                        {workflow.nodes?.map((node: any, index: number) => <div key={`${node.name}-${index}`} className="flex justify-between gap-3"><span>{node.name}</span><span className="truncate text-muted-foreground">{node.type}</span></div>)}
                       </div>
                     </div>
                   </CardContent>
@@ -254,40 +254,40 @@ export default function WorkflowDetail() {
               {advancedDetailAvailable ? <div className="grid items-start gap-6 xl:grid-cols-[1.4fr_.8fr]">
                 <WorkflowDiagram nodes={workflow.nodes} connections={workflow.connections} selectedNodeName={selectedNodeName} onSelectNode={setSelectedNodeName} executionNodeStatuses={executionNodeStatuses} />
                 <div className="space-y-6">
-                <Card className="border-0 bg-white shadow-sm">
+                <Card className="border-0 bg-card shadow-sm">
                   <CardHeader>
                     <CardTitle className="text-base">Execução em destaque</CardTitle>
-                    <p className="text-xs text-[#667085]">Selecione uma execução e clique em um node do diagrama para inspecionar suas respostas.</p>
+                    <p className="text-xs text-muted-foreground">Selecione uma execução e clique em um node do diagrama para inspecionar suas respostas.</p>
                   </CardHeader>
                   <CardContent className="space-y-3">
                     {history.slice(0, 12).map((item) => (
-                      <button key={item.id} type="button" onClick={() => setExecutionDiagramId(item.id)} className={`flex w-full items-center justify-between rounded-2xl border px-4 py-3 text-left ${executionDiagramId === item.id ? "border-[#4355D8] bg-[#EEF1FF]" : "border-[#E8EBF4] bg-[#FBFCFE]"}`}>
+                      <button key={item.id} type="button" onClick={() => setExecutionDiagramId(item.id)} className={`flex w-full items-center justify-between rounded-2xl border px-4 py-3 text-left ${executionDiagramId === item.id ? "border-feedback-info bg-feedback-info-surface" : "border-border bg-muted"}`}>
                         <div>
-                          <p className="text-sm font-semibold text-[#11183D]">{item.sectionName || "Fluxo principal"}</p>
-                          <p className="mt-1 text-xs text-[#667085]">#{item.id} · {item.startedAt ? new Date(item.startedAt).toLocaleString("pt-BR") : "-"}</p>
+                          <p className="text-sm font-semibold text-foreground">{item.sectionName || "Fluxo principal"}</p>
+                          <p className="mt-1 text-xs text-muted-foreground">#{item.id} · {item.startedAt ? new Date(item.startedAt).toLocaleString("pt-BR") : "-"}</p>
                         </div>
                         <Badge className={statusBadge(item.status)}>{statusLabel(item.status)}</Badge>
                       </button>
                     ))}
-                    {history.length === 0 ? <div className="rounded-xl border border-dashed border-[#DDE2EE] px-4 py-8 text-center text-sm text-[#98A2B3]">Nenhuma execução encontrada para destacar o diagrama.</div> : null}
+                    {history.length === 0 ? <div className="rounded-xl border border-dashed border-border px-4 py-8 text-center text-sm text-muted-foreground">Nenhuma execução encontrada para destacar o diagrama.</div> : null}
                   </CardContent>
                 </Card>
-                <Card className="border-0 bg-white shadow-sm">
+                <Card className="border-0 bg-card shadow-sm">
                   <CardHeader>
-                    <CardTitle className="flex items-center gap-2 text-base"><Code2 className="h-4 w-4 text-[#4355D8]" />Dados do node</CardTitle>
-                    <p className="text-xs text-[#667085]">{selectedNodeName ? `${selectedNodeName} na execução #${executionDiagramId}` : "Selecione um node executado no diagrama."}</p>
+                    <CardTitle className="flex items-center gap-2 text-base"><Code2 className="h-4 w-4 text-feedback-info" />Dados do node</CardTitle>
+                    <p className="text-xs text-muted-foreground">{selectedNodeName ? `${selectedNodeName} na execução #${executionDiagramId}` : "Selecione um node executado no diagrama."}</p>
                   </CardHeader>
                   <CardContent>
-                    {executionDetail.isLoading ? <div className="py-10 text-center text-sm text-[#667085]">Carregando dados da execução…</div> : selectedExecutionNodeRuns.length === 0 ? <div className="rounded-xl border border-dashed border-[#DDE2EE] px-4 py-8 text-center text-sm text-[#98A2B3]">Este node não foi executado ou não possui dados disponíveis nesta execução.</div> : <div className="space-y-4">
-                      {selectedExecutionNodeRuns.map((run: any, index: number) => <details key={`${run.nodeName}-${run.runIndex}-${index}`} open={index === 0} className="group rounded-2xl border border-[#E8EBF4] bg-[#FBFCFE] open:bg-white">
+                    {executionDetail.isLoading ? <div className="py-10 text-center text-sm text-muted-foreground">Carregando dados da execução…</div> : selectedExecutionNodeRuns.length === 0 ? <div className="rounded-xl border border-dashed border-border px-4 py-8 text-center text-sm text-muted-foreground">Este node não foi executado ou não possui dados disponíveis nesta execução.</div> : <div className="space-y-4">
+                      {selectedExecutionNodeRuns.map((run: any, index: number) => <details key={`${run.nodeName}-${run.runIndex}-${index}`} open={index === 0} className="group rounded-2xl border border-border bg-muted open:bg-card">
                         <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-3">
-                          <div className="flex items-center gap-3"><div className={`grid h-8 w-8 place-items-center rounded-xl ${run.status === "error" ? "bg-[#fff0e7] text-[#bd6338]" : "bg-[#e3f6eb] text-[#258b57]"}`}>{run.status === "error" ? <AlertTriangle className="h-4 w-4" /> : <CheckCircle2 className="h-4 w-4" />}</div><div><p className="text-xs font-semibold text-[#11183D]">Execução {run.runIndex + 1}</p><p className="mt-0.5 text-[11px] text-[#98A2B3]">{run.outputItems} item(ns) · {run.executionTimeMs != null ? `${run.executionTimeMs}ms` : "sem duração"}</p></div></div>
+                          <div className="flex items-center gap-3"><div className={`grid h-8 w-8 place-items-center rounded-xl ${run.status === "error" ? "bg-feedback-error-surface text-feedback-error" : "bg-feedback-success-surface text-feedback-success"}`}>{run.status === "error" ? <AlertTriangle className="h-4 w-4" /> : <CheckCircle2 className="h-4 w-4" />}</div><div><p className="text-xs font-semibold text-foreground">Execução {run.runIndex + 1}</p><p className="mt-0.5 text-[11px] text-muted-foreground">{run.outputItems} item(ns) · {run.executionTimeMs != null ? `${run.executionTimeMs}ms` : "sem duração"}</p></div></div>
                           <Badge className={statusBadge(run.status)}>{statusLabel(run.status)}</Badge>
                         </summary>
-                        <div className="space-y-4 border-t border-[#EEF0F6] px-4 py-4">
-                          <div><p className="mb-2 text-[10px] font-bold uppercase tracking-[0.12em] text-[#667085]">Entrada / origem</p><JsonBlock value={run.input ?? run.source} /></div>
-                          <div><p className="mb-2 text-[10px] font-bold uppercase tracking-[0.12em] text-[#667085]">Saída / resposta</p><JsonBlock value={run.output} /></div>
-                          {run.error ? <div><p className="mb-2 text-[10px] font-bold uppercase tracking-[0.12em] text-[#BD6338]">Erro do node</p><JsonBlock value={run.error} /></div> : null}
+                        <div className="space-y-4 border-t border-border px-4 py-4">
+                          <div><p className="mb-2 text-[10px] font-bold uppercase tracking-[0.12em] text-muted-foreground">Entrada / origem</p><JsonBlock value={run.input ?? run.source} /></div>
+                          <div><p className="mb-2 text-[10px] font-bold uppercase tracking-[0.12em] text-muted-foreground">Saída / resposta</p><JsonBlock value={run.output} /></div>
+                          {run.error ? <div><p className="mb-2 text-[10px] font-bold uppercase tracking-[0.12em] text-feedback-error">Erro do node</p><JsonBlock value={run.error} /></div> : null}
                         </div>
                       </details>)}
                     </div>}
@@ -296,23 +296,23 @@ export default function WorkflowDetail() {
                 </div>
               </div> : null}
 
-              <Card className="border-0 bg-white shadow-sm">
+              <Card className="border-0 bg-card shadow-sm">
                 <CardHeader>
                   <CardTitle className="text-base">Todas as execuções deste workflow</CardTitle>
-                  <p className="text-xs text-[#667085]">Histórico paginado com acesso ao detalhe completo.</p>
+                  <p className="text-xs text-muted-foreground">Histórico paginado com acesso ao detalhe completo.</p>
                 </CardHeader>
                 <CardContent className="p-0">
-                  <div className="hidden grid-cols-[1.2fr_.5fr_.7fr_.8fr_.5fr_auto] gap-4 border-t px-6 py-3 text-[10px] font-bold uppercase tracking-[.14em] text-[#A0A7BD] md:grid">
+                  <div className="hidden grid-cols-[1.2fr_.5fr_.7fr_.8fr_.5fr_auto] gap-4 border-t px-6 py-3 text-[10px] font-bold uppercase tracking-[.14em] text-muted-foreground md:grid">
                     <span>Automação / área</span><span>ID</span><span>Status</span><span>Início</span><span>Duração</span><span>Ação</span>
                   </div>
                   <div className="divide-y">
                     {pageItems.map((item) => (
                       <div key={item.id} className="grid gap-3 px-6 py-4 md:grid-cols-[1.2fr_.5fr_.7fr_.8fr_.5fr_auto] md:items-center">
-                        <span className="truncate text-sm font-semibold text-[#11183D]">{item.sectionName || "Fluxo principal"}</span>
+                        <span className="truncate text-sm font-semibold text-foreground">{item.sectionName || "Fluxo principal"}</span>
                         <span className="font-mono text-xs">#{item.id}</span>
                         <Badge className={`w-fit ${statusBadge(item.status)}`}>{statusLabel(item.status)}</Badge>
-                        <span className="text-xs text-[#667085]">{item.startedAt ? new Date(item.startedAt).toLocaleString("pt-BR") : "-"}</span>
-                        <span className="text-xs text-[#667085]">{item.duration != null ? `${item.duration}s` : "-"}</span>
+                        <span className="text-xs text-muted-foreground">{item.startedAt ? new Date(item.startedAt).toLocaleString("pt-BR") : "-"}</span>
+                        <span className="text-xs text-muted-foreground">{item.duration != null ? `${item.duration}s` : "-"}</span>
                         <div className="flex gap-2">
                           <Button variant="outline" size="sm" onClick={() => setExecutionDiagramId(item.id)}>Destacar</Button>
                           <Button variant="outline" size="sm" onClick={() => setSelectedExecutionId(item.id)}><Eye className="mr-2 h-3.5 w-3.5" />Ver detalhes</Button>
@@ -320,7 +320,7 @@ export default function WorkflowDetail() {
                       </div>
                     ))}
                   </div>
-                  <div className="flex items-center justify-between border-t px-6 py-4 text-xs text-[#667085]">
+                  <div className="flex items-center justify-between border-t px-6 py-4 text-xs text-muted-foreground">
                     <span>{history.length} execuções</span>
                     <div className="flex items-center gap-2">
                       <Button variant="outline" size="sm" disabled={safePage <= 1} onClick={() => setPage((value) => value - 1)}>Anterior</Button>
@@ -355,13 +355,13 @@ export default function WorkflowDetail() {
 }
 
 function Metric({ title, value, subtitle }: { title: string; value: string; subtitle: string }) {
-  return <Card className="border-0 bg-white shadow-sm"><CardContent className="p-5"><p className="text-[10px] font-bold uppercase tracking-[.14em] text-[#667085]">{title}</p><p className="mt-2 text-3xl font-semibold text-[#11183D]">{value}</p><p className="mt-1 text-xs text-[#98A2B3]">{subtitle}</p></CardContent></Card>;
+  return <Card className="border-0 bg-card shadow-sm"><CardContent className="p-5"><p className="text-[10px] font-bold uppercase tracking-[.14em] text-muted-foreground">{title}</p><p className="mt-2 text-3xl font-semibold text-foreground">{value}</p><p className="mt-1 text-xs text-muted-foreground">{subtitle}</p></CardContent></Card>;
 }
 
 function State({ title }: { title: string }) {
-  return <div className="grid min-h-[calc(100vh-86px)] place-items-center bg-[#F5F7FB]"><Card><CardContent className="p-8 text-sm text-[#667085]">{title}</CardContent></Card></div>;
+  return <div className="grid min-h-[calc(100vh-86px)] place-items-center bg-background"><Card><CardContent className="p-8 text-sm text-muted-foreground">{title}</CardContent></Card></div>;
 }
 
 function Empty() {
-  return <div className="flex flex-col items-center py-12 text-sm text-[#98A2B3]"><Clock3 className="mb-3 h-6 w-6" />Nenhuma execução vinculada.</div>;
+  return <div className="flex flex-col items-center py-12 text-sm text-muted-foreground"><Clock3 className="mb-3 h-6 w-6" />Nenhuma execução vinculada.</div>;
 }

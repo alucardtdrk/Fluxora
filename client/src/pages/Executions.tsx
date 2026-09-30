@@ -34,9 +34,9 @@ function label(status: string) {
 }
 
 function badgeClass(status: string) {
-  if (status === "success") return "bg-[#e3f6eb] text-[#258b57]";
-  if (["error", "failed", "crashed"].includes(status)) return "bg-[#fff0e7] text-[#bd6338]";
-  return "bg-[#E8ECFF] text-[#4355D8]";
+  if (status === "success") return "bg-feedback-success-surface text-feedback-success";
+  if (["error", "failed", "crashed"].includes(status)) return "bg-feedback-error-surface text-feedback-error";
+  return "bg-feedback-info-surface text-feedback-info";
 }
 
 export default function Executions() {
@@ -99,24 +99,24 @@ export default function Executions() {
 
   return (
     <OperationsShell>
-      <div className="min-h-[calc(100vh-86px)] bg-[#F5F7FB] px-5 py-7 md:px-9">
+      <div className="min-h-[calc(100vh-86px)] bg-background px-5 py-7 md:px-9">
         <div className="mx-auto max-w-[1450px]">
-          <Link href="/" className="mb-6 inline-flex items-center gap-2 text-xs font-semibold text-[#667085]">
+          <Link href="/" className="mb-6 inline-flex items-center gap-2 text-xs font-semibold text-muted-foreground">
             <ArrowLeft className="h-3.5 w-3.5" />Voltar para visão geral
           </Link>
 
           <div className="mb-7 flex flex-col justify-between gap-4 md:flex-row md:items-end">
             <div>
-              <p className="text-[11px] font-bold uppercase tracking-[.18em] text-[#667085]">Operação / Execuções</p>
+              <p className="text-[11px] font-bold uppercase tracking-[.18em] text-muted-foreground">Operação / Execuções</p>
               <h2 className="mt-3 text-4xl font-semibold tracking-[-.06em]">Execuções</h2>
-              <p className="mt-2 text-sm text-[#667085]">Histórico consolidado do n8n e Firestore, sem duplicar IDs.</p>
+              <p className="mt-2 text-sm text-muted-foreground">Histórico consolidado do n8n e Firestore, sem duplicar IDs.</p>
             </div>
-            <Button onClick={refresh} className="rounded-xl bg-[#4355D8] text-white">
+            <Button onClick={refresh} className="rounded-xl bg-primary text-primary-foreground">
               <RefreshCw className={`mr-2 h-4 w-4 ${executions.isFetching ? "animate-spin" : ""}`} />Atualizar
             </Button>
           </div>
 
-          <div className="mb-4 flex flex-wrap rounded-xl border bg-white p-1">
+          <div className="mb-4 flex flex-wrap rounded-xl border bg-card p-1">
             {periods.map(([value, text]) => (
               <button
                 key={value}
@@ -125,7 +125,7 @@ export default function Executions() {
                   setPeriod(value);
                   setPage(1);
                 }}
-                className={`rounded-lg px-3 py-2 text-xs font-semibold ${period === value ? "bg-[#11183D] text-white" : "text-[#667085]"}`}
+                className={`rounded-lg px-3 py-2 text-xs font-semibold ${period === value ? "bg-foreground text-background" : "text-muted-foreground"}`}
               >
                 {text}
               </button>
@@ -133,20 +133,20 @@ export default function Executions() {
           </div>
 
           {executions.data?.truncated && (
-            <div className="mb-4 rounded-xl border border-[#f3d5bf] bg-[#fff8f2] p-3 text-xs text-[#89542c]">
+            <div className="mb-4 rounded-xl border border-feedback-error-border bg-feedback-error-surface p-3 text-xs text-feedback-error">
               O histórico atingiu o limite configurado no servidor.
             </div>
           )}
 
-          {comparisonSelection.length > 0 ? <div className="mb-4 flex flex-col justify-between gap-3 rounded-xl border border-blue-200 bg-blue-50 p-4 sm:flex-row sm:items-center"><div><p className="text-sm font-semibold">Comparação de execuções</p><p className="mt-1 text-xs text-[#667085]">{comparisonSelection.length === 1 ? "Selecione mais uma execução do mesmo workflow." : `Pronto para comparar #${comparisonSelection[0].id} e #${comparisonSelection[1].id}.`}</p></div><div className="flex gap-2"><Button variant="ghost" size="sm" onClick={() => setComparisonSelection([])}><X className="mr-1 h-4 w-4" />Limpar</Button><Button size="sm" className="bg-[#4355D8] hover:bg-[#3546C7]" disabled={comparisonSelection.length !== 2} onClick={() => setComparisonOpen(true)}><GitCompareArrows className="mr-2 h-4 w-4" />Comparar</Button></div></div> : null}
+          {comparisonSelection.length > 0 ? <div className="mb-4 flex flex-col justify-between gap-3 rounded-xl border border-border bg-feedback-info-surface p-4 sm:flex-row sm:items-center"><div><p className="text-sm font-semibold">Comparação de execuções</p><p className="mt-1 text-xs text-muted-foreground">{comparisonSelection.length === 1 ? "Selecione mais uma execução do mesmo workflow." : `Pronto para comparar #${comparisonSelection[0].id} e #${comparisonSelection[1].id}.`}</p></div><div className="flex gap-2"><Button variant="ghost" size="sm" onClick={() => setComparisonSelection([])}><X className="mr-1 h-4 w-4" />Limpar</Button><Button size="sm" className="bg-primary hover:bg-primary/90" disabled={comparisonSelection.length !== 2} onClick={() => setComparisonOpen(true)}><GitCompareArrows className="mr-2 h-4 w-4" />Comparar</Button></div></div> : null}
 
-          <Card className="border-0 bg-white shadow-[0_10px_30px_rgba(41,54,115,.06)]">
+          <Card className="border-0 bg-card shadow-[0_10px_30px_rgba(41,54,115,.06)]">
             <CardHeader>
               <CardTitle className="text-base">Histórico completo</CardTitle>
-              <p className="text-xs text-[#667085]">A consulta é paginada no servidor para continuar rápida com grandes volumes.</p>
+              <p className="text-xs text-muted-foreground">A consulta é paginada no servidor para continuar rápida com grandes volumes.</p>
               <div className="mt-4 flex flex-col gap-3 xl:flex-row xl:flex-nowrap xl:items-center">
                 <div className="relative min-w-0 flex-1">
-                  <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#a4abc2]" />
+                  <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                   <Input
                     value={query}
                     onChange={(event) => {
@@ -185,36 +185,36 @@ export default function Executions() {
 
             <CardContent className="p-0">
               {executions.isLoading ? (
-                <div className="p-8 text-sm text-[#667085]">Carregando execuções...</div>
+                <div className="p-8 text-sm text-muted-foreground">Carregando execuções...</div>
               ) : executions.isError ? (
-                <div className="p-8 text-sm text-[#bd6338]">Falha ao consultar execuções.</div>
+                <div className="p-8 text-sm text-feedback-error">Falha ao consultar execuções.</div>
               ) : (
                 <>
-                  <div className="hidden gap-4 border-t px-6 py-3 text-[10px] font-bold uppercase tracking-[.14em] text-[#a0a7bd] md:grid md:grid-cols-[32px_minmax(300px,1.7fr)_minmax(105px,.55fr)_minmax(160px,.9fr)_minmax(90px,.5fr)_minmax(105px,.55fr)_minmax(85px,.4fr)_minmax(130px,.65fr)]">
+                  <div className="hidden gap-4 border-t px-6 py-3 text-[10px] font-bold uppercase tracking-[.14em] text-muted-foreground md:grid md:grid-cols-[32px_minmax(300px,1.7fr)_minmax(105px,.55fr)_minmax(160px,.9fr)_minmax(90px,.5fr)_minmax(105px,.55fr)_minmax(85px,.4fr)_minmax(130px,.65fr)]">
                     <span /><span>Automação / área</span><span className="text-center">Status</span><span className="text-center">Início</span><span className="text-center">Duração</span><span className="text-center">Origem</span><span className="text-center">ID</span><span className="text-right">Ação</span>
                   </div>
-                  <div className="divide-y divide-[#f1f2f7]">
+                  <div className="divide-y divide-border">
                     {items.map((item) => (
                       <div key={item.id} className="grid gap-3 px-6 py-4 md:grid-cols-[32px_minmax(300px,1.7fr)_minmax(105px,.55fr)_minmax(160px,.9fr)_minmax(90px,.5fr)_minmax(105px,.55fr)_minmax(85px,.4fr)_minmax(130px,.65fr)] md:items-center">
                         <Checkbox aria-label={`Selecionar execução ${item.id} para comparação`} checked={comparisonSelection.some((selectedItem) => selectedItem.id === item.id)} onCheckedChange={() => toggleComparison(item)} />
                         <div className="flex min-w-0 items-center gap-3">
-                          <div className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-[#EEF1FF] text-[#4355D8] dark:bg-[#34205F] dark:text-[#75A5FF]"><Timer className="h-4 w-4" /></div>
+                          <div className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-feedback-info-surface text-feedback-info "><Timer className="h-4 w-4" /></div>
                           <div className="min-w-0">
                             <p className="truncate text-sm font-semibold">{item.sectionName || item.workflowName}</p>
-                            <p className="mt-1 truncate text-xs text-[#98A2B3]">Workflow: {item.workflowName} | Modo: {item.mode || "não informado"}</p>
+                            <p className="mt-1 truncate text-xs text-muted-foreground">Workflow: {item.workflowName} | Modo: {item.mode || "não informado"}</p>
                           </div>
                         </div>
                         <Badge className={`w-fit justify-self-center ${badgeClass(item.status)}`}>{label(item.status)}</Badge>
-                        <span className="justify-self-center text-center text-xs text-[#667085]">{item.startedAt ? new Date(item.startedAt).toLocaleString("pt-BR") : "-"}</span>
-                        <span className="justify-self-center text-center text-xs text-[#667085]">{item.duration != null ? `${item.duration}s` : "-"}</span>
-                        <Badge className={`w-fit justify-self-center ${item.source === "firestore" ? "bg-[#EEF1FF] text-[#4355D8]" : "bg-[#e3f6eb] text-[#258b57]"}`}>{item.source === "firestore" ? "Arquivo" : "n8n"}</Badge>
-                        <span className="justify-self-center font-mono text-[11px] text-[#98A2B3]">#{item.id}</span>
+                        <span className="justify-self-center text-center text-xs text-muted-foreground">{item.startedAt ? new Date(item.startedAt).toLocaleString("pt-BR") : "-"}</span>
+                        <span className="justify-self-center text-center text-xs text-muted-foreground">{item.duration != null ? `${item.duration}s` : "-"}</span>
+                        <Badge className={`w-fit justify-self-center ${item.source === "firestore" ? "bg-feedback-info-surface text-feedback-info" : "bg-feedback-success-surface text-feedback-success"}`}>{item.source === "firestore" ? "Arquivo" : "n8n"}</Badge>
+                        <span className="justify-self-center font-mono text-[11px] text-muted-foreground">#{item.id}</span>
                         <Button variant="outline" size="sm" onClick={() => setSelected(item.id)} className="w-fit justify-self-end rounded-lg text-xs"><Eye className="mr-2 h-3.5 w-3.5" />Ver detalhes</Button>
                       </div>
                     ))}
-                    {items.length === 0 && <div className="py-16 text-center text-sm text-[#667085]">Nenhuma execução encontrada com estes filtros.</div>}
+                    {items.length === 0 && <div className="py-16 text-center text-sm text-muted-foreground">Nenhuma execução encontrada com estes filtros.</div>}
                   </div>
-                  <div className="flex flex-col gap-3 border-t px-6 py-4 text-xs text-[#667085] md:flex-row md:items-center md:justify-between">
+                  <div className="flex flex-col gap-3 border-t px-6 py-4 text-xs text-muted-foreground md:flex-row md:items-center md:justify-between">
                     <span>Mostrando {items.length ? (currentPage - 1) * pageSize + 1 : 0}-{Math.min(currentPage * pageSize, total)} de {total.toLocaleString("pt-BR")}</span>
                     <div className="flex items-center gap-2">
                       <Button variant="outline" size="sm" disabled={currentPage <= 1} onClick={() => setPage((value) => Math.max(1, value - 1))}>Anterior</Button>
