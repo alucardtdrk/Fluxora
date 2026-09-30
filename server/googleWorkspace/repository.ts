@@ -1,10 +1,12 @@
 import {
   commitFirestoreWrites,
+  deleteFirestoreDocument,
   getFirestoreDocument,
   mergeFirestoreDocument,
   runFirestoreQuery,
   type FirestoreRecord,
 } from "../firestore.js";
+import { removeExpiredWorkspaceEvents } from "./retention.js";
 import { getFluxoraCollectionPaths } from "../fluxoraFirestorePaths.js";
 import type { WorkspaceSecurityEvent, WorkspaceSecurityFinding, WorkspaceSecuritySource } from "./types.js";
 
@@ -184,3 +186,15 @@ export function createGoogleWorkspaceRepository(
 }
 
 export const googleWorkspaceRepository = createGoogleWorkspaceRepository();
+
+export async function pruneExpiredWorkspaceEvents(now = new Date()): Promise<number> {
+  return removeExpiredWorkspaceEvents({
+    listExpired: async () => (await runFirestoreQuery({
+      select: { fields: [{ fieldPath: "expiresAt" }] },
+      from: [{ collectionId: WORKSPACE_SECURITY_EVENTS_COLLECTION }],
+      where: { fieldFilter: { field: { fieldPath: "expiresAt" }, op: "LESS_THAN_OR_EQUAL", value: { timestampValue: now.toISOString() } } },
+      limit: 200,
+    })).map((record) => String(record._documentId || record.id || "")).filter(Boolean),
+    deleteEvent: async (id) => { await deleteFirestoreDocument(WORKSPACE_SECURITY_EVENTS_COLLECTION, id); },
+  });
+}
