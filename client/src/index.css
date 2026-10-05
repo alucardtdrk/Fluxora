@@ -396,8 +396,41 @@ button:active { transform: scale(0.98); }
   visibility: hidden;
   transition: opacity 80ms ease, visibility 0s 80ms;
 }
+.fluxora-sidebar .sidebar-section-title {
+  height: 15px;
+  line-height: 15px;
+  margin-bottom: 8px;
+  overflow: hidden;
+  white-space: nowrap;
+  transition: height 240ms cubic-bezier(0.22, 1, 0.36, 1), margin 240ms cubic-bezier(0.22, 1, 0.36, 1), opacity 100ms ease 140ms, visibility 0s 140ms;
+}
+.sidebar-section-management { margin-top: 32px; }
+.fluxora-sidebar[data-collapsed="true"] .sidebar-section-title {
+  height: 0;
+  margin-bottom: 0;
+  transition: height 240ms cubic-bezier(0.22, 1, 0.36, 1) 80ms, margin 240ms cubic-bezier(0.22, 1, 0.36, 1) 80ms, opacity 80ms ease, visibility 0s 80ms;
+}
+.fluxora-sidebar[data-collapsed="true"] .sidebar-section-management { margin-top: 12px; }
 .sidebar-chevron { transition: transform 240ms cubic-bezier(0.22, 1, 0.36, 1); }
 .fluxora-sidebar[data-collapsed="true"] .sidebar-chevron { transform: rotate(180deg); }
+
+.fluxora-notification-bell { transform-origin: 50% 15%; }
+.fluxora-notification:hover .fluxora-notification-bell,
+.fluxora-notification:focus-visible .fluxora-notification-bell {
+  animation: fluxora-bell-ring 650ms ease-in-out both;
+}
+@keyframes fluxora-bell-ring {
+  0%, 100% { transform: rotate(0) scale(1); }
+  18% { transform: rotate(16deg) scale(1.06); }
+  36% { transform: rotate(-13deg) scale(1.06); }
+  54% { transform: rotate(9deg); }
+  72% { transform: rotate(-5deg); }
+  88% { transform: rotate(2deg); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .fluxora-notification:hover .fluxora-notification-bell,
+  .fluxora-notification:focus-visible .fluxora-notification-bell { animation: none; }
+}
 
 .theme-orb {
   display: grid;

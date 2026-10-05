@@ -245,9 +245,9 @@ export default function OperationsShell({ children }: { children: React.ReactNod
         </div>
 
         <nav id="fluxora-sidebar-nav" className="flex-1 overflow-x-hidden overflow-y-auto px-3 pt-5">
-          <p className="sidebar-label mb-2 px-3 text-[10px] font-bold uppercase tracking-[0.18em] text-code-foreground/60" aria-hidden={collapsed}>Operação</p>
+          <p className="sidebar-label sidebar-section-title px-3 text-[10px] font-bold uppercase tracking-[0.18em] text-code-foreground/60" aria-hidden={collapsed}>Operação</p>
           {operationItems.map(navLink)}
-          <p className="sidebar-label mb-2 mt-8 px-3 text-[10px] font-bold uppercase tracking-[0.18em] text-code-foreground/60" aria-hidden={collapsed}>Gestão</p>
+          <p className="sidebar-label sidebar-section-title sidebar-section-management px-3 text-[10px] font-bold uppercase tracking-[0.18em] text-code-foreground/60" aria-hidden={collapsed}>Gestão</p>
           {visibleManagementItems.map(navLink)}
         </nav>
 
@@ -291,8 +291,8 @@ export default function OperationsShell({ children }: { children: React.ReactNod
             </Button>
             <Popover onOpenChange={(open) => open && markNotificationsRead()}>
               <PopoverTrigger asChild>
-                <Button variant="ghost" size="icon" className="relative rounded-xl text-muted-foreground">
-                  <Bell className="h-[18px] w-[18px]" />
+                <Button variant="ghost" size="icon" className="fluxora-notification relative rounded-full text-muted-foreground" aria-label={unread.length ? `Notificações: ${unread.length} não lidas` : "Notificações"}>
+                  <Bell aria-hidden="true" className="fluxora-notification-bell h-[18px] w-[18px]" />
                   {unread.length > 0 && <span className="absolute right-1 top-1 min-w-[16px] rounded-full bg-feedback-error px-1 text-center text-[9px] font-bold leading-4 text-white">{Math.min(unread.length, 99)}</span>}
                 </Button>
               </PopoverTrigger>
