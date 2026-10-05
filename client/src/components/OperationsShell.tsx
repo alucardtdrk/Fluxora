@@ -6,7 +6,6 @@ import {
   BarChart3,
   Bell,
   ChevronLeft,
-  ChevronRight,
   LayoutDashboard,
   LogOut,
   Search,
@@ -217,39 +216,42 @@ export default function OperationsShell({ children }: { children: React.ReactNod
   };
 
   const navLink = ({ label, path, icon: Icon }: typeof allItems[number]) => (
-    <Link key={path} href={path} title={collapsed ? label : undefined} className={`mb-1 flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm transition-colors ${currentPath === path ? "bg-primary text-white shadow-lg shadow-[#11183D]/25" : "text-code-foreground/80 hover:bg-white/10"}`}>
+    <Link key={path} href={path} aria-label={label} title={collapsed ? label : undefined} className={`mb-1 flex w-full items-center gap-3 overflow-hidden rounded-xl px-3 py-2.5 text-sm transition-colors ${currentPath === path ? "bg-primary text-white shadow-lg shadow-[#11183D]/25" : "text-code-foreground/80 hover:bg-white/10"}`}>
       <Icon className="h-[17px] w-[17px] shrink-0" />
-      {!collapsed && <span>{label}</span>}
-      {currentPath === path && !collapsed && <span className="ml-auto h-1.5 w-1.5 rounded-full bg-feedback-info" />}
+      <span className="sidebar-label whitespace-nowrap" aria-hidden={collapsed}>{label}</span>
+      {currentPath === path && <span className="sidebar-label ml-auto h-1.5 w-1.5 shrink-0 rounded-full bg-feedback-info" aria-hidden="true" />}
     </Link>
   );
 
   return (
     <div className="fluxora-app min-h-screen bg-background text-foreground">
-      <aside className={`fixed inset-y-0 left-0 z-30 hidden flex-col overflow-visible bg-[var(--fluxora-mirtilo)] text-white transition-all duration-200 lg:flex ${collapsed ? "w-[78px]" : "w-[252px]"}`}>
-        <div className={`relative flex h-[86px] items-center ${collapsed ? "justify-center px-3" : "px-5"}`}>
+      <aside data-collapsed={collapsed} className={`fluxora-sidebar fixed inset-y-0 left-0 z-30 hidden flex-col overflow-visible bg-[var(--fluxora-mirtilo)] text-white lg:flex ${collapsed ? "w-[78px]" : "w-[252px]"}`}>
+        <div className="relative flex h-[86px] shrink-0 items-center px-[23px]">
           <Link href="/" className="shrink-0" aria-label="Fluxora"><FluxoraMark light className="h-8 w-8" /></Link>
-          {!collapsed && <div className="ml-2.5 min-w-0"><p className="truncate text-[15px] font-semibold tracking-[-0.03em]">Fluxora</p><p className="truncate text-[10px] font-medium text-code-foreground/70">Automation Control Center</p></div>}
+          <div className="sidebar-label ml-2.5 min-w-0 overflow-hidden whitespace-nowrap" aria-hidden={collapsed}><p className="text-[15px] font-semibold tracking-[-0.03em]">Fluxora</p><p className="text-[10px] font-medium text-code-foreground/70">Automation Control Center</p></div>
           <button
             onClick={() => setCollapsed((value) => !value)}
-            className={`${collapsed ? "absolute right-1 top-1/2 -translate-y-1/2" : "ml-auto"} grid h-8 w-8 place-items-center rounded-lg text-code-foreground/70 hover:bg-white/10 hover:text-white`}
+            type="button"
+            aria-expanded={!collapsed}
+            aria-controls="fluxora-sidebar-nav"
+            className="absolute -right-3 top-1/2 grid h-6 w-6 -translate-y-1/2 place-items-center rounded-full border border-white/15 bg-[var(--fluxora-mirtilo)] text-code-foreground/70 hover:text-white"
             aria-label={collapsed ? "Expandir sidebar" : "Recolher sidebar"}
-          >{collapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronLeft className="h-4 w-4" />}</button>
+          ><ChevronLeft className="sidebar-chevron h-4 w-4" /></button>
         </div>
 
-        <nav className="flex-1 overflow-y-auto px-3 pt-5">
-          {!collapsed && <p className="mb-2 px-3 text-[10px] font-bold uppercase tracking-[0.18em] text-code-foreground/60">Operação</p>}
+        <nav id="fluxora-sidebar-nav" className="flex-1 overflow-x-hidden overflow-y-auto px-3 pt-5">
+          <p className="sidebar-label mb-2 px-3 text-[10px] font-bold uppercase tracking-[0.18em] text-code-foreground/60" aria-hidden={collapsed}>Operação</p>
           {operationItems.map(navLink)}
-          {!collapsed && <p className="mb-2 mt-8 px-3 text-[10px] font-bold uppercase tracking-[0.18em] text-code-foreground/60">Gestão</p>}
+          <p className="sidebar-label mb-2 mt-8 px-3 text-[10px] font-bold uppercase tracking-[0.18em] text-code-foreground/60" aria-hidden={collapsed}>Gestão</p>
           {visibleManagementItems.map(navLink)}
         </nav>
 
         <div className="border-t border-white/10 p-4">
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <button type="button" className={`flex w-full items-center rounded-xl py-1 text-left transition-colors hover:bg-white/10 focus:outline-none focus-visible:ring-2 focus-visible:ring-white/60 ${collapsed ? "justify-center px-0" : "gap-3 px-1"}`} aria-label="Abrir menu da conta">
+              <button type="button" className="flex w-full items-center gap-3 overflow-hidden rounded-xl px-1 py-1 text-left transition-colors hover:bg-white/10 focus:outline-none focus-visible:ring-2 focus-visible:ring-white/60" aria-label="Abrir menu da conta">
                 <div className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-primary text-xs font-semibold">{user.name?.slice(0, 1).toUpperCase() || "F"}</div>
-                {!collapsed && <div className="min-w-0 flex-1"><p className="truncate text-xs font-semibold">{user.name}</p><p className="truncate text-[11px] text-code-foreground/70">{user.role === "admin" ? "Administrador" : user.role === "operator" ? "Operador" : "Visualizador"}</p></div>}
+                <div className="sidebar-label min-w-0 flex-1 whitespace-nowrap" aria-hidden={collapsed}><p className="truncate text-xs font-semibold">{user.name}</p><p className="truncate text-[11px] text-code-foreground/70">{user.role === "admin" ? "Administrador" : user.role === "operator" ? "Operador" : "Visualizador"}</p></div>
               </button>
             </DropdownMenuTrigger>
             <DropdownMenuContent side="top" align={collapsed ? "center" : "end"} className="w-56">
@@ -261,7 +263,7 @@ export default function OperationsShell({ children }: { children: React.ReactNod
         </div>
       </aside>
 
-      <main className={`min-h-screen transition-[margin] duration-200 ${collapsed ? "lg:ml-[78px]" : "lg:ml-[252px]"}`}>
+      <main data-sidebar-collapsed={collapsed} className={`fluxora-main min-h-screen ${collapsed ? "lg:ml-[78px]" : "lg:ml-[252px]"}`}>
         <header className="sticky top-0 z-20 flex h-[86px] items-center justify-between border-b border-border bg-background/90 px-5 backdrop-blur-xl md:px-9">
           <div><p className="text-[11px] font-bold uppercase tracking-[0.18em] text-muted-foreground">Fluxora</p><h1 className="mt-1 text-xl font-semibold tracking-[-0.03em] text-foreground">{currentTitle}</h1></div>
           <div className="flex items-center gap-2">
