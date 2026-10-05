@@ -316,6 +316,72 @@ button:active { transform: scale(0.98); }
   color: var(--foreground);
   border-color: var(--border);
 }
+/* Adapted from Nawsome: https://uiverse.io/Nawsome/cold-liger-90 */
+.fluxora-loading-cubes {
+  --cube-size: 28px;
+  --cube-duration: 800ms;
+  --cube-shadow: var(--color-mirtilo-100);
+  width: calc(var(--cube-size) * 3);
+  height: calc(var(--cube-size) * 2);
+  margin-top: calc(var(--cube-size) * -1.5);
+  position: relative;
+  transform-style: preserve-3d;
+  transform: rotateX(60deg) rotateZ(45deg);
+}
+.dark .fluxora-loading-cubes { --cube-shadow: var(--color-mirtilo-900); }
+.fluxora-loading-cube {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: var(--cube-size);
+  height: var(--cube-size);
+  transform-style: preserve-3d;
+  animation: var(--cube-animation) var(--cube-duration) linear infinite;
+}
+.fluxora-loading-cube:nth-child(1) { --cube-animation: fluxora-cube-one; transform: translate(100%, 0); }
+.fluxora-loading-cube:nth-child(2) { --cube-animation: fluxora-cube-two; transform: translate(0, 100%); }
+.fluxora-loading-cube:nth-child(3) { --cube-animation: fluxora-cube-three; transform: translate(100%, 100%); }
+.fluxora-loading-cube:nth-child(4) { --cube-animation: fluxora-cube-four; transform: translate(200%, 0); }
+.fluxora-loading-cube > div {
+  position: absolute;
+  inset: 0;
+  background: var(--color-curacao-500);
+  transform: translateZ(calc(var(--cube-size) / 2));
+}
+.fluxora-loading-cube > div:nth-child(2) {
+  background: var(--fluxora-mirtilo);
+  transform: rotateY(90deg) translateZ(calc(var(--cube-size) / 2));
+}
+.fluxora-loading-cube > div:nth-child(3) {
+  background: var(--fluxora-curacao);
+  transform: rotateX(-90deg) translateZ(calc(var(--cube-size) / 2));
+}
+.fluxora-loading-cube > div:nth-child(4) {
+  background: var(--cube-shadow);
+  transform: translateZ(calc(var(--cube-size) * -3));
+}
+@keyframes fluxora-cube-one {
+  0%, 50% { transform: translate(100%, 0); }
+  100% { transform: translate(200%, 0); }
+}
+@keyframes fluxora-cube-two {
+  0% { transform: translate(0, 100%); }
+  50% { transform: translate(0, 0); }
+  100% { transform: translate(100%, 0); }
+}
+@keyframes fluxora-cube-three {
+  0%, 50% { transform: translate(100%, 100%); }
+  100% { transform: translate(0, 100%); }
+}
+@keyframes fluxora-cube-four {
+  0% { transform: translate(200%, 0); }
+  50% { transform: translate(200%, 100%); }
+  100% { transform: translate(100%, 100%); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .fluxora-loading-cube { animation: none; }
+}
+
 .fluxora-sidebar { transition: width 240ms cubic-bezier(0.22, 1, 0.36, 1); }
 .fluxora-main { transition: margin-left 240ms cubic-bezier(0.22, 1, 0.36, 1); }
 .fluxora-sidebar[data-collapsed="true"],

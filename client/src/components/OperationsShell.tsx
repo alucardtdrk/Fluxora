@@ -191,9 +191,14 @@ export default function OperationsShell({ children }: { children: React.ReactNod
 
   if (loading) return <div className="grid min-h-screen place-items-center bg-background ">
     <div role="status" aria-live="polite" className="flex flex-col items-center gap-4">
-      <div className="relative grid h-20 w-20 place-items-center rounded-2xl border border-border bg-card shadow-[0_12px_35px_rgba(40,14,89,0.12)] ">
-        <FluxoraMark className="h-14 w-14 dark:brightness-0 dark:invert" />
-        <span className="absolute -bottom-1 h-2 w-8 animate-pulse rounded-full bg-primary" aria-hidden="true" />
+      <div className="grid h-32 w-36 place-items-center" aria-hidden="true">
+        <div className="fluxora-loading-cubes">
+          {[0, 1, 2, 3].map((cube) => (
+            <div key={cube} className="fluxora-loading-cube">
+              <div /><div /><div /><div />
+            </div>
+          ))}
+        </div>
       </div>
       <div className="text-center"><p className="text-sm font-semibold text-foreground">Carregando Fluxora</p><p className="mt-1 text-xs text-muted-foreground">Validando sua sessão…</p></div>
     </div>
