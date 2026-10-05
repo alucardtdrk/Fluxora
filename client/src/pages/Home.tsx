@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { LayoutGroup, motion, useReducedMotion } from "framer-motion";
+import PeriodFilter from "@/components/PeriodFilter";
 import { CheckCircle2, Clock3, DatabaseZap, Play, RefreshCw, Workflow, XCircle, Zap } from "lucide-react";
 import { Area, AreaChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { toast } from "sonner";
@@ -21,7 +21,7 @@ function Metric({ title, value, detail, icon: Icon, loading = false }: { title: 
 }
 
 export default function Home() {
-  const reducedMotion = useReducedMotion();
+
   const { user } = useAuth();
   const [refreshIntervalMs, setRefreshIntervalMs] = useState(() => readPreferredRefreshSeconds() * 1000);
   const [period, setPeriod] = useState<Period>(() => readScopedPeriod("home"));
@@ -68,10 +68,7 @@ export default function Home() {
   const canceled = m?.canceled ?? 0;
 
   return <OperationsShell><div className="mx-auto max-w-[1480px] px-5 py-7 md:px-9">
-    <div className="mb-8 flex flex-col justify-between gap-5 xl:flex-row xl:items-end"><div><span className="rounded-full bg-feedback-info-surface px-3 py-1 text-[10px] font-bold uppercase tracking-[.14em] text-feedback-info">Live operations</span><h2 className="mt-4 text-[42px] font-semibold tracking-[-.06em] text-foreground">Tudo sob controle.</h2><p className="mt-2 text-sm text-muted-foreground">Monitore o ambiente e escolha os workflows que quer manter em foco.</p></div><div className="flex flex-wrap gap-2"><LayoutGroup id="home-period"><div role="group" aria-label="Período das execuções" className="flex flex-wrap rounded-xl border bg-card p-1">{periods.map(([value, label]) => <button key={value} type="button" aria-pressed={period === value} onClick={() => setPeriod(value)} className={`relative rounded-lg px-3 py-2 text-xs font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${period === value ? "text-background" : "text-muted-foreground"}`}>
-              {period === value && <motion.span aria-hidden="true" layoutId={reducedMotion ? undefined : "active-period"} initial={false} transition={{ duration: reducedMotion ? 0 : 0.22, ease: "easeInOut" }} className="pointer-events-none absolute inset-0 rounded-lg bg-foreground" />}
-              <span className="relative z-10">{label}</span>
-            </button>)}</div></LayoutGroup><Button onClick={refresh} variant="outline" disabled={overview.isFetching || workflows.isFetching} aria-busy={overview.isFetching || workflows.isFetching}><RefreshCw className={`mr-2 h-4 w-4 ${overview.isFetching || workflows.isFetching ? "animate-spin" : ""}`} />{overview.isFetching || workflows.isFetching ? "Atualizando…" : "Atualizar"}</Button></div></div>
+    <div className="mb-8 flex flex-col justify-between gap-5 xl:flex-row xl:items-end"><div><span className="rounded-full bg-feedback-info-surface px-3 py-1 text-[10px] font-bold uppercase tracking-[.14em] text-feedback-info">Live operations</span><h2 className="mt-4 text-[42px] font-semibold tracking-[-.06em] text-foreground">Tudo sob controle.</h2><p className="mt-2 text-sm text-muted-foreground">Monitore o ambiente e escolha os workflows que quer manter em foco.</p></div><div className="flex flex-wrap gap-2"><PeriodFilter value={period} options={periods} onChange={setPeriod} /><Button onClick={refresh} variant="outline" disabled={overview.isFetching || workflows.isFetching} aria-busy={overview.isFetching || workflows.isFetching}><RefreshCw className={`mr-2 h-4 w-4 ${overview.isFetching || workflows.isFetching ? "animate-spin" : ""}`} />{overview.isFetching || workflows.isFetching ? "Atualizando…" : "Atualizar"}</Button></div></div>
 
     <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-7"><Metric title="Workflows" value={String(m?.workflows ?? 0)} detail={focusIds.length ? "em foco" : "total"} icon={Workflow} loading={initialLoading} /><Metric title="Ativos" value={String(m?.active ?? 0)} detail="em operação" icon={Zap} loading={initialLoading} /><Metric title="Execuções" value={String(total)} detail={periods.find((p) => p[0] === period)?.[1] || ""} icon={Play} loading={initialLoading} /><Metric title="Sucesso" value={m?.successRate != null ? `${m.successRate}%` : "—"} detail="taxa" icon={CheckCircle2} loading={initialLoading} /><Metric title="Erros" value={String(errorCount)} detail="falhas" icon={XCircle} loading={initialLoading} /><Metric title="Em andamento" value={String(running)} detail="agora" icon={Clock3} loading={initialLoading} /><Metric title="n8n" value={initialLoading ? "Verificando…" : overview.data?.connected ? "Online" : "Offline"} detail={initialLoading ? "conectando" : "conexão"} icon={DatabaseZap} /></div>
 

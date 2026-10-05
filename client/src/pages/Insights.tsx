@@ -11,7 +11,7 @@ import IncidentLifecycleDialog from "@/components/IncidentLifecycleDialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import PeriodFilter from "@/components/PeriodFilter";
 import { PREFERENCES_UPDATED_EVENT, readPreferredPageSize, readPreferredRefreshSeconds, readScopedPeriod, saveScopedPeriod, type DashboardPeriod } from "@/lib/preferences";
 import { trpc } from "@/lib/trpc";
 
@@ -36,11 +36,8 @@ function Header({ title, description, period, setPeriod, refresh, loading }: { t
           <h2 className="mt-3 text-4xl font-semibold tracking-[-.06em]">{title}</h2>
           <p className="mt-2 text-sm text-muted-foreground">{description}</p>
         </div>
-        <div className="flex gap-2">
-          <Select value={period} onValueChange={(value) => setPeriod(value as Period)}>
-            <SelectTrigger className="w-[160px] bg-card"><SelectValue /></SelectTrigger>
-            <SelectContent>{(Object.keys(periodLabels) as Period[]).map((value) => <SelectItem key={value} value={value}>{periodLabels[value]}</SelectItem>)}</SelectContent>
-          </Select>
+        <div className="flex flex-wrap items-center gap-2">
+          <PeriodFilter value={period} options={(Object.keys(periodLabels) as Period[]).map((value) => [value, periodLabels[value]] as const)} onChange={setPeriod} />
           <Button onClick={refresh} disabled={loading} aria-busy={loading} className="rounded-xl bg-primary text-primary-foreground"><RefreshCw className={`mr-2 h-4 w-4 ${loading ? "animate-spin" : ""}`} />{loading ? "Atualizando…" : "Atualizar"}</Button>
         </div>
       </div>
