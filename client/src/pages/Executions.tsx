@@ -79,6 +79,18 @@ export default function Executions() {
   const total = executions.data?.total ?? 0;
   const currentPage = executions.data?.page ?? page;
   const totalPages = executions.data?.totalPages ?? 1;
+  const hasFilters = Boolean(search.trim()) || status !== "all" || workflowId !== "all" || period !== "all";
+  const clearFilters = () => {
+    setQuery("");
+    setStatus("all");
+    setWorkflowId("all");
+    setPeriod("all");
+    setPage(1);
+    setSearchParams((params) => {
+      params.delete("search");
+      return params;
+    }, { replace: true });
+  };
 
   const change = (setter: (value: string) => void) => (value: string) => {
     setter(value);
@@ -195,7 +207,7 @@ export default function Executions() {
                   </div>
                   <div className="divide-y divide-border">
                     {items.map((item) => (
-                      <div key={item.id} className="grid gap-3 px-6 py-4 md:grid-cols-[32px_minmax(300px,1.7fr)_minmax(105px,.55fr)_minmax(160px,.9fr)_minmax(90px,.5fr)_minmax(105px,.55fr)_minmax(85px,.4fr)_minmax(130px,.65fr)] md:items-center">
+                      <div key={item.id} className="grid gap-3 transition-colors duration-150 hover:bg-feedback-info-surface focus-within:bg-feedback-info-surface px-6 py-4 md:grid-cols-[32px_minmax(300px,1.7fr)_minmax(105px,.55fr)_minmax(160px,.9fr)_minmax(90px,.5fr)_minmax(105px,.55fr)_minmax(85px,.4fr)_minmax(130px,.65fr)] md:items-center">
                         <Checkbox aria-label={`Selecionar execução ${item.id} para comparação`} checked={comparisonSelection.some((selectedItem) => selectedItem.id === item.id)} onCheckedChange={() => toggleComparison(item)} />
                         <div className="flex min-w-0 items-center gap-3">
                           <div className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-feedback-info-surface text-feedback-info "><Timer className="h-4 w-4" /></div>
@@ -209,10 +221,15 @@ export default function Executions() {
                         <span className="justify-self-center text-center text-xs text-muted-foreground">{item.duration != null ? `${item.duration}s` : "-"}</span>
                         <Badge className={`w-fit justify-self-center ${item.source === "firestore" ? "bg-feedback-info-surface text-feedback-info" : "bg-feedback-success-surface text-feedback-success"}`}>{item.source === "firestore" ? "Arquivo" : "n8n"}</Badge>
                         <span className="justify-self-center font-mono text-[11px] text-muted-foreground">#{item.id}</span>
-                        <Button variant="outline" size="sm" onClick={() => setSelected(item.id)} className="w-fit justify-self-end rounded-lg text-xs"><Eye className="mr-2 h-3.5 w-3.5" />Ver detalhes</Button>
+                        <Button variant="outline" size="sm" aria-label={`Ver detalhes da execução ${item.id} de ${item.workflowName}`} onClick={() => setSelected(item.id)} className="w-fit justify-self-end rounded-lg text-xs"><Eye className="mr-2 h-3.5 w-3.5" />Ver detalhes</Button>
                       </div>
                     ))}
-                    {items.length === 0 && <div className="py-16 text-center text-sm text-muted-foreground">Nenhuma execução encontrada com estes filtros.</div>}
+                    {items.length === 0 && <div role="status" className="flex flex-col items-center px-6 py-16 text-center">
+                      <Timer aria-hidden="true" className="h-8 w-8 text-muted-foreground" />
+                      <p className="mt-3 text-sm font-semibold text-foreground">{executions.isFetching ? "Atualizando resultados…" : hasFilters ? "Nenhuma execução para estes filtros" : "Nenhuma execução disponível"}</p>
+                      <p className="mt-1 max-w-sm text-xs leading-5 text-muted-foreground">{executions.isFetching ? "Aguarde a consulta do histórico." : hasFilters ? "Limpe a busca, o status, o workflow e o período para consultar todo o histórico disponível." : "As execuções aparecerão aqui quando houver registros disponíveis para consulta."}</p>
+                      {!executions.isFetching && hasFilters && <Button variant="outline" size="sm" className="mt-4" onClick={clearFilters}><X aria-hidden="true" className="mr-2 h-4 w-4" />Limpar filtros</Button>}
+                    </div>}
                   </div>
                   <div className="flex flex-col gap-3 border-t px-6 py-4 text-xs text-muted-foreground md:flex-row md:items-center md:justify-between">
                     <span>Mostrando {items.length ? (currentPage - 1) * pageSize + 1 : 0}-{Math.min(currentPage * pageSize, total)} de {total.toLocaleString("pt-BR")}</span>
