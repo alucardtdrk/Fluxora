@@ -1,6 +1,6 @@
 import { useDeferredValue, useEffect, useState } from "react";
 import { ArrowLeft, Eye, GitCompareArrows, RefreshCw, Search, Timer, X } from "lucide-react";
-import { Link, useLocation } from "wouter";
+import { Link, useSearchParams } from "wouter";
 import { toast } from "sonner";
 import { useAuth } from "@/_core/hooks/useAuth";
 import OperationsShell from "@/components/OperationsShell";
@@ -41,7 +41,8 @@ function badgeClass(status: string) {
 
 export default function Executions() {
   const { user } = useAuth();
-  const [location] = useLocation();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const executionId = searchParams.get("execution");
   const [query, setQuery] = useState(() => new URLSearchParams(window.location.search).get("search") || "");
   const search = useDeferredValue(query);
   const [status, setStatus] = useState("all");
@@ -66,9 +67,8 @@ export default function Executions() {
   useEffect(() => saveScopedPeriod("executions", period), [period]);
 
   useEffect(() => {
-    const executionId = new URLSearchParams(location.split("?")[1] || "").get("execution");
     if (executionId) setSelected(executionId);
-  }, [location]);
+  }, [executionId]);
 
   const executions = trpc.n8n.executionsPage.useQuery(
     { page, pageSize, period, search, status, workflowId },
@@ -228,7 +228,14 @@ export default function Executions() {
           </Card>
         </div>
       </div>
-      <ExecutionDetailDialog executionId={selected} open={Boolean(selected)} onOpenChange={(open) => !open && setSelected(null)} />
+      <ExecutionDetailDialog executionId={selected} open={Boolean(selected)} onOpenChange={(open) => {
+        if (open) return;
+        setSelected(null);
+        setSearchParams((params) => {
+          params.delete("execution");
+          return params;
+        }, { replace: true });
+      }} />
       <ExecutionComparisonDialog executionIds={comparisonSelection.map((item) => item.id)} open={comparisonOpen} onOpenChange={setComparisonOpen} />
     </OperationsShell>
   );
