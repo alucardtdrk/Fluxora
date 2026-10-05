@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { ShieldCheck, UserPlus, Users as UsersIcon, Trash2 } from "lucide-react";
+import { ShieldCheck, UserPlus, Users as UsersIcon, RefreshCw, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import OperationsShell from "@/components/OperationsShell";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -54,10 +54,11 @@ export default function Users() {
       <Card className="border-0"><CardHeader><div className="flex flex-wrap items-center justify-between gap-3"><CardTitle className="flex items-center gap-2 text-base"><UsersIcon className="h-4 w-4"/>Pessoas autorizadas</CardTitle><Input className="max-w-[280px]" placeholder="Buscar por nome ou e-mail" value={search} onChange={(e) => setSearch(e.target.value)}/></div></CardHeader><CardContent className="p-0">
         <div className="divide-y divide-border">{filtered.map((item) => {
           const isSelf = currentUser?.email === item.email;
+          const changingAccess = setActive.isPending && setActive.variables?.email === item.email;
           return <div key={item.email} className="grid gap-4 px-6 py-4 md:grid-cols-[1.5fr_170px_110px_42px] md:items-center">
             <div className="min-w-0"><div className="flex items-center gap-2"><p className="truncate text-sm font-semibold text-foreground">{item.name}</p>{item.role === "admin" && <ShieldCheck className="h-4 w-4 text-feedback-info"/>}</div><p className="truncate text-xs text-muted-foreground">{item.email}</p><p className="mt-1 text-[11px] text-muted-foreground">Último acesso: {item.lastLoginAt ? new Date(item.lastLoginAt).toLocaleString("pt-BR") : "ainda não acessou"}</p></div>
             <Select value={item.role} disabled={isSelf && item.role === "admin"} onValueChange={(value) => save.mutate({ email: item.email, name: item.name, role: value as Role, active: item.active })}><SelectTrigger><SelectValue>{roleLabel[item.role as Role]}</SelectValue></SelectTrigger><SelectContent><SelectItem value="viewer">Visualizador</SelectItem><SelectItem value="operator">Operador</SelectItem><SelectItem value="admin">Administrador</SelectItem></SelectContent></Select>
-            <div className="flex items-center gap-2"><Switch checked={item.active} disabled={isSelf} onCheckedChange={(active) => setActive.mutate({ email: item.email, active })}/><span className="text-xs text-muted-foreground">{item.active ? "Ativo" : "Bloqueado"}</span></div>
+            <div className="flex items-center gap-2"><Switch checked={item.active} aria-label={`Acesso de ${item.name || item.email}`} aria-busy={changingAccess} disabled={isSelf || setActive.isPending || users.isFetching} onCheckedChange={(active) => setActive.mutate({ email: item.email, active })}/><span role="status" className="flex items-center gap-1 text-xs text-muted-foreground">{changingAccess && <RefreshCw aria-hidden="true" className="h-3 w-3 animate-spin" />}{changingAccess ? "Salvando…" : item.active ? "Ativo" : "Bloqueado"}</span></div>
             <Button variant="ghost" size="icon" disabled={isSelf} onClick={() => { if (confirm(`Remover o acesso de ${item.email}?`)) remove.mutate({ email: item.email }); }}><Trash2 className="h-4 w-4 text-muted-foreground"/></Button>
           </div>;
         })}{!users.isLoading && filtered.length === 0 && <div className="px-6 py-12 text-center text-sm text-muted-foreground">Nenhum usuário encontrado.</div>}</div>

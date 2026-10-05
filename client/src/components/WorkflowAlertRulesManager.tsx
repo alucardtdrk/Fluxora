@@ -53,7 +53,7 @@ export default function WorkflowAlertRulesManager() {
     <CardContent className="space-y-6 px-6 pb-6 md:px-7 md:pb-7">
       <div className="grid gap-4 rounded-xl border bg-muted p-4 md:grid-cols-[minmax(0,1fr)_auto] md:items-end md:p-5">
         <div><Label>Workflow monitorado</Label><Select value={workflowId} onValueChange={setWorkflowId}><SelectTrigger className="mt-2 bg-card"><SelectValue placeholder="Selecione um workflow" /></SelectTrigger><SelectContent>{items.map((workflow) => <SelectItem key={workflow.id} value={workflow.id}>{workflow.name}</SelectItem>)}</SelectContent></Select></div>
-        <div className="flex min-h-10 items-center gap-3 rounded-lg bg-card px-4 py-2 ring-1 ring-border"><Switch id="workflow-alert-enabled" checked={enabled} onCheckedChange={setEnabled} /><Label htmlFor="workflow-alert-enabled" className="cursor-pointer whitespace-nowrap">Regra ativa</Label></div>
+        <div className="flex min-h-10 items-center gap-3 rounded-lg bg-card px-4 py-2 ring-1 ring-border"><Switch id="workflow-alert-enabled" checked={enabled} disabled={save.isPending} aria-busy={save.isPending} onCheckedChange={setEnabled} /><Label htmlFor="workflow-alert-enabled" className="cursor-pointer whitespace-nowrap">{save.isPending ? "Salvando…" : "Regra ativa"}</Label></div>
       </div>
 
       <div>

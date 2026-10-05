@@ -30,6 +30,7 @@ export default function Settings() {
   const [rememberFilters, setRememberFilters] = useState(() => rememberFiltersEnabled());
   const [errorThreshold, setErrorThreshold] = useState(() => localStorage.getItem("fluxoraErrorThreshold") || "5");
   const [inactiveHours, setInactiveHours] = useState(() => localStorage.getItem("fluxoraInactiveHours") || "24");
+  const [savingSettings, setSavingSettings] = useState(false);
   const [syncingHistory, setSyncingHistory] = useState(false);
   const [syncProgress, setSyncProgress] = useState("");
 
@@ -84,6 +85,9 @@ export default function Settings() {
   };
 
   const saveSettings = async () => {
+    if (savingSettings) return;
+    setSavingSettings(true);
+    try {
     localStorage.setItem("notificationsEnabled", String(notifications));
     localStorage.setItem("preferredRefreshInterval", refreshInterval);
     localStorage.setItem("fluxoraDefaultPeriod", defaultPeriod);
@@ -106,6 +110,11 @@ export default function Settings() {
       utils.n8n.executions.invalidate(),
     ]);
     toast.success("Alterações salvas", { description: "As preferências do painel foram aplicadas agora." });
+    } catch {
+      toast.error("Não foi possível aplicar as preferências. Tente novamente.");
+    } finally {
+      setSavingSettings(false);
+    }
   };
 
   const clearLocalCache = () => {
@@ -186,10 +195,10 @@ export default function Settings() {
             <div><Label>Período padrão</Label><p className="mb-2 mt-1 text-xs text-muted-foreground">Período selecionado ao abrir dashboards e análises.</p><Select value={defaultPeriod} onValueChange={(value) => setDefaultPeriod(value as DashboardPeriod)}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="today">Hoje</SelectItem><SelectItem value="7d">7 dias</SelectItem><SelectItem value="30d">30 dias</SelectItem><SelectItem value="90d">90 dias</SelectItem><SelectItem value="all">Todas as execuções</SelectItem></SelectContent></Select></div>
             <div><Label>Atualização preferida</Label><p className="mb-2 mt-1 text-xs text-muted-foreground">Intervalo sugerido para consultas automáticas.</p><Select value={refreshInterval} onValueChange={setRefreshInterval}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="15">15 segundos</SelectItem><SelectItem value="30">30 segundos</SelectItem><SelectItem value="60">1 minuto</SelectItem><SelectItem value="300">5 minutos</SelectItem></SelectContent></Select></div>
             <div><Label>Execuções por página</Label><Select value={pageSize} onValueChange={setPageSize}><SelectTrigger className="mt-2"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="25">25</SelectItem><SelectItem value="50">50</SelectItem><SelectItem value="100">100</SelectItem></SelectContent></Select></div>
-            <div className="flex items-center justify-between"><div><Label>Lembrar filtros</Label><p className="mt-1 text-xs text-muted-foreground">Mantém filtros e preferências entre sessões.</p></div><Switch checked={rememberFilters} onCheckedChange={setRememberFilters} /></div>
+            <div className="flex items-center justify-between"><div><Label>Lembrar filtros</Label><p className="mt-1 text-xs text-muted-foreground">Mantém filtros e preferências entre sessões.</p></div><Switch checked={rememberFilters} aria-label="Lembrar filtros" disabled={savingSettings} aria-busy={savingSettings} onCheckedChange={setRememberFilters} /></div>
             <div className="flex flex-wrap gap-3 pt-2">
-              <Button className="bg-primary text-primary-foreground hover:bg-primary/90" disabled={!hasChanges} onClick={saveSettings}>Salvar alterações</Button>
-              <Button variant="outline" disabled={!hasChanges} onClick={restoreDraft}>Descartar</Button>
+              <Button className="bg-primary text-primary-foreground hover:bg-primary/90" disabled={!hasChanges || savingSettings} onClick={saveSettings} aria-busy={savingSettings}>{savingSettings ? "Salvando…" : "Salvar alterações"}</Button>
+              <Button variant="outline" disabled={!hasChanges || savingSettings} onClick={restoreDraft}>Descartar</Button>
             </div>
           </CardContent>
         </Card>
@@ -204,12 +213,12 @@ export default function Settings() {
       <TabsContent value="alerts" className="mt-6 grid gap-6 lg:grid-cols-2">
         <WorkflowAlertRulesManager />
         <Card className="border-0"><CardHeader><CardTitle className="flex items-center gap-2 text-base"><Bell className="h-4 w-4" />Notificações</CardTitle></CardHeader><CardContent className="space-y-5">
-          <div className="flex items-center justify-between"><div><Label>Alertas de falha</Label><p className="mt-1 text-xs text-muted-foreground">Notificar novas execuções com erro durante a sessão.</p></div><Switch checked={notifications} onCheckedChange={setNotifications} /></div>
+          <div className="flex items-center justify-between"><div><Label>Alertas de falha</Label><p className="mt-1 text-xs text-muted-foreground">Notificar novas execuções com erro durante a sessão.</p></div><Switch checked={notifications} aria-label="Alertas de falha" disabled={savingSettings} aria-busy={savingSettings} onCheckedChange={setNotifications} /></div>
           <div><Label>Limiar de falha (%)</Label><p className="mb-2 mt-1 text-xs text-muted-foreground">Referência para destacar workflows com taxa de erro elevada.</p><Input type="number" min="1" max="100" value={errorThreshold} onChange={(e) => setErrorThreshold(e.target.value)} /></div>
           <div><Label>Workflow sem executar (horas)</Label><p className="mb-2 mt-1 text-xs text-muted-foreground">Referência para alertas de automações inativas, até o máximo de 7 dias monitorados.</p><Input type="number" min="1" max="168" value={inactiveHours} onChange={(e) => setInactiveHours(e.target.value)} /></div>
           <div className="flex flex-wrap gap-3 pt-2">
-            <Button className="bg-primary text-primary-foreground hover:bg-primary/90" disabled={!hasChanges} onClick={saveSettings}>Salvar alterações</Button>
-            <Button variant="outline" disabled={!hasChanges} onClick={restoreDraft}>Descartar</Button>
+            <Button className="bg-primary text-primary-foreground hover:bg-primary/90" disabled={!hasChanges || savingSettings} onClick={saveSettings} aria-busy={savingSettings}>{savingSettings ? "Salvando…" : "Salvar alterações"}</Button>
+            <Button variant="outline" disabled={!hasChanges || savingSettings} onClick={restoreDraft}>Descartar</Button>
           </div>
         </CardContent></Card>
         <Card className="border-0"><CardHeader><CardTitle className="text-base">Política de alertas</CardTitle></CardHeader><CardContent className="space-y-3 text-sm text-muted-foreground"><p>Os alertas do cabeçalho continuam baseados nas falhas reais consultadas pelo Fluxora.</p><p>As preferências gerais ficam neste navegador. As regras por workflow são centralizadas no Firestore e valem para toda a equipe.</p></CardContent></Card>
