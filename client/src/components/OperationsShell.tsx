@@ -133,7 +133,10 @@ export default function OperationsShell({ children }: { children: React.ReactNod
   const { user, loading, logout } = useAuth();
   const { theme, toggleTheme } = useTheme();
   const utils = trpc.useUtils();
-  const [collapsed, setCollapsed] = useState(false);
+  const [collapsed, setCollapsed] = useState(() => sessionStorage.getItem("fluxoraSidebarCollapsed") === "true");
+  useEffect(() => {
+    sessionStorage.setItem("fluxoraSidebarCollapsed", String(collapsed));
+  }, [collapsed]);
   const [commandOpen, setCommandOpen] = useState(false);
   const [refreshIntervalMs, setRefreshIntervalMs] = useState(() => readPreferredRefreshSeconds() * 1000);
   const [location, setLocation] = useLocation();
