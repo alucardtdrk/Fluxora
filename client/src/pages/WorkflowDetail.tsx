@@ -122,14 +122,6 @@ export default function WorkflowDetail() {
     return nodes.filter((node: any) => node.nodeName === selectedNodeName);
   }, [executionDetail.data, selectedNodeName]);
 
-  useEffect(() => {
-    const executedNodes = executionDetail.data?.execution?.nodes ?? [];
-    if (!executedNodes.length) return;
-    if (!selectedNodeName || !executedNodes.some((node: any) => node.nodeName === selectedNodeName)) {
-      setSelectedNodeName(executedNodes[0]?.nodeName ?? null);
-    }
-  }, [executionDetail.data, selectedNodeName]);
-
   const canOperate = user?.role === "admin" || user?.role === "operator";
   const canRestore = user?.role === "admin";
 
