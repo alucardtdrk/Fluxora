@@ -414,6 +414,21 @@ button:active { transform: scale(0.98); }
 .sidebar-chevron { transition: transform 240ms cubic-bezier(0.22, 1, 0.36, 1); }
 .fluxora-sidebar[data-collapsed="true"] .sidebar-chevron { transform: rotate(180deg); }
 
+.execution-steps [data-slot="accordion-content"][data-state="open"] {
+  animation: execution-step-open 200ms ease-out;
+}
+.execution-steps [data-slot="accordion-content"][data-state="closed"] {
+  animation: execution-step-close 180ms ease-in;
+}
+@keyframes execution-step-open {
+  from { height: 0; opacity: 0; }
+  to { height: var(--radix-accordion-content-height); opacity: 1; }
+}
+@keyframes execution-step-close {
+  from { height: var(--radix-accordion-content-height); opacity: 1; }
+  to { height: 0; opacity: 0; }
+}
+
 .fluxora-notification-bell { transform-origin: 50% 15%; }
 .fluxora-notification:hover .fluxora-notification-bell,
 .fluxora-notification:focus-visible .fluxora-notification-bell {
