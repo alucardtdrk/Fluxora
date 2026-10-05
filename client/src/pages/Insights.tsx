@@ -109,11 +109,33 @@ function AnalyticsPage() {
           <div className="mt-6 grid gap-6 xl:grid-cols-[1.5fr_1fr]">
             <Card className="border-0 bg-card shadow-sm">
               <CardHeader><CardTitle className="flex items-center gap-2 text-base"><BarChart3 className="h-4 w-4 text-feedback-info" />Tendência de execuções</CardTitle></CardHeader>
-              <CardContent><div className="h-[300px]">{(dashboard?.trend?.length ?? 0) > 0 ? <ResponsiveContainer width="100%" height="100%"><AreaChart data={[...(dashboard?.trend ?? [])].reverse()}><CartesianGrid vertical={false} stroke="var(--border)" /><XAxis dataKey="date" tick={{ fontSize: 10 }} /><YAxis tick={{ fontSize: 10 }} /><Tooltip contentStyle={{ background: "var(--card)", borderColor: "var(--border)", color: "var(--foreground)" }} /><Area dataKey="total" stroke="var(--feedback-info)" fill="none" /><Area dataKey="success" stroke="var(--feedback-success)" fill="var(--feedback-success-surface)" /><Area dataKey="errors" stroke="var(--feedback-error)" fill="var(--feedback-error-surface)" /></AreaChart></ResponsiveContainer> : <Empty text={initialLoading ? "Carregando telemetria..." : "Sem dados no período"} />}</div></CardContent>
+              <CardContent><div className="h-[300px]">{(dashboard?.trend?.length ?? 0) > 0 ? <ResponsiveContainer width="100%" height="100%"><AreaChart accessibilityLayer data={[...(dashboard?.trend ?? [])].reverse()} margin={{ top: 16, right: 8, bottom: 0, left: 0 }}>
+              <defs>
+                <linearGradient id="analytics-total-gradient" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="5%" stopColor="var(--feedback-info)" stopOpacity={0.18} />
+                  <stop offset="95%" stopColor="var(--feedback-info)" stopOpacity={0.02} />
+                </linearGradient>
+                <linearGradient id="analytics-success-gradient" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="5%" stopColor="var(--feedback-success)" stopOpacity={0.4} />
+                  <stop offset="95%" stopColor="var(--feedback-success)" stopOpacity={0.04} />
+                </linearGradient>
+                <linearGradient id="analytics-error-gradient" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="5%" stopColor="var(--feedback-error)" stopOpacity={0.4} />
+                  <stop offset="95%" stopColor="var(--feedback-error)" stopOpacity={0.04} />
+                </linearGradient>
+              </defs>
+              <CartesianGrid vertical={false} stroke="var(--border)" strokeDasharray="3 3" strokeOpacity={0.6} />
+              <XAxis dataKey="date" tick={{ fontSize: 10, fill: "var(--muted-foreground)" }} tickLine={false} axisLine={false} tickMargin={8} minTickGap={24} />
+              <YAxis tick={{ fontSize: 10, fill: "var(--muted-foreground)" }} tickLine={false} axisLine={false} allowDecimals={false} />
+              <Tooltip cursor={false} contentStyle={{ background: "var(--card)", border: "1px solid var(--border)", borderRadius: 12, color: "var(--foreground)", padding: "12px 16px", boxShadow: "0 8px 24px rgb(0 0 0 / 0.15)" }} labelStyle={{ color: "var(--foreground)", fontWeight: 600, borderBottom: "1px solid var(--border)", paddingBottom: 8, marginBottom: 8 }} itemStyle={{ fontSize: 12, fontVariantNumeric: "tabular-nums" }} formatter={(value, name) => [Number(value).toLocaleString("pt-BR"), name]} />
+              <Area name="Total" dataKey="total" type="monotone" stroke="var(--feedback-info)" strokeWidth={2} fill="url(#analytics-total-gradient)" />
+              <Area name="Sucesso" dataKey="success" type="monotone" stroke="var(--feedback-success)" strokeWidth={2} fill="url(#analytics-success-gradient)" />
+              <Area name="Erros" dataKey="errors" type="monotone" stroke="var(--feedback-error)" strokeWidth={2} fill="url(#analytics-error-gradient)" />
+            </AreaChart></ResponsiveContainer> : <Empty text={initialLoading ? "Carregando telemetria..." : "Sem dados no período"} />}</div></CardContent>
             </Card>
             <Card className="border-0 bg-card shadow-sm">
               <CardHeader><CardTitle className="flex items-center gap-2 text-base"><Workflow className="h-4 w-4 text-feedback-info" />Top workflows por volume</CardTitle></CardHeader>
-              <CardContent><div className="h-[300px]">{(dashboard?.workflowStats?.length ?? 0) > 0 ? <ResponsiveContainer width="100%" height="100%"><BarChart data={(dashboard?.workflowStats ?? []).slice(0, 8)} layout="vertical" margin={{ left: 20 }}><CartesianGrid horizontal={false} stroke="var(--border)" /><XAxis type="number" tick={{ fontSize: 10 }} /><YAxis type="category" dataKey="name" width={150} tick={{ fontSize: 10 }} /><Tooltip contentStyle={{ background: "var(--card)", borderColor: "var(--border)", color: "var(--foreground)" }} /><Bar dataKey="executions" fill="var(--feedback-info)" radius={[0, 6, 6, 0]} /></BarChart></ResponsiveContainer> : <Empty text={initialLoading ? "Carregando workflows..." : "Nenhum workflow com execuções"} />}</div></CardContent>
+              <CardContent><div className="h-[300px]">{(dashboard?.workflowStats?.length ?? 0) > 0 ? <ResponsiveContainer width="100%" height="100%"><BarChart data={(dashboard?.workflowStats ?? []).slice(0, 8)} layout="vertical" margin={{ left: 20 }}><CartesianGrid horizontal={false} stroke="var(--border)" strokeDasharray="3 3" strokeOpacity={0.6} /><XAxis type="number" tick={{ fontSize: 10, fill: "var(--muted-foreground)" }} tickLine={false} axisLine={false} allowDecimals={false} /><YAxis type="category" dataKey="name" width={150} tick={{ fontSize: 10, fill: "var(--muted-foreground)" }} tickLine={false} axisLine={false} /><Tooltip cursor={false} contentStyle={{ background: "var(--card)", border: "1px solid var(--border)", borderRadius: 12, color: "var(--foreground)", padding: "12px 16px", boxShadow: "0 8px 24px rgb(0 0 0 / 0.15)" }} labelStyle={{ color: "var(--foreground)", fontWeight: 600, borderBottom: "1px solid var(--border)", paddingBottom: 8, marginBottom: 8 }} itemStyle={{ fontSize: 12, fontVariantNumeric: "tabular-nums" }} formatter={(value, name) => [Number(value).toLocaleString("pt-BR"), name]} /><Bar name="Execuções" dataKey="executions" fill="var(--feedback-info)" radius={[0, 6, 6, 0]} /></BarChart></ResponsiveContainer> : <Empty text={initialLoading ? "Carregando workflows..." : "Nenhum workflow com execuções"} />}</div></CardContent>
             </Card>
           </div>
 
