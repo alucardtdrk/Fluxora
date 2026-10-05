@@ -5,7 +5,7 @@ import {
   AlertTriangle,
   BarChart3,
   Bell,
-  ChevronLeft,
+  PanelLeft,
   LayoutDashboard,
   LogOut,
   Search,
@@ -36,8 +36,19 @@ const operationItems = [
   { label: "Workspace Security", path: "/workspace-security", icon: ShieldCheck },
 ];
 
+function MonitoringRadar({ className }: { className?: string }) {
+  return <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" aria-hidden="true">
+    <path d="M16 3.34 A10 10 0 1 0 18.07 19.07" />
+    <path d="M14 6.28 A6.5 6.5 0 1 0 15.6 16.6" />
+    <path d="M12.08 8.67 A3.5 3.5 0 1 0 13.48 14.48" />
+    <path d="M11 12 L17.5 5.5" />
+    <circle cx="11" cy="12" r="1.5" fill="currentColor" stroke="none" />
+    <circle cx="20" cy="3.5" r="1.2" fill="currentColor" stroke="none" />
+  </svg>;
+}
+
 const baseManagementItems = [
-  { label: "Monitoramento", path: "/monitoring", icon: ShieldCheck },
+  { label: "Monitoramento", path: "/monitoring", icon: MonitoringRadar },
 ];
 const adminManagementItems = [
   { label: "Auditoria", path: "/audit", icon: ScrollText },
@@ -224,8 +235,8 @@ export default function OperationsShell({ children }: { children: React.ReactNod
   const navLink = ({ label, path, icon: Icon }: typeof allItems[number]) => (
     <Tooltip key={path} delayDuration={200}>
     <TooltipTrigger asChild>
-    <Link href={path} aria-label={label} className={`mb-1 flex w-full items-center gap-3 overflow-hidden rounded-xl px-3 py-2.5 text-sm transition-colors ${currentPath === path ? "bg-primary text-white shadow-lg shadow-[#11183D]/25" : "text-code-foreground/80 hover:bg-white/10"}`}>
-      <Icon className="h-[17px] w-[17px] shrink-0" />
+    <Link href={path} aria-label={label} aria-current={currentPath === path ? "page" : undefined} className={`group/sidebar-item focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/60 mb-1 flex w-full items-center gap-3 overflow-hidden rounded-xl px-3 py-2.5 text-sm transition-colors ${currentPath === path ? "bg-primary text-white shadow-lg shadow-[#11183D]/25" : "text-code-foreground/80 hover:bg-white/10"}`}>
+      <Icon className={`h-[17px] w-[17px] shrink-0 transition-[transform,color] duration-200 group-hover/sidebar-item:scale-110 group-focus-visible/sidebar-item:scale-110 motion-reduce:transform-none ${currentPath === path ? "scale-110 text-white" : "group-hover/sidebar-item:text-feedback-info group-focus-visible/sidebar-item:text-feedback-info"}`} />
       <span className="sidebar-label whitespace-nowrap" aria-hidden={collapsed}>{label}</span>
       {currentPath === path && <span className="sidebar-label ml-auto h-1.5 w-1.5 shrink-0 rounded-full bg-feedback-info" aria-hidden="true" />}
     </Link>
@@ -245,9 +256,9 @@ export default function OperationsShell({ children }: { children: React.ReactNod
             type="button"
             aria-expanded={!collapsed}
             aria-controls="fluxora-sidebar-nav"
-            className="absolute -right-3 top-1/2 grid h-6 w-6 -translate-y-1/2 place-items-center rounded-full border border-white/15 bg-[var(--fluxora-mirtilo)] text-code-foreground/70 hover:text-white"
+            className="absolute -right-4 top-1/2 grid h-8 w-8 -translate-y-1/2 place-items-center rounded-lg bg-[var(--fluxora-mirtilo)] text-code-foreground/70 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/60"
             aria-label={collapsed ? "Expandir sidebar" : "Recolher sidebar"}
-          ><ChevronLeft className="sidebar-chevron h-4 w-4" /></button>
+          ><PanelLeft aria-hidden="true" className="h-[22px] w-[22px]" /></button>
         </div>
 
         <nav id="fluxora-sidebar-nav" className="flex-1 overflow-x-hidden overflow-y-auto px-3 pt-5">

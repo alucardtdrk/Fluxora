@@ -75,6 +75,7 @@ export default function Executions() {
     { enabled: Boolean(user), retry: false, placeholderData: (previous) => previous },
   );
   const workflows = trpc.n8n.workflows.useQuery(undefined, { enabled: Boolean(user), retry: false });
+  const refreshing = executions.isFetching || workflows.isFetching;
   const items = executions.data?.items ?? [];
   const total = executions.data?.total ?? 0;
   const currentPage = executions.data?.page ?? page;
@@ -123,8 +124,8 @@ export default function Executions() {
               <h2 className="mt-3 text-4xl font-semibold tracking-[-.06em]">Execuções</h2>
               <p className="mt-2 text-sm text-muted-foreground">Histórico consolidado do n8n e Firestore, sem duplicar IDs.</p>
             </div>
-            <Button onClick={refresh} className="rounded-xl bg-primary text-primary-foreground">
-              <RefreshCw className={`mr-2 h-4 w-4 ${executions.isFetching ? "animate-spin" : ""}`} />Atualizar
+            <Button onClick={refresh} disabled={refreshing} aria-busy={refreshing} className="rounded-xl bg-primary text-primary-foreground">
+              <RefreshCw className={`mr-2 h-4 w-4 ${refreshing ? "animate-spin" : ""}`} />{refreshing ? "Atualizando…" : "Atualizar"}
             </Button>
           </div>
 

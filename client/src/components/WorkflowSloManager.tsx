@@ -48,7 +48,7 @@ export default function WorkflowSloManager() {
       <div><Label>Workflow</Label><Select value={workflowId} onValueChange={setWorkflowId}><SelectTrigger className="mt-2"><SelectValue placeholder="Selecione um workflow" /></SelectTrigger><SelectContent>{items.map((workflow) => <SelectItem key={workflow.id} value={workflow.id}>{workflow.name}</SelectItem>)}</SelectContent></Select></div>
       <div><Label>Sucesso mínimo (%)</Label><Input className="mt-2" type="number" min="0" max="100" step="0.1" value={successTarget} onChange={(event) => setSuccessTarget(event.target.value)} /></div>
       <div><Label>Tempo máximo para 95% (segundos)</Label><Input className="mt-2" type="number" min="0.1" step="0.1" value={p95Target} onChange={(event) => setP95Target(event.target.value)} /></div>
-      <div className="flex items-center gap-3 md:pb-2"><Switch checked={enabled} onCheckedChange={setEnabled} /><Label>Ativa</Label></div>
+      <div className="flex items-center gap-3 md:pb-2"><Switch id="workflow-slo-enabled" checked={enabled} disabled={save.isPending} aria-busy={save.isPending} onCheckedChange={setEnabled} /><Label htmlFor="workflow-slo-enabled">{save.isPending ? "Salvando…" : "Ativa"}</Label></div>
       <Button className="bg-primary hover:bg-primary/90 md:col-span-full md:w-fit" disabled={!workflowId || save.isPending} onClick={submit}>{save.isPending ? "Salvando…" : "Salvar meta"}</Button>
     </CardContent>
   </Card>;
