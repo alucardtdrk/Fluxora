@@ -18,6 +18,7 @@ import {
 import { toast } from "sonner";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { Button } from "@/components/ui/button";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { trpc } from "@/lib/trpc";
@@ -221,11 +222,16 @@ export default function OperationsShell({ children }: { children: React.ReactNod
   };
 
   const navLink = ({ label, path, icon: Icon }: typeof allItems[number]) => (
-    <Link key={path} href={path} aria-label={label} title={collapsed ? label : undefined} className={`mb-1 flex w-full items-center gap-3 overflow-hidden rounded-xl px-3 py-2.5 text-sm transition-colors ${currentPath === path ? "bg-primary text-white shadow-lg shadow-[#11183D]/25" : "text-code-foreground/80 hover:bg-white/10"}`}>
+    <Tooltip key={path} delayDuration={200}>
+    <TooltipTrigger asChild>
+    <Link href={path} aria-label={label} className={`mb-1 flex w-full items-center gap-3 overflow-hidden rounded-xl px-3 py-2.5 text-sm transition-colors ${currentPath === path ? "bg-primary text-white shadow-lg shadow-[#11183D]/25" : "text-code-foreground/80 hover:bg-white/10"}`}>
       <Icon className="h-[17px] w-[17px] shrink-0" />
       <span className="sidebar-label whitespace-nowrap" aria-hidden={collapsed}>{label}</span>
       {currentPath === path && <span className="sidebar-label ml-auto h-1.5 w-1.5 shrink-0 rounded-full bg-feedback-info" aria-hidden="true" />}
     </Link>
+    </TooltipTrigger>
+    {collapsed && <TooltipContent side="right" sideOffset={12}>{label}</TooltipContent>}
+    </Tooltip>
   );
 
   return (

@@ -124,6 +124,7 @@ export default function WorkflowDetail() {
 
   const canOperate = user?.role === "admin" || user?.role === "operator";
   const canRestore = user?.role === "admin";
+  const refreshing = workflowDetail.isFetching || executions.isFetching || executionDetail.isFetching;
 
   const refreshAll = async () => {
     await Promise.all([workflowDetail.refetch(), executions.refetch(), executionDiagramId ? executionDetail.refetch() : Promise.resolve()]);
@@ -161,8 +162,8 @@ export default function WorkflowDetail() {
             </div>
             <div className="flex flex-wrap gap-2">
               {workflowDetail.data?.editorUrl ? <Button variant="outline" onClick={() => window.open(workflowDetail.data?.editorUrl || "", "_blank", "noopener,noreferrer")}><ExternalLink className="mr-2 h-4 w-4" />Abrir no n8n</Button> : null}
-              {canOperate ? <Button variant="outline" onClick={toggle}><Play className="mr-2 h-4 w-4" />{workflow.active ? "Desativar" : "Ativar"}</Button> : null}
-              <Button onClick={refreshAll} className="bg-primary text-primary-foreground"><RefreshCw className="mr-2 h-4 w-4" />Atualizar</Button>
+              {canOperate ? <Button variant="outline" onClick={toggle} disabled={toggleWorkflow.isPending || workflowDetail.isFetching} aria-busy={toggleWorkflow.isPending}>{toggleWorkflow.isPending ? <RefreshCw className="mr-2 h-4 w-4 animate-spin" /> : <Play className="mr-2 h-4 w-4" />}{toggleWorkflow.isPending ? (workflow.active ? "Desativando…" : "Ativando…") : workflow.active ? "Desativar" : "Ativar"}</Button> : null}
+              <Button onClick={refreshAll} disabled={refreshing} aria-busy={refreshing} className="bg-primary text-primary-foreground"><RefreshCw className={`mr-2 h-4 w-4 ${refreshing ? "animate-spin" : ""}`} />{refreshing ? "Atualizando…" : "Atualizar"}</Button>
             </div>
           </div>
 
