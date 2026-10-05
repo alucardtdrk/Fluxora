@@ -7,6 +7,8 @@ const NODE_WIDTH = 180;
 const NODE_MIDDLE_Y = 52;
 const NODE_OUT_X = NODE_WIDTH - 10;
 const NODE_IN_X = 10;
+const POSITION_SCALE_X = 1.6;
+const POSITION_SCALE_Y = 1.5;
 
 type DiagramNode = {
   name: string;
@@ -83,8 +85,8 @@ export default function WorkflowDiagram({ nodes, connections, selectedNodeName, 
     return {
       minX,
       minY,
-      width: maxX - minX + 520,
-      height: maxY - minY + 360,
+      width: (maxX - minX) * POSITION_SCALE_X + 520,
+      height: (maxY - minY) * POSITION_SCALE_Y + 360,
       offsetX: 140 - minX,
       offsetY: 100 - minY,
     };
@@ -101,8 +103,8 @@ export default function WorkflowDiagram({ nodes, connections, selectedNodeName, 
 
   function displayPosition(node: DiagramNode) {
     return {
-      x: Number(node.position?.[0] || 0) + layout.offsetX,
-      y: Number(node.position?.[1] || 0) + layout.offsetY,
+      x: (Number(node.position?.[0] || 0) - layout.minX) * POSITION_SCALE_X + 140,
+      y: (Number(node.position?.[1] || 0) - layout.minY) * POSITION_SCALE_Y + 100,
     };
   }
 
