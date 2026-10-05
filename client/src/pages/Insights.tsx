@@ -41,7 +41,7 @@ function Header({ title, description, period, setPeriod, refresh, loading }: { t
             <SelectTrigger className="w-[160px] bg-card"><SelectValue /></SelectTrigger>
             <SelectContent>{(Object.keys(periodLabels) as Period[]).map((value) => <SelectItem key={value} value={value}>{periodLabels[value]}</SelectItem>)}</SelectContent>
           </Select>
-          <Button onClick={refresh} className="rounded-xl bg-primary text-primary-foreground"><RefreshCw className={`mr-2 h-4 w-4 ${loading ? "animate-spin" : ""}`} />Atualizar</Button>
+          <Button onClick={refresh} disabled={loading} aria-busy={loading} className="rounded-xl bg-primary text-primary-foreground"><RefreshCw className={`mr-2 h-4 w-4 ${loading ? "animate-spin" : ""}`} />{loading ? "Atualizando…" : "Atualizar"}</Button>
         </div>
       </div>
     </>
