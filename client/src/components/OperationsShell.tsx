@@ -254,7 +254,6 @@ export default function OperationsShell({ children }: { children: React.ReactNod
             <DropdownMenuContent side="top" align={collapsed ? "center" : "end"} className="w-56">
               <DropdownMenuLabel className="font-normal"><p className="truncate text-sm font-semibold">{user.name}</p><p className="mt-1 truncate text-xs text-muted-foreground">{user.email}</p></DropdownMenuLabel>
               <DropdownMenuSeparator />
-              <DropdownMenuItem onClick={() => setLocation("/settings")}><Settings2 className="mr-2 h-4 w-4" />Configurações</DropdownMenuItem>
               <DropdownMenuItem onClick={() => logout()} className="text-destructive focus:text-destructive"><LogOut className="mr-2 h-4 w-4" />Sair</DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
@@ -305,7 +304,6 @@ export default function OperationsShell({ children }: { children: React.ReactNod
               <DropdownMenuContent align="end" className="w-56 lg:hidden">
                 <DropdownMenuLabel className="font-normal"><p className="truncate text-sm font-semibold">{user.name}</p><p className="mt-1 truncate text-xs text-muted-foreground">{user.email}</p></DropdownMenuLabel>
                 <DropdownMenuSeparator />
-                <DropdownMenuItem onClick={() => setLocation("/settings")}><Settings2 className="mr-2 h-4 w-4" />Configurações</DropdownMenuItem>
                 <DropdownMenuItem onClick={() => logout()} className="text-destructive focus:text-destructive"><LogOut className="mr-2 h-4 w-4" />Sair</DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
