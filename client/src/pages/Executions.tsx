@@ -4,6 +4,7 @@ import { Link, useSearchParams } from "wouter";
 import { toast } from "sonner";
 import { useAuth } from "@/_core/hooks/useAuth";
 import OperationsShell from "@/components/OperationsShell";
+import PeriodFilter from "@/components/PeriodFilter";
 import ExecutionDetailDialog from "@/components/ExecutionDetailDialog";
 import ExecutionComparisonDialog from "@/components/ExecutionComparisonDialog";
 import { Badge } from "@/components/ui/badge";
@@ -129,21 +130,7 @@ export default function Executions() {
             </Button>
           </div>
 
-          <div className="mb-4 flex flex-wrap rounded-xl border bg-card p-1">
-            {periods.map(([value, text]) => (
-              <button
-                key={value}
-                type="button"
-                onClick={() => {
-                  setPeriod(value);
-                  setPage(1);
-                }}
-                className={`rounded-lg px-3 py-2 text-xs font-semibold ${period === value ? "bg-foreground text-background" : "text-muted-foreground"}`}
-              >
-                {text}
-              </button>
-            ))}
-          </div>
+          <PeriodFilter className="mb-4" value={period} options={periods} onChange={(value) => { setPeriod(value); setPage(1); }} />
 
           {executions.data?.truncated && (
             <div className="mb-4 rounded-xl border border-feedback-error-border bg-feedback-error-surface p-3 text-xs text-feedback-error">
@@ -151,7 +138,7 @@ export default function Executions() {
             </div>
           )}
 
-          {comparisonSelection.length > 0 ? <div className="mb-4 flex flex-col justify-between gap-3 rounded-xl border border-border bg-feedback-info-surface p-4 sm:flex-row sm:items-center"><div><p className="text-sm font-semibold">Comparação de execuções</p><p className="mt-1 text-xs text-muted-foreground">{comparisonSelection.length === 1 ? "Selecione mais uma execução do mesmo workflow." : `Pronto para comparar #${comparisonSelection[0].id} e #${comparisonSelection[1].id}.`}</p></div><div className="flex gap-2"><Button variant="ghost" size="sm" onClick={() => setComparisonSelection([])}><X className="mr-1 h-4 w-4" />Limpar</Button><Button size="sm" className="bg-primary hover:bg-primary/90" disabled={comparisonSelection.length !== 2} onClick={() => setComparisonOpen(true)}><GitCompareArrows className="mr-2 h-4 w-4" />Comparar</Button></div></div> : null}
+          {comparisonSelection.length > 0 ? <div className="mb-4 flex flex-col justify-between gap-3 rounded-xl border border-border bg-feedback-info-surface p-4 sm:flex-row sm:items-center"><div><p className="text-sm font-semibold">Comparação de execuções</p><p className="mt-1 text-xs text-muted-foreground">{comparisonSelection.length === 1 ? "Selecione mais uma execução do mesmo workflow." : `Pronto para comparar #${comparisonSelection[0].id} e #${comparisonSelection[1].id}.`}</p></div><div className="flex gap-2"><Button variant="ghost" size="sm" className="fluxora-action" onClick={() => setComparisonSelection([])}><X className="mr-1 h-4 w-4" />Limpar</Button><Button size="sm" className="bg-primary hover:bg-primary/90" disabled={comparisonSelection.length !== 2} onClick={() => setComparisonOpen(true)}><GitCompareArrows className="mr-2 h-4 w-4" />Comparar</Button></div></div> : null}
 
           <Card className="border-0 bg-card shadow-[0_10px_30px_rgba(41,54,115,.06)]">
             <CardHeader>
@@ -222,14 +209,14 @@ export default function Executions() {
                         <span className="justify-self-center text-center text-xs text-muted-foreground">{item.duration != null ? `${item.duration}s` : "-"}</span>
                         <Badge className={`w-fit justify-self-center ${item.source === "firestore" ? "bg-feedback-info-surface text-feedback-info" : "bg-feedback-success-surface text-feedback-success"}`}>{item.source === "firestore" ? "Arquivo" : "n8n"}</Badge>
                         <span className="justify-self-center font-mono text-[11px] text-muted-foreground">#{item.id}</span>
-                        <Button variant="outline" size="sm" aria-label={`Ver detalhes da execução ${item.id} de ${item.workflowName}`} onClick={() => setSelected(item.id)} className="w-fit justify-self-end rounded-lg text-xs"><Eye className="mr-2 h-3.5 w-3.5" />Ver detalhes</Button>
+                        <Button variant="outline" size="sm" aria-label={`Ver detalhes da execução ${item.id} de ${item.workflowName}`} onClick={() => setSelected(item.id)} className="fluxora-action w-fit justify-self-end rounded-lg text-xs"><Eye className="mr-2 h-3.5 w-3.5" />Ver detalhes</Button>
                       </div>
                     ))}
                     {items.length === 0 && <div role="status" className="flex flex-col items-center px-6 py-16 text-center">
                       <Timer aria-hidden="true" className="h-8 w-8 text-muted-foreground" />
                       <p className="mt-3 text-sm font-semibold text-foreground">{executions.isFetching ? "Atualizando resultados…" : hasFilters ? "Nenhuma execução para estes filtros" : "Nenhuma execução disponível"}</p>
                       <p className="mt-1 max-w-sm text-xs leading-5 text-muted-foreground">{executions.isFetching ? "Aguarde a consulta do histórico." : hasFilters ? "Limpe a busca, o status, o workflow e o período para consultar todo o histórico disponível." : "As execuções aparecerão aqui quando houver registros disponíveis para consulta."}</p>
-                      {!executions.isFetching && hasFilters && <Button variant="outline" size="sm" className="mt-4" onClick={clearFilters}><X aria-hidden="true" className="mr-2 h-4 w-4" />Limpar filtros</Button>}
+                      {!executions.isFetching && hasFilters && <Button variant="outline" size="sm" className="fluxora-action mt-4" onClick={clearFilters}><X aria-hidden="true" className="mr-2 h-4 w-4" />Limpar filtros</Button>}
                     </div>}
                   </div>
                   <div className="flex flex-col gap-3 border-t px-6 py-4 text-xs text-muted-foreground md:flex-row md:items-center md:justify-between">

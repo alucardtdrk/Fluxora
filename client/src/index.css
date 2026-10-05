@@ -412,6 +412,18 @@ button:active { transform: scale(0.98); }
 }
 .fluxora-sidebar[data-collapsed="true"] .sidebar-section-management { margin-top: 12px; }
 
+.fluxora-action {
+  cursor: pointer;
+  transition: background-color 160ms ease, color 160ms ease, border-color 160ms ease, box-shadow 160ms ease;
+}
+.fluxora-action:not(:disabled):hover,
+.fluxora-action:not(:disabled):focus-visible {
+  background-color: var(--primary);
+  color: var(--primary-foreground);
+  border-color: var(--primary);
+  box-shadow: 0 3px 10px color-mix(in srgb, var(--primary) 25%, transparent);
+}
+
 .execution-steps [data-slot="accordion-content"][data-state="open"] {
   animation: execution-step-open 200ms ease-out;
 }

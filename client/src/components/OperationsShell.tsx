@@ -5,7 +5,7 @@ import {
   AlertTriangle,
   BarChart3,
   Bell,
-  PanelLeft,
+  ChevronLeft,
   LayoutDashboard,
   LogOut,
   Search,
@@ -256,9 +256,9 @@ export default function OperationsShell({ children }: { children: React.ReactNod
             type="button"
             aria-expanded={!collapsed}
             aria-controls="fluxora-sidebar-nav"
-            className="absolute -right-4 top-1/2 grid h-8 w-8 -translate-y-1/2 place-items-center rounded-lg bg-[var(--fluxora-mirtilo)] text-code-foreground/70 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/60"
+            className="absolute -right-4 top-1/2 grid h-8 w-8 -translate-y-1/2 place-items-center rounded-full border-2 border-white/30 bg-[var(--fluxora-mirtilo)] text-white shadow-md hover:border-white/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/60"
             aria-label={collapsed ? "Expandir sidebar" : "Recolher sidebar"}
-          ><PanelLeft aria-hidden="true" className="h-[22px] w-[22px]" /></button>
+          ><ChevronLeft aria-hidden="true" className={`h-5 w-5 transition-transform duration-200 motion-reduce:transition-none ${collapsed ? "rotate-180" : ""}`} /></button>
         </div>
 
         <nav id="fluxora-sidebar-nav" className="flex-1 overflow-x-hidden overflow-y-auto px-3 pt-5">
