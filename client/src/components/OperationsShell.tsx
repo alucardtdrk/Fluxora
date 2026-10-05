@@ -9,12 +9,10 @@ import {
   ChevronRight,
   LayoutDashboard,
   LogOut,
-  Moon,
   Search,
   ScrollText,
   Settings2,
   ShieldCheck,
-  Sun,
   Workflow,
   Users,
 } from "lucide-react";
@@ -279,8 +277,10 @@ export default function OperationsShell({ children }: { children: React.ReactNod
               <span className="flex items-center gap-2"><Search className="h-4 w-4" />Buscar no Fluxora</span>
               <kbd className="rounded-md border bg-background px-1.5 py-0.5 text-[10px]">Ctrl K</kbd>
             </Button>
-            <Button type="button" variant="ghost" size="icon" onClick={toggleTheme} className="rounded-xl text-muted-foreground" aria-label={theme === "dark" ? "Usar tema claro" : "Usar tema escuro"}>
-              {theme === "dark" ? <Sun className="h-[18px] w-[18px]" /> : <Moon className="h-[18px] w-[18px]" />}
+            <Button type="button" variant="ghost" size="icon" onClick={toggleTheme} style={{ viewTransitionName: "theme-toggle" }} className="rounded-xl text-muted-foreground" aria-label={theme === "dark" ? "Usar tema claro" : "Usar tema escuro"}>
+              <span aria-hidden="true" className={`theme-orb ${theme === "dark" ? "theme-orb-dark" : ""}`}>
+                <span className="theme-orb-core" />
+              </span>
             </Button>
             <Popover onOpenChange={(open) => open && markNotificationsRead()}>
               <PopoverTrigger asChild>
