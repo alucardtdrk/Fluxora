@@ -424,10 +424,10 @@ button:active { transform: scale(0.98); }
   box-shadow: 0 3px 10px color-mix(in srgb, var(--primary) 25%, transparent);
 }
 
-.execution-steps [data-slot="accordion-content"][data-state="open"] {
+[data-slot="accordion-content"][data-state="open"] {
   animation: execution-step-open 200ms ease-out;
 }
-.execution-steps [data-slot="accordion-content"][data-state="closed"] {
+[data-slot="accordion-content"][data-state="closed"] {
   animation: execution-step-close 180ms ease-in;
 }
 @keyframes execution-step-open {
