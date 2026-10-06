@@ -343,12 +343,12 @@ export async function deleteFirestoreDocument(collection: string, id: string) {
   return { deleted: true };
 }
 
-export async function countFirestoreCollection(collection: string) {
+export async function countFirestoreCollection(collection: string, where?: FirestoreRecord) {
   const response = await firestoreFetch(":runAggregationQuery", {
     method: "POST",
     body: JSON.stringify({
       structuredAggregationQuery: {
-        structuredQuery: { from: [{ collectionId: collection }] },
+        structuredQuery: { from: [{ collectionId: collection }], ...(where ? { where } : {}) },
         aggregations: [{ alias: "total", count: {} }],
       },
     }),

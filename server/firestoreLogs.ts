@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import {
   commitFirestoreDocuments,
   countFirestoreCollection,
@@ -44,12 +45,18 @@ export type ArchivedExecution = {
   detailsAvailable?: boolean;
   detailFetchAttemptedAt?: string;
   detailUnavailable?: boolean;
+  detailsPending?: boolean;
+  summaryHash?: string;
+  detailsHash?: string;
   archiveRunId?: string;
   archivedAt?: string;
   archiveVersion?: number;
 };
 
 export type ArchiveSyncState = {
+  detailsQueueVersion?: number;
+  detailsQueueOffset?: number;
+  activeExecutionIds?: string[];
   backfillStarted?: boolean;
   backfillComplete?: boolean;
   backfillCursor?: string | null;
@@ -136,15 +143,59 @@ export async function saveArchivedExecutions(executions: ArchivedExecution[]) {
     if (!execution.executionId) continue;
     unique.set(String(execution.executionId), execution);
   }
+  const existing = new Map<string, FirestoreRecord>();
+  const ids = Array.from(unique.keys());
+  for (let offset = 0; offset < ids.length; offset += 10) {
+    const records = await runFirestoreQuery({
+      from: [{ collectionId: logsCollection() }],
+      select: { fields: ["executionId", "summaryHash", "detailsHash", "detailsAvailable", "detailFetchAttemptedAt", "detailUnavailable"].map((fieldPath) => ({ fieldPath })) },
+      where: { fieldFilter: { field: { fieldPath: "executionId" }, op: "IN", value: { arrayValue: { values: ids.slice(offset, offset + 10).map((id) => ({ stringValue: id })) } } } },
+    });
+    for (const record of records) existing.set(String(record.executionId), record);
+  }
+  const changed: ArchivedExecution[] = [];
+  for (const execution of unique.values()) {
+    const previous = existing.get(execution.executionId);
+    const summary = Object.fromEntries(["executionId", "workflowId", "workflowName", "sectionName", "status", "mode", "startedAt", "stoppedAt", "duration", "finished", "retryOf", "retrySuccessId", "archiveRunId", "archiveVersion"].map((key) => [key, (execution as FirestoreRecord)[key]]));
+    const summaryHash = createHash("sha256").update(JSON.stringify(summary)).digest("hex");
+    const detailsHash = execution.detailsAvailable ? createHash("sha256").update(JSON.stringify([execution.nodes, execution.nodeMetrics, execution.error, execution.lastNodeExecuted])).digest("hex") : undefined;
+    const detailUnavailable = execution.detailsAvailable ? false : execution.detailUnavailable;
+    if (previous?.summaryHash === summaryHash && (!execution.detailsAvailable || previous.detailsHash === detailsHash) && (execution.detailFetchAttemptedAt === undefined || execution.detailFetchAttemptedAt === previous.detailFetchAttemptedAt) && (detailUnavailable === undefined || detailUnavailable === previous.detailUnavailable)) continue;
+    changed.push({ ...execution, summaryHash, detailsHash, detailUnavailable, detailsPending: !(execution.detailsAvailable || previous?.detailsAvailable || execution.detailFetchAttemptedAt || previous?.detailFetchAttemptedAt) });
+  }
+  if (!changed.length) return { writes: 0 };
   return commitFirestoreDocuments(
     logsCollection(),
-    Array.from(unique.values()).map((execution) => ({ id: String(execution.executionId), data: execution as FirestoreRecord })),
+    changed.map((execution) => ({ id: String(execution.executionId), data: execution as FirestoreRecord })),
   );
 }
 
 export async function saveArchivedExecution(execution: ArchivedExecution) {
   if (!execution.executionId) return null;
-  return setFirestoreDocument(logsCollection(), String(execution.executionId), execution as FirestoreRecord);
+  await saveArchivedExecutions([execution]);
+  return execution;
+}
+
+export async function getArchiveDetailBatch(limit: number) {
+  let state = await getArchiveSyncState();
+  if (state.detailsQueueVersion !== 1) {
+    // ponytail: one bounded preparation page per cycle; offsets are used only for this legacy setup.
+    const history = await listArchivedExecutions("all", true, { limit: 1000, offset: state.detailsQueueOffset ?? 0 });
+    await commitFirestoreDocuments(logsCollection(), history.items.map((item) => ({
+      id: item.id, data: { executionId: item.id, detailsPending: !item.detailsAvailable && !item.detailFetchAttemptedAt },
+    })));
+    state = { ...await getArchiveSyncState(), detailsQueueVersion: history.hasMore ? undefined : 1, detailsQueueOffset: (state.detailsQueueOffset ?? 0) + history.rowsRead };
+    await setArchiveSyncState(state);
+  }
+  const filter = (fieldPath: string) => ({ fieldFilter: { field: { fieldPath }, op: "EQUAL", value: { booleanValue: true } } });
+  const [records, available, queued, unavailable] = await Promise.all([
+    runFirestoreQuery({ from: [{ collectionId: logsCollection() }], select: { fields: ["executionId", "archiveRunId"].map((fieldPath) => ({ fieldPath })) }, where: filter("detailsPending"), limit }),
+    countFirestoreCollection(logsCollection(), filter("detailsAvailable")),
+    countFirestoreCollection(logsCollection(), filter("detailsPending")),
+    countFirestoreCollection(logsCollection(), filter("detailUnavailable")),
+  ]);
+  const pending = state.detailsQueueVersion === 1 ? queued : Math.max(queued, (await countFirestoreCollection(logsCollection())) - available - unavailable);
+  return { candidates: records.map((record) => ({ id: String(record.executionId || record._documentId), archiveRunId: record.archiveRunId ? String(record.archiveRunId) : undefined })), available, pending, unavailable, queueState: { detailsQueueVersion: state.detailsQueueVersion, detailsQueueOffset: state.detailsQueueOffset } };
 }
 
 export async function getArchivedExecution(id: string): Promise<ArchivedExecution | null> {
@@ -153,7 +204,7 @@ export async function getArchivedExecution(id: string): Promise<ArchivedExecutio
   return document as unknown as ArchivedExecution;
 }
 
-export async function listArchivedExecutions(period: ArchivePeriod, includeLegacy = false, page?: { limit: number }) {
+export async function listArchivedExecutions(period: ArchivePeriod, includeLegacy = false, page?: { limit: number; offset?: number }) {
   const activeArchiveRunId = includeLegacy ? null : (await getArchiveSyncState()).activeArchiveRunId || null;
   const limit = Math.min(page?.limit ?? readLimit(), readLimit());
   const cutoff = periodCutoff(period);
@@ -162,6 +213,7 @@ export async function listArchivedExecutions(period: ArchivePeriod, includeLegac
     from: [{ collectionId: logsCollection() }],
     orderBy: [{ field: { fieldPath: "startedAt" }, direction: "DESCENDING" }],
     limit,
+    ...(page?.offset ? { offset: page.offset } : {}),
   };
   if (cutoff) {
     structuredQuery.where = {
@@ -205,7 +257,7 @@ export async function listArchivedExecutions(period: ArchivePeriod, includeLegac
     }))
     .filter((row) => row.id && row.id !== "teste_inicial" && (!activeArchiveRunId || row.archiveRunId === activeArchiveRunId));
 
-  return { items, truncated: (period !== "all" || Boolean(page)) && rows.length >= readLimit(), hasMore: Boolean(page) && rows.length >= limit };
+  return { items, rowsRead: rows.length, truncated: (period !== "all" || Boolean(page)) && rows.length >= readLimit(), hasMore: Boolean(page) && rows.length >= limit };
 }
 
 export async function getArchiveSyncState(): Promise<ArchiveSyncState> {
