@@ -156,9 +156,11 @@ export default function OperationsShell({ children }: { children: React.ReactNod
   });
   const workflows = trpc.n8n.workflows.useQuery(undefined, { enabled: Boolean(user), retry: false });
   const notificationState = trpc.notifications.readState.useQuery(undefined, { enabled: Boolean(user), retry: false });
-  const markRead = trpc.notifications.markRead.useMutation();
+  const markRead = trpc.notifications.markRead.useMutation({
+    onError: () => toast.error("Não foi possível salvar a leitura das notificações. Abra o sino novamente para tentar."),
+  });
   const initializedRef = useRef(false);
-  const lastNotifiedIdRef = useRef<string | null>(null);
+  const notifiedStorageKey = `fluxoraNotifiedErrors:${user?.email ?? ""}`;
 
   const recentErrors = useMemo(() => (executions.data?.items ?? [])
     .filter((item: any) => ["error", "failed", "crashed"].includes(String(item.status || "").toLowerCase()))
@@ -184,22 +186,23 @@ export default function OperationsShell({ children }: { children: React.ReactNod
   }, []);
 
   useEffect(() => {
-    if (!notificationState.data || initializedRef.current) return;
+    if (!notificationState.data || !executions.data || initializedRef.current) return;
     initializedRef.current = true;
     if (!notificationState.data.initialized && recentErrors.length > 0) {
       const ids = recentErrors.map((item: any) => String(item.id));
       utils.notifications.readState.setData(undefined, { ...notificationState.data, initialized: true, seenErrorExecutionIds: ids });
       markRead.mutate({ executionIds: ids });
     }
-  }, [markRead, notificationState.data, recentErrors, utils.notifications.readState]);
+  }, [executions.data, markRead, notificationState.data, recentErrors, utils.notifications.readState]);
 
   useEffect(() => {
     if (!notificationState.data?.initialized || unread.length === 0) return;
     const newest = unread[0] as any;
-    if (lastNotifiedIdRef.current === String(newest.id)) return;
-    lastNotifiedIdRef.current = String(newest.id);
-    toast.error(`Falha detectada: ${newest.workflowName || "Workflow"}`, { description: `Execução #${newest.id}` });
-  }, [notificationState.data?.initialized, unread]);
+    const notifiedIds = (sessionStorage.getItem(notifiedStorageKey) ?? "").split(",");
+    if (notifiedIds.includes(String(newest.id))) return;
+    sessionStorage.setItem(notifiedStorageKey, [String(newest.id), ...notifiedIds].slice(0, 250).join(","));
+    toast.error(`Falha detectada: ${newest.workflowName || "Workflow"}`, { id: `${notifiedStorageKey}:${newest.id}`, description: `Execução #${newest.id}` });
+  }, [notificationState.data?.initialized, notifiedStorageKey, unread]);
 
   if (loading) return <div className="grid min-h-screen place-items-center bg-background ">
     <div role="status" aria-live="polite" className="flex flex-col items-center gap-4">
@@ -221,9 +224,11 @@ export default function OperationsShell({ children }: { children: React.ReactNod
   const visibleItems = [...operationItems, ...visibleManagementItems];
   const currentPath = location.split("?")[0];
   const currentTitle = visibleItems.find((item) => item.path === currentPath)?.label ?? "Fluxora";
-  const markNotificationsRead = () => {
-    const ids = recentErrors.map((item: any) => String(item.id));
-    const current = notificationState.data ?? { configured: false, initialized: true, seenErrorExecutionIds: [] };
+  const markNotificationsRead = async () => {
+    recentErrors.forEach((item: any) => toast.dismiss(`${notifiedStorageKey}:${item.id}`));
+    await utils.notifications.readState.cancel();
+    const current = utils.notifications.readState.getData() ?? { configured: false, initialized: true, seenErrorExecutionIds: [] };
+    const ids = [...new Set([...recentErrors.map((item: any) => String(item.id)), ...current.seenErrorExecutionIds])].slice(0, 250);
     utils.notifications.readState.setData(undefined, { ...current, initialized: true, seenErrorExecutionIds: ids });
     markRead.mutate({ executionIds: ids });
   };

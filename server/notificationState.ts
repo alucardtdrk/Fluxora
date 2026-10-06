@@ -24,7 +24,8 @@ export async function getNotificationReadState(email: string) {
 }
 
 export async function saveNotificationReadState(email: string, executionIds: string[]) {
-  const ids = [...new Set(executionIds.map(String))].slice(0, MAX_SEEN_EXECUTIONS);
+  const previous = await getNotificationReadState(email);
+  const ids = [...new Set([...executionIds.map(String), ...previous.seenErrorExecutionIds])].slice(0, MAX_SEEN_EXECUTIONS);
   if (!isFirestoreConfigured()) {
     return { configured: false, initialized: true, seenErrorExecutionIds: ids };
   }
