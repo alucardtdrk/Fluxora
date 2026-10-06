@@ -57,7 +57,9 @@ async function cached<T>(key: string, ttlMs: number, staleMs: number, loader: ()
     if (!current.promise) {
       const refresh = loader()
         .then((value) => {
-          runtimeCache.set(key, { value, expiresAt: Date.now() + ttlMs, staleUntil: Date.now() + staleMs });
+          if ((runtimeCache.get(key) as CacheEntry<T> | undefined)?.promise === refresh) {
+            runtimeCache.set(key, { value, expiresAt: Date.now() + ttlMs, staleUntil: Date.now() + staleMs });
+          }
           return value;
         })
         .catch(() => current.value as T)
@@ -76,7 +78,9 @@ async function cached<T>(key: string, ttlMs: number, staleMs: number, loader: ()
   const entry: CacheEntry<T> = { expiresAt: 0, staleUntil: 0 };
   const promise = loader()
     .then((value) => {
-      runtimeCache.set(key, { value, expiresAt: Date.now() + ttlMs, staleUntil: Date.now() + staleMs });
+      if ((runtimeCache.get(key) as CacheEntry<T> | undefined)?.promise === promise) {
+        runtimeCache.set(key, { value, expiresAt: Date.now() + ttlMs, staleUntil: Date.now() + staleMs });
+      }
       return value;
     })
     .finally(() => {
@@ -90,6 +94,13 @@ async function cached<T>(key: string, ttlMs: number, staleMs: number, loader: ()
 
 function invalidateCache(prefix: string) {
   for (const key of runtimeCache.keys()) if (key.startsWith(prefix)) runtimeCache.delete(key);
+}
+
+export function invalidateN8nCache() {
+  invalidateCache("dashboard:");
+  invalidateCache("executions:");
+  invalidateCache("archive:");
+  invalidateCache("workflows");
 }
 
 export class N8nIntegrationError extends Error {
@@ -633,6 +644,7 @@ export async function syncN8nArchive(options: { recentPages?: number; backfillPa
     const { workflows } = await loadWorkflows();
     const names = workflowMap(workflows);
     let state = await getArchiveSyncState();
+    const stateBeforeSyncComplete = state.backfillComplete;
     state = { ...state, lastRunStartedAt: runStartedAt, lastRunStatus: "running", lastRunTrigger: runTrigger, lastError: null };
     await setArchiveSyncState(state);
     // A distinct run id prevents documents left by an older retention window
@@ -650,7 +662,7 @@ export async function syncN8nArchive(options: { recentPages?: number; backfillPa
         sourceCountCheckedAt: undefined,
       };
     }
-    if (!Number.isFinite(state.sourceExecutionCount) || state.backfillComplete) {
+    if (!Number.isFinite(state.sourceExecutionCount) && !state.backfillComplete) {
       state = {
         ...state,
         sourceExecutionCount: await countAvailableExecutions(),
@@ -692,6 +704,7 @@ export async function syncN8nArchive(options: { recentPages?: number; backfillPa
       await setArchiveSyncState(state);
       invalidateCache("archive:");
       invalidateCache("executions:");
+      invalidateCache("dashboard:");
       return {
         status: "ok" as const,
         processed: Number(state.sourceExecutionCount || 0),
@@ -794,7 +807,9 @@ export async function syncN8nArchive(options: { recentPages?: number; backfillPa
         detailsUnavailable: details.unavailable,
       };
     }
-    if (backfillComplete) {
+    const reconciledAt = Date.parse(state.reconciliationCheckedAt || "");
+    // ponytail: keep a full daily check; incomplete or failed checks are retried immediately.
+    if (backfillComplete && (runTrigger === "scheduled" || stateBeforeSyncComplete !== true || state.missingExecutionCount !== 0 || state.reconciliationTruncated || !Number.isFinite(reconciledAt) || runStartedMs - reconciledAt >= 24 * 60 * 60 * 1000)) {
       try {
         state = await reconcileArchivedExecutionIds(state, names);
         backfillComplete = state.missingExecutionCount === 0 && !state.reconciliationTruncated;
@@ -805,7 +820,7 @@ export async function syncN8nArchive(options: { recentPages?: number; backfillPa
     }
     await setArchiveSyncState(state);
     invalidateCache("archive:");
-    invalidateCache("executions:archive:");
+    invalidateN8nCache();
 
     return {
       status: "ok" as const,
@@ -848,6 +863,7 @@ export async function preserveN8nExecutionDetails(batchSize?: number) {
     });
     invalidateCache("archive:");
     invalidateCache("executions:");
+    invalidateCache("dashboard:");
     return { status: "ok" as const, attempted: details.attempted, hydrated: details.hydrated, newlyUnavailable: details.newlyUnavailable, detailsHydrated: details.available, detailsPending: details.pending, detailsUnavailable: details.unavailable };
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
@@ -858,6 +874,10 @@ export async function preserveN8nExecutionDetails(batchSize?: number) {
 async function loadArchivedExecutions(period: Period, includeLegacy = false) {
   const scope = includeLegacy ? "all-stored" : "active";
   return cached(`archive:executions:${scope}:${period}`, 20_000, 2 * 60_000, () => listArchivedExecutions(period, includeLegacy));
+}
+
+async function loadLiveExecutions(period: Period) {
+  return cached(`executions:live:${period}`, 15_000, 15_000, () => fetchExecutionsForPeriod(period, false));
 }
 
 function mergeExecutions(archived: N8nExecution[], live: N8nExecution[]) {
@@ -886,7 +906,7 @@ async function loadConsolidatedExecutions(backfillComplete: boolean) {
   // independently refreshed caches.
   const livePeriod: Period = backfillComplete ? "today" : "all";
   const archive = await loadArchivedExecutions("all", true);
-  const live = await fetchExecutionsForPeriod(livePeriod, false).catch((error) => {
+  const live = await loadLiveExecutions(livePeriod).catch((error) => {
     console.error("n8n live executions unavailable; using Firestore archive", { error: error instanceof Error ? error.name : "unknown" });
     return { items: [] as N8nExecution[], truncated: false };
   });
@@ -1006,6 +1026,14 @@ export function summarizeTrendComparison(rows: TrendSummaryPoint[]) {
 }
 
 export async function getN8nOverview(period: Period = "7d", workflowIds: string[] = [], inactiveHours = 24) {
+  getConfig();
+  const key = `dashboard:overview:${JSON.stringify([period, [...workflowIds].sort(), inactiveHours])}`;
+  const result = await cached(key, 30_000, 30_000, () => calculateN8nOverview(period, workflowIds, inactiveHours));
+  if (result.status !== "ok" || !result.connected) invalidateCache(key);
+  return result;
+}
+
+async function calculateN8nOverview(period: Period, workflowIds: string[], inactiveHours: number) {
   if (!getConfig()) return { status: "not_configured" as const, connected: false as const, metrics: null, chart: [], workflowStats: [], truncated: false };
 
   try {
@@ -1107,11 +1135,49 @@ export async function listN8nWorkflows() {
 export async function listN8nExecutions() {
   if (!getConfig()) return { status: "not_configured" as const, connected: false as const, items: [] as any[], truncated: false };
   try {
-    const [{ workflows }, raw] = await Promise.all([loadWorkflows(), loadExecutions(false, "all")]);
-    const names = workflowMap(workflows);
-    return { status: "ok" as const, connected: true as const, items: raw.items.map((item) => normalizeExecution(item, names)), truncated: raw.truncated };
+    const raw = await loadNormalizedExecutions();
+    return { status: "ok" as const, connected: true as const, ...raw };
   } catch (error) {
     return { status: errorStatus(error), connected: false as const, items: [], truncated: false };
+  }
+}
+
+async function loadNormalizedExecutions() {
+  return cached("executions:normalized:all", 30_000, 30_000, async () => {
+    const [{ workflows }, raw] = await Promise.all([loadWorkflows(), loadExecutions(false, "all")]);
+    const names = workflowMap(workflows);
+    return { items: raw.items.map((item) => normalizeExecution(item, names)), truncated: raw.truncated };
+  });
+}
+
+export async function listN8nRecentErrors() {
+  if (!getConfig()) return { status: "not_configured" as const, connected: false as const, items: [] as ReturnType<typeof normalizeExecution>[] };
+  try {
+    return await cached("executions:recent-errors", 30_000, 30_000, async () => {
+      const isError = (item: N8nExecution) => ["error", "failed", "crashed"].includes(String(item.status || "").toLowerCase());
+      const { workflows } = await loadWorkflows();
+      const names = workflowMap(workflows);
+      let errors: N8nExecution[];
+      if (archiveConfigured()) {
+        const state = await getArchiveSyncState();
+        const live = await loadLiveExecutions(state.backfillComplete ? "today" : "all").catch(() => ({ items: [] as N8nExecution[], truncated: false }));
+        const liveById = new Map(live.items.map((item) => [String(item.id), item]));
+        errors = mergeExecutions([], live.items).filter(isError).slice(0, 12);
+        const recent = await listArchivedExecutions("all", true, { limit: 100 });
+        errors = mergeExecutions(errors, recent.items.map((item) => ({ ...item, ...liveById.get(String(item.id)) }))).filter(isError).slice(0, 12);
+        const oldest = Date.parse(recent.items.at(-1)?.startedAt || "");
+        if (recent.hasMore && (errors.length < 12 || !(Date.parse(errors[11].startedAt || "") > oldest))) {
+          // Reuse the dashboard snapshot if older errors are needed; avoid repeated offset scans.
+          const history = await loadArchivedExecutions("all", true);
+          errors = mergeExecutions(history.items as N8nExecution[], live.items).filter(isError).slice(0, 12);
+        }
+      } else {
+        errors = mergeExecutions([], (await loadExecutions(false, "all")).items).filter(isError).slice(0, 12);
+      }
+      return { status: "ok" as const, connected: true as const, items: errors.map((item) => normalizeExecution(item, names)) };
+    });
+  } catch (error) {
+    return { status: errorStatus(error), connected: false as const, items: [] as ReturnType<typeof normalizeExecution>[] };
   }
 }
 
@@ -1127,9 +1193,8 @@ export async function listN8nExecutionsPage(input: {
   const empty = { items: [] as any[], total: 0, page: input.page, pageSize: input.pageSize, totalPages: 1, sections: [] as string[], truncated: false };
   if (!getConfig()) return { status: "not_configured" as const, connected: false as const, ...empty };
   try {
-    const [{ workflows }, raw] = await Promise.all([loadWorkflows(), loadExecutions(false, input.period)]);
-    const names = workflowMap(workflows);
-    const normalized = raw.items.map((item) => normalizeExecution(item, names));
+    const raw = await loadNormalizedExecutions();
+    const normalized = raw.items;
     const periodItems = normalized.filter((item) => withinPeriod(item, input.period));
     const workflowItems = periodItems.filter((item) => !input.workflowId || input.workflowId === "all" || item.workflowId === input.workflowId);
     // A workflow name is used only as a display fallback when n8n has no Sticky Note
@@ -1267,6 +1332,14 @@ export async function getN8nExecutionDetail(id: string) {
 }
 
 export async function getN8nAnalytics(period: Period = "7d") {
+  getConfig();
+  const key = `dashboard:analytics:${period}`;
+  const result = await cached(key, 30_000, 30_000, () => calculateN8nAnalytics(period));
+  if (result.status !== "ok" || !result.connected) invalidateCache(key);
+  return result;
+}
+
+async function calculateN8nAnalytics(period: Period) {
   if (!getConfig()) return { status: "not_configured" as const, connected: false as const, summary: null, trend: [], workflowStats: [], recentErrors: [], incidentGroups: [], nodeStats: [], nodeAnalyticsCoverage: 0, sloSummary: null, reliability: null, anomalies: [], alertSummary: null, truncated: false };
   try {
     const [workflowResult, executionResult, incidentStateResult, sloResult, runbookResult, alertRuleResult] = await Promise.allSettled([loadWorkflows(), loadExecutions(false, period), listIncidentStates(), listWorkflowSlos(), listWorkflowRunbooks(), listWorkflowAlertRules()]);
@@ -1281,7 +1354,12 @@ export async function getN8nAnalytics(period: Period = "7d") {
     const alertRules = alertRuleResult.status === "fulfilled" ? alertRuleResult.value : [];
     const alertRuleMap = new Map(alertRules.map((rule) => [rule.workflowId, rule]));
     const executionsByWorkflow = new Map<string, N8nExecution[]>();
-    executions.forEach((item) => executionsByWorkflow.set(item.workflowId || "unknown", [...(executionsByWorkflow.get(item.workflowId || "unknown") || []), item]));
+    for (const item of executions) {
+      const workflowId = item.workflowId || "unknown";
+      const rows = executionsByWorkflow.get(workflowId) ?? [];
+      rows.push(item);
+      executionsByWorkflow.set(workflowId, rows);
+    }
     const stats = aggregate(workflows, executions).filter((item) => item.executions > 0 || alertRuleMap.has(item.id)).map((item) => {
       const slo = sloMap.get(item.id);
       const alertRule = alertRuleMap.get(item.id);
@@ -1395,6 +1473,7 @@ export async function setN8nWorkflowActive(id: string, active: boolean) {
   try {
     await n8nRequest(`/api/v1/workflows/${encodeURIComponent(id)}/${active ? "activate" : "deactivate"}`, { method: "POST" });
     invalidateCache("workflows");
+    invalidateCache("dashboard:");
     return { status: "ok" as const, connected: true as const, active };
   } catch (error) {
     return { status: errorStatus(error), connected: false as const };

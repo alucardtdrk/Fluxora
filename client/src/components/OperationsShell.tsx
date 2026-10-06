@@ -149,11 +149,12 @@ export default function OperationsShell({ children }: { children: React.ReactNod
   const [commandOpen, setCommandOpen] = useState(false);
   const [refreshIntervalMs, setRefreshIntervalMs] = useState(() => readPreferredRefreshSeconds() * 1000);
   const [location, setLocation] = useLocation();
-  const executions = trpc.n8n.executions.useQuery(undefined, {
+  const errorExecutions = trpc.n8n.recentErrors.useQuery(undefined, {
     enabled: Boolean(user),
     retry: false,
     refetchInterval: refreshIntervalMs,
   });
+  const executions = trpc.n8n.executions.useQuery(undefined, { enabled: Boolean(user) && commandOpen, retry: false });
   const workflows = trpc.n8n.workflows.useQuery(undefined, { enabled: Boolean(user), retry: false });
   const notificationState = trpc.notifications.readState.useQuery(undefined, { enabled: Boolean(user), retry: false });
   const markRead = trpc.notifications.markRead.useMutation({
@@ -162,9 +163,9 @@ export default function OperationsShell({ children }: { children: React.ReactNod
   const initializedRef = useRef(false);
   const notifiedStorageKey = `fluxoraNotifiedErrors:${user?.email ?? ""}`;
 
-  const recentErrors = useMemo(() => (executions.data?.items ?? [])
+  const recentErrors = useMemo(() => (errorExecutions.data?.items ?? [])
     .filter((item: any) => ["error", "failed", "crashed"].includes(String(item.status || "").toLowerCase()))
-    .slice(0, 12), [executions.data]);
+    .slice(0, 12), [errorExecutions.data]);
   const seenErrorIds = notificationState.data?.seenErrorExecutionIds ?? [];
   const unread = recentErrors.filter((item: any) => !seenErrorIds.includes(String(item.id)));
 
@@ -186,14 +187,14 @@ export default function OperationsShell({ children }: { children: React.ReactNod
   }, []);
 
   useEffect(() => {
-    if (!notificationState.data || !executions.data || initializedRef.current) return;
+    if (!notificationState.data || !errorExecutions.data || initializedRef.current) return;
     initializedRef.current = true;
     if (!notificationState.data.initialized && recentErrors.length > 0) {
       const ids = recentErrors.map((item: any) => String(item.id));
       utils.notifications.readState.setData(undefined, { ...notificationState.data, initialized: true, seenErrorExecutionIds: ids });
       markRead.mutate({ executionIds: ids });
     }
-  }, [executions.data, markRead, notificationState.data, recentErrors, utils.notifications.readState]);
+  }, [errorExecutions.data, markRead, notificationState.data, recentErrors, utils.notifications.readState]);
 
   useEffect(() => {
     if (!notificationState.data?.initialized || unread.length === 0) return;

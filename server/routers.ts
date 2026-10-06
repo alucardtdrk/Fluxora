@@ -1,6 +1,6 @@
 import { authConfigured, clearSessionCookie } from "./auth.js";
 import { adminProcedure, operatorProcedure, protectedProcedure, publicProcedure, router } from "./_core/trpc.js";
-import { getN8nAnalytics, getN8nExecutionDetail, getN8nOverview, listN8nExecutions, listN8nExecutionsPage, listN8nWorkflows, preserveN8nExecutionDetails, setN8nWorkflowActive, syncN8nArchive } from "./n8n.js";
+import { getN8nAnalytics, getN8nExecutionDetail, getN8nOverview, invalidateN8nCache, listN8nExecutions, listN8nExecutionsPage, listN8nRecentErrors, listN8nWorkflows, preserveN8nExecutionDetails, setN8nWorkflowActive, syncN8nArchive } from "./n8n.js";
 import { archiveConfigured, getArchiveDiagnostics, getArchiveSyncState, type ArchiveSyncState } from "./firestoreLogs.js";
 import { deleteFluxoraUser, listFluxoraUsers, setFluxoraUserActive, upsertFluxoraUser } from "./access.js";
 import { isFirestoreConfigured } from "./firestore.js";
@@ -18,6 +18,7 @@ const roleSchema = z.enum(["admin", "operator", "viewer"]);
 async function audited<T>(event: AuditEventInput, operation: () => Promise<T>) {
   try {
     const result = await operation();
+    if (["workflow", "incident", "history"].includes(event.category) || ["slo.save", "runbook.save", "alert_rule.save"].includes(event.action)) invalidateN8nCache();
     const resultStatus = result && typeof result === "object" && "status" in result ? String((result as { status?: unknown }).status || "ok") : "ok";
     const failureReason = resultStatus === "error" && result && typeof result === "object" && "message" in result ? String((result as { message?: unknown }).message || "A ação não foi concluída") : event.reason;
     await recordAuditEventSafe({ ...event, status: resultStatus === "error" ? "failure" : "success", reason: failureReason, metadata: { ...event.metadata, resultStatus } });
@@ -51,6 +52,7 @@ export const appRouter = router({
     workflows: protectedProcedure.query(() => listN8nWorkflows()),
     workflowDetail: protectedProcedure.input(z.object({ id: z.string().min(1) })).query(({ input }) => getN8nWorkflowDetail(input.id)),
     executions: protectedProcedure.query(() => listN8nExecutions()),
+    recentErrors: protectedProcedure.query(() => listN8nRecentErrors()),
     executionsPage: protectedProcedure.input(z.object({
       page: z.number().int().min(1).default(1), pageSize: z.number().int().min(10).max(100).default(50), period: periodSchema.default("30d"),
       search: z.string().max(120).optional(), status: z.string().max(30).optional(), workflowId: z.string().max(120).optional(), sectionName: z.string().max(160).optional(),
