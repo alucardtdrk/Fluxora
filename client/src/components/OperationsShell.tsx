@@ -224,11 +224,11 @@ export default function OperationsShell({ children }: { children: React.ReactNod
   const visibleItems = [...operationItems, ...visibleManagementItems];
   const currentPath = location.split("?")[0];
   const currentTitle = visibleItems.find((item) => item.path === currentPath)?.label ?? "Fluxora";
-  const markNotificationsRead = async () => {
-    recentErrors.forEach((item: any) => toast.dismiss(`${notifiedStorageKey}:${item.id}`));
+  const markNotificationsRead = async (executionIds = recentErrors.map((item: any) => String(item.id))) => {
+    executionIds.forEach((id: string) => toast.dismiss(`${notifiedStorageKey}:${id}`));
     await utils.notifications.readState.cancel();
     const current = utils.notifications.readState.getData() ?? { configured: false, initialized: true, seenErrorExecutionIds: [] };
-    const ids = [...new Set([...recentErrors.map((item: any) => String(item.id)), ...current.seenErrorExecutionIds])].slice(0, 250);
+    const ids = [...new Set([...executionIds, ...current.seenErrorExecutionIds])].slice(0, 250);
     utils.notifications.readState.setData(undefined, { ...current, initialized: true, seenErrorExecutionIds: ids });
     markRead.mutate({ executionIds: ids });
   };
@@ -311,7 +311,7 @@ export default function OperationsShell({ children }: { children: React.ReactNod
                 <span className="theme-orb-core" />
               </span>
             </Button>
-            <Popover onOpenChange={(open) => open && markNotificationsRead()}>
+            <Popover onOpenChange={(open) => { if (open) recentErrors.forEach((item: any) => toast.dismiss(`${notifiedStorageKey}:${item.id}`)); }}>
               <PopoverTrigger asChild>
                 <Button variant="ghost" size="icon" className="fluxora-notification relative rounded-full text-muted-foreground" aria-label={unread.length ? `Notificações: ${unread.length} não lidas` : "Notificações"}>
                   <Bell aria-hidden="true" className="fluxora-notification-bell h-[18px] w-[18px]" />
@@ -319,11 +319,11 @@ export default function OperationsShell({ children }: { children: React.ReactNod
                 </Button>
               </PopoverTrigger>
               <PopoverContent align="end" className="w-[360px] p-0">
-                <div className="border-b px-4 py-3"><p className="text-sm font-semibold text-foreground">Notificações</p><p className="mt-1 text-xs text-muted-foreground">Falhas recentes detectadas pelo n8n.</p></div>
+                <div className="border-b px-4 py-3"><p className="text-sm font-semibold text-foreground">Notificações</p><p className="mt-1 text-xs text-muted-foreground">Falhas recentes detectadas pelo n8n.</p><Button variant="ghost" size="sm" className="fluxora-action mt-2" disabled={!unread.length || markRead.isPending} onClick={() => markNotificationsRead()}>{markRead.isPending ? "Salvando…" : "Marcar todas como lidas"}</Button></div>
                 <div className="max-h-[360px] overflow-y-auto">
                   {recentErrors.length === 0 ? <div className="px-4 py-8 text-center text-xs text-muted-foreground">Nenhuma falha recente.</div> : recentErrors.map((item: any) => (
-                    <Link key={item.id} href={`/executions?execution=${encodeURIComponent(String(item.id))}`} className="block border-b px-4 py-3 hover:bg-background">
-                      <div className="flex items-start gap-3"><span className="mt-1 h-2 w-2 shrink-0 rounded-full bg-feedback-error"/><div><p className="text-xs font-semibold text-foreground">{item.workflowName}</p><p className="mt-1 text-[11px] text-muted-foreground">Execução #{item.id} · {item.startedAt ? new Date(item.startedAt).toLocaleString("pt-BR") : "sem horário"}</p></div></div>
+                    <Link key={item.id} onClick={() => markNotificationsRead([String(item.id)])} href={`/executions?execution=${encodeURIComponent(String(item.id))}`} className={`block border-b px-4 py-3 hover:bg-background ${seenErrorIds.includes(String(item.id)) ? "" : "bg-feedback-info-surface"}`}>
+                      <div className="flex items-start gap-3"><span className={`mt-1 h-2 w-2 shrink-0 rounded-full ${seenErrorIds.includes(String(item.id)) ? "bg-muted-foreground/40" : "bg-feedback-error"}`}/><div><span className="text-[10px] font-semibold text-muted-foreground">{seenErrorIds.includes(String(item.id)) ? "Lida" : "Não lida"}</span><p className="text-xs font-semibold text-foreground">{item.workflowName}</p><p className="mt-1 text-[11px] text-muted-foreground">Execução #{item.id} · {item.startedAt ? new Date(item.startedAt).toLocaleString("pt-BR") : "sem horário"}</p></div></div>
                     </Link>
                   ))}
                 </div>

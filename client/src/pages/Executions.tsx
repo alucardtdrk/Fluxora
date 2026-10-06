@@ -13,7 +13,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { PREFERENCES_UPDATED_EVENT, readPreferredPageSize, readScopedPeriod, saveScopedPeriod } from "@/lib/preferences";
+import { PREFERENCES_UPDATED_EVENT, readPreferredPageSize, readScopedPeriod, saveScopedPeriod, rememberFiltersEnabled } from "@/lib/preferences";
 import { trpc } from "@/lib/trpc";
 
 type Period = "today" | "7d" | "30d" | "90d" | "all";
@@ -44,12 +44,14 @@ export default function Executions() {
   const { user } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
   const executionId = searchParams.get("execution");
-  const [query, setQuery] = useState(() => new URLSearchParams(window.location.search).get("search") || "");
+  const filterStorageKey = "fluxoraExecutionFilters";
+  const [savedFilters] = useState(() => new URLSearchParams(rememberFiltersEnabled() ? sessionStorage.getItem(filterStorageKey) ?? "" : ""));
+  const [query, setQuery] = useState(() => searchParams.get("search") ?? savedFilters.get("search") ?? "");
   const search = useDeferredValue(query);
-  const [status, setStatus] = useState("all");
-  const [workflowId, setWorkflowId] = useState("all");
+  const [status, setStatus] = useState(() => savedFilters.get("status") || "all");
+  const [workflowId, setWorkflowId] = useState(() => savedFilters.get("workflowId") || "all");
   const [period, setPeriod] = useState<Period>(() => readScopedPeriod("executions", "30d"));
-  const [page, setPage] = useState(1);
+  const [page, setPage] = useState(() => Math.max(1, Math.min(100000, Math.floor(Number(savedFilters.get("page"))) || 1)));
   const [pageSize, setPageSize] = useState(() => readPreferredPageSize(50));
   const [selected, setSelected] = useState<string | null>(() => new URLSearchParams(window.location.search).get("execution"));
   const [comparisonSelection, setComparisonSelection] = useState<Array<{ id: string; workflowId?: string; workflowName?: string }>>([]);
@@ -66,6 +68,10 @@ export default function Executions() {
   }, []);
 
   useEffect(() => saveScopedPeriod("executions", period), [period]);
+  useEffect(() => {
+    if (!rememberFiltersEnabled()) { sessionStorage.removeItem(filterStorageKey); return; }
+    sessionStorage.setItem(filterStorageKey, new URLSearchParams({ search: query, status, workflowId, page: String(page) }).toString());
+  }, [filterStorageKey, query, status, workflowId, page]);
 
   useEffect(() => {
     if (executionId) setSelected(executionId);
