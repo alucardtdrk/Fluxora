@@ -1,5 +1,6 @@
 import { useMemo } from "react";
 import { AlertTriangle, ArrowRight, CheckCircle2, Clock3, GitCompareArrows } from "lucide-react";
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { trpc } from "@/lib/trpc";
@@ -68,7 +69,7 @@ function ExecutionSummary({ execution }: { execution: any }) {
 function ChangedData({ rows, leftId, rightId }: { rows: any[]; leftId: string; rightId: string }) {
   const changed = rows.filter((row) => row.inputChanged || row.outputChanged);
   if (!changed.length) return null;
-  return <section><h3 className="text-sm font-semibold">Dados alterados nas etapas</h3><p className="mt-1 text-xs text-muted-foreground">Abra uma etapa para consultar os valores preservados de cada execução.</p><div className="mt-3 space-y-2">{changed.map((row) => <details key={row.key} className="rounded-xl border bg-card"><summary className="cursor-pointer px-4 py-3 text-sm font-semibold">{row.name}</summary><div className="grid gap-4 border-t p-4 lg:grid-cols-2"><DataColumn title={`Execução #${leftId}`} node={row.left} /><DataColumn title={`Execução #${rightId}`} node={row.right} /></div></details>)}</div></section>;
+  return <section><h3 className="text-sm font-semibold">Dados alterados nas etapas</h3><p className="mt-1 text-xs text-muted-foreground">Abra uma etapa para consultar os valores preservados de cada execução.</p><Accordion type="multiple" className="mt-3 space-y-2">{changed.map((row) => <AccordionItem key={row.key} value={row.key} className="rounded-xl border bg-card last:border-b"><AccordionTrigger className="px-4 py-3 text-sm font-semibold hover:no-underline">{row.name}</AccordionTrigger><AccordionContent className="pb-0"><div className="grid gap-4 border-t p-4 lg:grid-cols-2"><DataColumn title={`Execução #${leftId}`} node={row.left} /><DataColumn title={`Execução #${rightId}`} node={row.right} /></div></AccordionContent></AccordionItem>)}</Accordion></section>;
 }
 
 function DataColumn({ title, node }: { title: string; node: any }) {

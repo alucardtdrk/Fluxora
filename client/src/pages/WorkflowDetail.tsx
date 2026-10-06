@@ -8,6 +8,7 @@ import OperationsShell from "@/components/OperationsShell";
 import WorkflowChangeHistory from "@/components/WorkflowChangeHistory";
 import WorkflowDiagram from "@/components/WorkflowDiagram";
 import WorkflowNodePanel from "@/components/WorkflowNodePanel";
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -271,19 +272,19 @@ export default function WorkflowDetail() {
                     <p className="text-xs text-muted-foreground">{selectedNodeName ? `${selectedNodeName} na execução #${executionDiagramId}` : "Selecione um node executado no diagrama."}</p>
                   </CardHeader>
                   <CardContent>
-                    {executionDetail.isLoading ? <div className="py-10 text-center text-sm text-muted-foreground">Carregando dados da execução…</div> : selectedExecutionNodeRuns.length === 0 ? <div className="rounded-xl border border-dashed border-border px-4 py-8 text-center text-sm text-muted-foreground">Este node não foi executado ou não possui dados disponíveis nesta execução.</div> : <div className="space-y-4">
-                      {selectedExecutionNodeRuns.map((run: any, index: number) => <details key={`${run.nodeName}-${run.runIndex}-${index}`} open={index === 0} className="group rounded-2xl border border-border bg-muted open:bg-card">
-                        <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-3">
+                    {executionDetail.isLoading ? <div className="py-10 text-center text-sm text-muted-foreground">Carregando dados da execução…</div> : selectedExecutionNodeRuns.length === 0 ? <div className="rounded-xl border border-dashed border-border px-4 py-8 text-center text-sm text-muted-foreground">Este node não foi executado ou não possui dados disponíveis nesta execução.</div> : <Accordion key={`${executionDiagramId}-${selectedNodeName}`} type="multiple" defaultValue={["run-0"]} className="space-y-4">
+                      {selectedExecutionNodeRuns.map((run: any, index: number) => <AccordionItem key={`${run.nodeName}-${run.runIndex}-${index}`} value={`run-${index}`} className="rounded-2xl border border-border bg-muted last:border-b data-[state=open]:bg-card">
+                        <AccordionTrigger className="items-center gap-3 px-4 py-3 hover:no-underline">
                           <div className="flex items-center gap-3"><div className={`grid h-8 w-8 place-items-center rounded-xl ${run.status === "error" ? "bg-feedback-error-surface text-feedback-error" : "bg-feedback-success-surface text-feedback-success"}`}>{run.status === "error" ? <AlertTriangle className="h-4 w-4" /> : <CheckCircle2 className="h-4 w-4" />}</div><div><p className="text-xs font-semibold text-foreground">Execução {run.runIndex + 1}</p><p className="mt-0.5 text-[11px] text-muted-foreground">{run.outputItems} item(ns) · {run.executionTimeMs != null ? `${run.executionTimeMs}ms` : "sem duração"}</p></div></div>
                           <Badge className={statusBadge(run.status)}>{statusLabel(run.status)}</Badge>
-                        </summary>
-                        <div className="space-y-4 border-t border-border px-4 py-4">
+                        </AccordionTrigger>
+                        <AccordionContent className="pb-0"><div className="space-y-4 border-t border-border px-4 py-4">
                           <div><p className="mb-2 text-[10px] font-bold uppercase tracking-[0.12em] text-muted-foreground">Entrada / origem</p><JsonBlock value={run.input ?? run.source} /></div>
                           <div><p className="mb-2 text-[10px] font-bold uppercase tracking-[0.12em] text-muted-foreground">Saída / resposta</p><JsonBlock value={run.output} /></div>
                           {run.error ? <div><p className="mb-2 text-[10px] font-bold uppercase tracking-[0.12em] text-feedback-error">Erro do node</p><JsonBlock value={run.error} /></div> : null}
                         </div>
-                      </details>)}
-                    </div>}
+                      </AccordionContent></AccordionItem>)}
+                    </Accordion>}
                   </CardContent>
                 </Card>
                 </div>
