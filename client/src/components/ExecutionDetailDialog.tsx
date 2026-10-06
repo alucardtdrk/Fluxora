@@ -4,6 +4,8 @@ import { Badge } from "@/components/ui/badge";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { trpc } from "@/lib/trpc";
+import { toast } from "sonner";
+import { Button } from "@/components/ui/button";
 
 function statusLabel(status?: string) {
   if (status === "success") return "Sucesso";
@@ -24,6 +26,27 @@ function JsonBlock({ value }: { value: unknown }) {
   return <pre className="max-h-64 overflow-auto whitespace-pre-wrap break-all rounded-xl bg-code-background p-4 text-[11px] leading-5 text-code-foreground">{JSON.stringify(value, null, 2)}</pre>;
 }
 
+export function ErrorDetails({ error, nodeName }: { error: unknown; nodeName?: string }) {
+  const message = typeof error === "string" ? error : error && typeof error === "object" && "message" in error && typeof error.message === "string" ? error.message : "O serviço não informou uma mensagem de erro.";
+  const explanation = /timeout|timed out|ETIMEDOUT/i.test(message) ? "O serviço demorou além do tempo permitido para responder."
+    : /unauthorized|401|invalid credential/i.test(message) ? "O serviço recusou as credenciais usadas pela automação."
+    : /forbidden|403/i.test(message) ? "A automação não tem permissão para realizar esta operação."
+    : /429|rate limit|too many requests/i.test(message) ? "O serviço recebeu solicitações demais e limitou o acesso temporariamente."
+    : "A etapa não conseguiu concluir a operação. Confira a mensagem retornada abaixo.";
+  const copy = async () => {
+    try {
+      await navigator.clipboard.writeText(JSON.stringify({ etapa: nodeName, erro: error }, null, 2));
+      toast.success("Detalhes do erro copiados");
+    } catch { toast.error("Não foi possível copiar. Selecione os dados técnicos e copie manualmente."); }
+  };
+  return <div className="rounded-2xl border border-feedback-error-border bg-feedback-error-surface p-4">
+    <p className="flex items-center gap-2 text-sm font-semibold text-feedback-error"><AlertTriangle className="h-4 w-4" />{nodeName ? `Falha na etapa: ${nodeName}` : "Erro da execução"}</p>
+    <p className="mt-2 text-sm">{explanation}</p><p className="mt-2 whitespace-pre-wrap break-words text-xs text-muted-foreground">{message}</p>
+    <Button variant="outline" size="sm" className="fluxora-action mt-3" onClick={copy}>Copiar detalhes do erro</Button>
+    <details className="mt-3"><summary className="cursor-pointer text-xs font-semibold">Dados técnicos do erro</summary><div className="mt-2"><JsonBlock value={error} /></div></details>
+  </div>;
+}
+
 function NodeDiagnostics({ nodes }: { nodes: Array<{ nodeName?: string; status?: string; executionTimeMs?: number | null }> }) {
   let failedCount = 0;
   let slowest: { nodeName?: string; executionTimeMs?: number | null } | null = null;
@@ -40,6 +63,7 @@ export default function ExecutionDetailDialog({ executionId, open, onOpenChange 
   const detail = trpc.n8n.executionDetail.useQuery({ id: executionId || "" }, { enabled: open && Boolean(executionId), retry: false });
   const execution = detail.data?.execution;
   const nodes = useMemo(() => execution?.nodes ?? [], [execution]);
+  const failedNodes = nodes.filter((node) => ["error", "failed", "crashed"].includes(node.status || ""));
 
   return <Dialog open={open} onOpenChange={onOpenChange}>
     <DialogContent className="max-h-[92vh] overflow-hidden p-0 sm:max-w-5xl">
@@ -58,7 +82,8 @@ export default function ExecutionDetailDialog({ executionId, open, onOpenChange 
             <div className="rounded-2xl bg-background p-4"><p className="text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground">Último node</p><p className="mt-2 text-sm font-semibold text-foreground">{execution.lastNodeExecuted || "—"}</p></div>
           </div>
 
-          {execution.error && <div className="rounded-2xl border border-feedback-error-border bg-feedback-error-surface p-4"><div className="mb-3 flex items-center gap-2 text-sm font-semibold text-feedback-error"><AlertTriangle className="h-4 w-4" />Erro da execução</div><JsonBlock value={execution.error} /></div>}
+          {failedNodes.map((node, index) => <ErrorDetails key={`${node.nodeName}-${index}`} nodeName={node.nodeName} error={node.error ?? execution.error} />)}
+          {!failedNodes.length && execution.error && <ErrorDetails error={execution.error} nodeName={execution.lastNodeExecuted} />}
 
           {(execution as any).archived && !(execution as any).detailsAvailable && <div className="rounded-2xl border border-border bg-muted p-4 text-sm text-muted-foreground">Esta execução foi preservada no arquivo histórico. O resumo operacional está disponível, mas o payload técnico completo não foi armazenado ou já não está disponível no n8n.</div>}
 
