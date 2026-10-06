@@ -153,15 +153,15 @@ export async function getArchivedExecution(id: string): Promise<ArchivedExecutio
   return document as unknown as ArchivedExecution;
 }
 
-export async function listArchivedExecutions(period: ArchivePeriod, includeLegacy = false) {
-  const syncState = await getArchiveSyncState();
-  const activeArchiveRunId = includeLegacy ? null : syncState.activeArchiveRunId || null;
+export async function listArchivedExecutions(period: ArchivePeriod, includeLegacy = false, page?: { limit: number }) {
+  const activeArchiveRunId = includeLegacy ? null : (await getArchiveSyncState()).activeArchiveRunId || null;
+  const limit = Math.min(page?.limit ?? readLimit(), readLimit());
   const cutoff = periodCutoff(period);
   const structuredQuery: FirestoreRecord = {
     select: { fields: summaryFields.map((fieldPath) => ({ fieldPath })) },
     from: [{ collectionId: logsCollection() }],
     orderBy: [{ field: { fieldPath: "startedAt" }, direction: "DESCENDING" }],
-    limit: readLimit(),
+    limit,
   };
   if (cutoff) {
     structuredQuery.where = {
@@ -197,7 +197,7 @@ export async function listArchivedExecutions(period: ArchivePeriod, includeLegac
     }))
     .filter((row) => row.id && row.id !== "teste_inicial" && (!activeArchiveRunId || row.archiveRunId === activeArchiveRunId));
 
-  return { items, truncated: rows.length >= readLimit() };
+  return { items, truncated: rows.length >= readLimit(), hasMore: rows.length >= limit && limit < readLimit() };
 }
 
 export async function getArchiveSyncState(): Promise<ArchiveSyncState> {
