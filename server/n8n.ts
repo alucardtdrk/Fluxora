@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 import { z } from "zod";
-import { archiveConfigured, getArchivedExecution, getArchiveSyncState, listArchivedExecutions, saveArchivedExecution, saveArchivedExecutions, setArchiveSyncState, type ArchivedExecution } from "./firestoreLogs.js";
+import { archiveConfigured, getArchivedExecution, getArchiveDetailBatch, getArchiveSyncState, listArchivedExecutions, saveArchivedExecution, saveArchivedExecutions, setArchiveSyncState, type ArchivedExecution } from "./firestoreLogs.js";
 import { incidentFingerprint, listIncidentStates, listWorkflowAlertRules, listWorkflowRunbooks, listWorkflowSlos, normalizeErrorSignature } from "./observability.js";
 
 const workflowSchema = z.object({
@@ -497,12 +497,26 @@ function toArchivedExecution(item: N8nExecution, names: Map<string, N8nWorkflow>
   return document;
 }
 
+async function measureSyncStage<T>(stage: string, operation: () => Promise<T>) {
+  const startedAt = Date.now();
+  const startedCpu = process.cpuUsage();
+  try { return await operation(); }
+  finally {
+    const cpu = process.cpuUsage(startedCpu);
+    console.info(JSON.stringify({ message: "history_sync_stage", stage, durationMs: Date.now() - startedAt, cpuMs: (cpu.user + cpu.system) / 1000, cpuScope: "process" }));
+  }
+}
+
 async function fetchArchivePage(cursor?: string | null, includeData = false) {
   const cursorQuery = cursor ? `&cursor=${encodeURIComponent(cursor)}` : "";
   return n8nRequest<Page<N8nExecution>>(`/api/v1/executions?limit=${syncPageSize()}&includeData=${includeData ? "true" : "false"}${cursorQuery}`);
 }
 
 async function saveArchivePageDocuments(documents: ArchivedExecution[], detailed: boolean) {
+  return measureSyncStage("archive_write", () => writeArchivePageDocuments(documents, detailed));
+}
+
+async function writeArchivePageDocuments(documents: ArchivedExecution[], detailed: boolean) {
   if (!documents.length) return 0;
   if (!detailed) return (await saveArchivedExecutions(documents)).writes;
 
@@ -531,15 +545,32 @@ async function countAvailableExecutions() {
 }
 
 async function reconcileArchivedExecutionIds(state: import("./firestoreLogs.js").ArchiveSyncState, names: Map<string, N8nWorkflow>) {
+  return measureSyncStage("reconciliation", () => reconcileExecutionIds(state, names));
+}
+
+async function reconcileExecutionIds(state: import("./firestoreLogs.js").ArchiveSyncState, names: Map<string, N8nWorkflow>) {
   const [source, archived] = await Promise.all([
     fetchExecutionsForPeriod("all", false),
     listArchivedExecutions("all"),
   ]);
   const archivedIds = new Set(archived.items.map((item) => String(item.id)));
+  const archivedById = new Map(archived.items.map((item) => [String(item.id), item]));
+  const activeIds = new Set(state.activeExecutionIds ?? []);
+  const isActive = (item: N8nExecution) => ["running", "waiting", "new"].includes(String(item.status)) && !item.finished && !item.stoppedAt;
+  for (const item of source.items) {
+    if (!item.id) continue;
+    if (isActive(item)) activeIds.add(String(item.id));
+    else activeIds.delete(String(item.id));
+  }
   const sourceIds = new Set(source.items.map((item) => String(item.id)).filter(Boolean));
   const missingItems = source.items.filter((item) => item.id && !archivedIds.has(String(item.id)));
   const reconciliationTruncated = source.truncated || archived.truncated;
   let recovered = 0;
+  const updates = source.items.filter((item) => item.id && archivedIds.has(String(item.id)) && (isActive(item) || isActive(archivedById.get(String(item.id))!)));
+  const updated = await saveArchivePageDocuments(updates.flatMap((item) => {
+    const document = toArchivedExecution(item, names, false, state.activeArchiveRunId);
+    return document ? [document] : [];
+  }), false);
 
   // A complete source scan already contains the summaries that are missing
   // from the active archive. Persist them directly instead of restarting the
@@ -556,6 +587,7 @@ async function reconcileArchivedExecutionIds(state: import("./firestoreLogs.js")
 
   return {
     ...state,
+    activeExecutionIds: [...activeIds],
     sourceExecutionCount: sourceIds.size,
     sourceCountCheckedAt: new Date().toISOString(),
     missingExecutionCount: missing,
@@ -563,22 +595,16 @@ async function reconcileArchivedExecutionIds(state: import("./firestoreLogs.js")
     reconciliationTruncated,
     reconciliationMissingBefore: missingItems.length,
     reconciliationRecovered: recovered,
-    lastRunSaved: Number(state.lastRunSaved || 0) + recovered,
+    lastRunSaved: Number(state.lastRunSaved || 0) + recovered + updated,
   };
 }
 
 async function hydrateArchivedNodeDetails(names: Map<string, N8nWorkflow>, requestedBatchSize?: number) {
-  const archive = await listArchivedExecutions("all", true);
-  const items = archive.items as unknown as Array<ArchivedExecution & { id: string }>;
-  const available = items.filter((item) => item.detailsAvailable).length;
-  const unavailable = items.filter((item) => item.detailUnavailable).length;
-  const pendingBefore = items.filter((item) => !item.detailsAvailable && !item.detailFetchAttemptedAt).length;
-  const candidates = items
-    // Section classification is metadata enrichment, not detail preservation.
-    // Including already hydrated records here allowed them to monopolize every
-    // batch and made the real detail queue appear stuck.
-    .filter((item) => !item.detailsAvailable && !item.detailFetchAttemptedAt)
-    .slice(0, detailArchiveBatchSize(requestedBatchSize));
+  return measureSyncStage("detail_batch", () => hydratePendingNodeDetails(names, requestedBatchSize));
+}
+
+async function hydratePendingNodeDetails(names: Map<string, N8nWorkflow>, requestedBatchSize?: number) {
+  const { candidates, available, unavailable, pending: pendingBefore, queueState } = await measureSyncStage("detail_queue", () => getArchiveDetailBatch(detailArchiveBatchSize(requestedBatchSize)));
   let hydrated = 0;
   let newlyUnavailable = 0;
 
@@ -591,7 +617,9 @@ async function hydrateArchivedNodeDetails(names: Map<string, N8nWorkflow>, reque
         return { hydrated: 1, unavailable: 0 };
       }
       return { hydrated: 0, unavailable: 0 };
-    } catch {
+    } catch (error) {
+      // Temporary failures stay pending; only a confirmed 404 is permanently unavailable.
+      if (!(error instanceof N8nIntegrationError) || error.status !== 404) return { hydrated: 0, unavailable: 0 };
       const stored = await getArchivedExecution(candidate.id);
       if (stored) {
         await saveArchivedExecution({
@@ -618,6 +646,7 @@ async function hydrateArchivedNodeDetails(names: Map<string, N8nWorkflow>, reque
 
   return {
     available: available + hydrated,
+    queueState,
     // Only remove records that were actually preserved or confirmed missing.
     // A candidate with an inconclusive response remains eligible for retry.
     pending: Math.max(0, pendingBefore - hydrated - newlyUnavailable),
@@ -665,7 +694,7 @@ export async function syncN8nArchive(options: { recentPages?: number; backfillPa
     if (!Number.isFinite(state.sourceExecutionCount) && !state.backfillComplete) {
       state = {
         ...state,
-        sourceExecutionCount: await countAvailableExecutions(),
+        sourceExecutionCount: await measureSyncStage("source_count", countAvailableExecutions),
         sourceCountCheckedAt: new Date().toISOString(),
       };
     }
@@ -722,23 +751,51 @@ export async function syncN8nArchive(options: { recentPages?: number; backfillPa
     let recentCursor: string | null | undefined;
     let newestId: string | null = null;
     const preserveRecentDetails = options.hydrateDetails !== false;
+    const activeIds = new Set(state.activeExecutionIds ?? []);
+    const observedIds = new Set<string>();
+    const trackExecution = (row: N8nExecution) => {
+      if (!row.id) return;
+      const id = String(row.id);
+      observedIds.add(id);
+      if (row.finished || row.stoppedAt || ["success", "error", "failed", "crashed", "canceled"].includes(String(row.status))) activeIds.delete(id);
+      else activeIds.add(id);
+    };
 
     // Always archive the newest executions first. The document id is the n8n
     // execution id, so repeating this step is idempotent and never duplicates logs.
     for (let page = 0; page < recentPages; page += 1) {
-      const response = await fetchArchivePage(recentCursor, preserveRecentDetails);
+      const response = await measureSyncStage("recent_collection", () => fetchArchivePage(recentCursor, preserveRecentDetails));
       const rows = response.data ?? [];
+      rows.forEach(trackExecution);
       if (!newestId && rows[0]?.id) newestId = String(rows[0].id);
-      const documents = rows.flatMap((row) => {
+      const documents = await measureSyncStage("recent_transform", async () => rows.flatMap((row) => {
         const document = toArchivedExecution(row, names, preserveRecentDetails, archiveRunId);
         return document ? [document] : [];
-      });
+      }));
       processed += rows.length;
       if (isFirstBackfillRun) backfillScanned += rows.length;
       saved += await saveArchivePageDocuments(documents, preserveRecentDetails);
       recentCursor = response.nextCursor;
-      if (!recentCursor) break;
+      if (!recentCursor || (stateBeforeSyncComplete && rows.some((row) => String(row.id) === state.lastRecentExecutionId))) break;
     }
+
+    // Older running executions must keep updating even after the recent overlap stops.
+    const activeToRefresh = [...activeIds].filter((id) => !observedIds.has(id));
+    for (let index = 0; index < activeToRefresh.length; index += 12) {
+      await measureSyncStage("active_collection", () => Promise.all(activeToRefresh.slice(index, index + 12).map(async (id) => {
+        try {
+          const row = await n8nRequest<N8nExecution>(`/api/v1/executions/${encodeURIComponent(id)}?includeData=${preserveRecentDetails}`);
+          trackExecution(row);
+          const document = toArchivedExecution(row, names, preserveRecentDetails, archiveRunId);
+          if (document) saved += await saveArchivePageDocuments([document], preserveRecentDetails);
+          processed += 1;
+        } catch (error) {
+          if (error instanceof N8nIntegrationError && error.status === 404) activeIds.delete(id);
+          else console.warn(JSON.stringify({ message: "history_active_refresh_failed", executionId: id }));
+        }
+      })));
+    }
+    state = { ...state, activeExecutionIds: [...activeIds] };
 
     // First run starts the historical backfill immediately after the recent pages.
     // Later runs continue from the persisted n8n cursor while still protecting new logs above.
@@ -752,15 +809,15 @@ export async function syncN8nArchive(options: { recentPages?: number; backfillPa
           backfillComplete = true;
           break;
         }
-        const response = await fetchArchivePage(backfillCursor);
+        const response = await measureSyncStage("backfill_collection", () => fetchArchivePage(backfillCursor));
         const rows = response.data ?? [];
-        const documents = rows.flatMap((row) => {
+        const documents = await measureSyncStage("backfill_transform", async () => rows.flatMap((row) => {
           const document = toArchivedExecution(row, names, false, archiveRunId);
           return document ? [document] : [];
-        });
+        }));
         processed += rows.length;
         backfillScanned += rows.length;
-        if (documents.length) saved += (await saveArchivedExecutions(documents)).writes;
+        if (documents.length) saved += await saveArchivePageDocuments(documents, false);
         backfillCursor = response.nextCursor ?? null;
         backfillComplete = !backfillCursor;
 
@@ -805,6 +862,7 @@ export async function syncN8nArchive(options: { recentPages?: number; backfillPa
         detailsHydrated: details.available,
         detailsPending: details.pending,
         detailsUnavailable: details.unavailable,
+        ...details.queueState,
       };
     }
     const reconciledAt = Date.parse(state.reconciliationCheckedAt || "");
@@ -855,6 +913,7 @@ export async function preserveN8nExecutionDetails(batchSize?: number) {
       detailsHydrated: details.available,
       detailsPending: details.pending,
       detailsUnavailable: details.unavailable,
+      ...details.queueState,
       lastDetailAttempted: details.attempted,
       lastDetailHydrated: details.hydrated,
       lastDetailUnavailable: details.newlyUnavailable,

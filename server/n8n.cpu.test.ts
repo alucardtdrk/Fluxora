@@ -7,6 +7,7 @@ const archive = vi.hoisted(() => ({
   saveArchivedExecutions: vi.fn(async (items: unknown[]) => ({ writes: items.length })),
   saveArchivedExecution: vi.fn(),
   getArchivedExecution: vi.fn(),
+  getArchiveDetailBatch: vi.fn(),
   setArchiveSyncState: vi.fn(),
 }));
 vi.mock("./firestoreLogs.js", () => archive);
@@ -24,6 +25,7 @@ beforeEach(() => {
   archive.archiveConfigured.mockReturnValue(false);
   vi.stubEnv("N8N_BASE_URL", "https://cpu.example.test");
   vi.stubEnv("N8N_API_KEY", "test-key");
+  vi.spyOn(console, "info").mockImplementation(() => {});
 });
 afterEach(() => { vi.unstubAllEnvs(); vi.restoreAllMocks(); vi.useRealTimers(); });
 
@@ -106,4 +108,38 @@ it.each([false, true])("reconciles completed history only when the last successf
   expect((await n8n.syncN8nArchive({ recentPages: 1, backfillPages: 0, hydrateDetails: false })).status).toBe("ok");
   expect(archive.listArchivedExecutions).toHaveBeenCalledTimes(due ? 1 : 0);
   expect(fetch.mock.calls.filter(([url]) => String(url).includes("/executions?limit=250"))).toHaveLength(due ? 1 : 0);
+});
+
+it("stops at the recent overlap but updates older running executions", async () => {
+  archive.archiveConfigured.mockReturnValue(true);
+  archive.getArchiveSyncState.mockResolvedValue({
+    archiveFormatVersion: 2, activeArchiveRunId: "run", backfillStarted: true, backfillComplete: true,
+    missingExecutionCount: 0, reconciliationCheckedAt: new Date().toISOString(),
+    lastRecentExecutionId: "recent", activeExecutionIds: ["running"],
+  });
+  const fetch = vi.spyOn(globalThis, "fetch").mockImplementation(async (url) => new Response(JSON.stringify(
+    String(url).includes("/workflows") ? { data: [] }
+    : String(url).includes("/executions/running") ? { id: "running", status: "success", finished: true }
+    : { data: [{ id: "recent", status: "success" }], nextCursor: "older" }
+  )));
+  const n8n = await import("./n8n.js");
+  expect((await n8n.syncN8nArchive({ hydrateDetails: false })).status).toBe("ok");
+  expect(fetch.mock.calls.some(([url]) => String(url).includes("cursor=older"))).toBe(false);
+  expect(fetch.mock.calls.some(([url]) => String(url).includes("/executions/running"))).toBe(true);
+  expect(archive.setArchiveSyncState).toHaveBeenLastCalledWith(expect.objectContaining({ activeExecutionIds: [] }));
+  expect(console.info).toHaveBeenCalledWith(expect.stringContaining('"cpuMs":'));
+});
+
+it.each([503, 404])("keeps temporary detail failures pending and retires only confirmed missing records: %s", async (status) => {
+  archive.archiveConfigured.mockReturnValue(true);
+  archive.getArchiveSyncState.mockResolvedValue({});
+  archive.getArchiveDetailBatch.mockResolvedValue({ candidates: [{ id: "pending" }], available: 0, pending: 1, unavailable: 0, queueState: { detailsQueueVersion: 1 } });
+  archive.getArchivedExecution.mockResolvedValue({ executionId: "pending" });
+  vi.spyOn(globalThis, "fetch").mockImplementation(async (url) => String(url).includes("/workflows")
+    ? new Response(JSON.stringify({ data: [] })) : new Response("failure", { status }));
+  const n8n = await import("./n8n.js");
+  const result = await n8n.preserveN8nExecutionDetails(20);
+  expect(result).toMatchObject({ status: "ok", detailsPending: status === 404 ? 0 : 1, detailsUnavailable: status === 404 ? 1 : 0 });
+  expect(archive.saveArchivedExecution).toHaveBeenCalledTimes(status === 404 ? 1 : 0);
+  expect(archive.setArchiveSyncState).toHaveBeenLastCalledWith(expect.objectContaining({ detailsQueueVersion: 1 }));
 });
