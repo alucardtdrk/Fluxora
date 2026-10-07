@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { Link, useLocation } from "wouter";
 import {
   Activity,
@@ -9,7 +10,7 @@ import {
   LayoutDashboard,
   LogOut,
   Search,
-  Menu,
+  Plus,
   ScrollText,
   Settings2,
   ShieldCheck,
@@ -18,7 +19,6 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "@/_core/hooks/useAuth";
-import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription, SheetTrigger, SheetClose } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
@@ -80,7 +80,7 @@ function LoginScreen() {
   })();
 
   return (
-    <div className="fluxora-login min-h-screen px-5 py-8 text-white md:px-8">
+    <div className="fluxora-login min-h-dvh px-4 py-4 md:px-5 md:py-8 text-white md:px-8">
       <div className="fluxora-login-aurora pointer-events-none fixed inset-0" />
       <div className="relative mx-auto flex min-h-[calc(100vh-4rem)] max-w-[1120px] items-center justify-center">
         <div className="grid w-full overflow-hidden rounded-[32px] border border-white/10 shadow-[0_35px_100px_rgba(16,4,42,.48)] md:grid-cols-[1.08fr_.92fr]">
@@ -89,7 +89,7 @@ function LoginScreen() {
             <div className="pointer-events-none absolute -right-24 -top-24 h-[420px] w-[420px] rounded-full bg-[#286EF7]/15 blur-[100px]" />
             <div className="relative flex h-full min-h-0 flex-col md:min-h-[520px]">
               <FluxoraBrand light />
-              <div className="my-auto py-5 md:py-12">
+              <div className="hidden my-auto py-5 md:block md:py-12">
                 <h1 className="max-w-[560px] text-[28px] font-bold leading-[1.04] tracking-[-0.06em] md:text-[60px]">
                   Controle operacional para suas automações.
                 </h1>
@@ -97,13 +97,13 @@ function LoginScreen() {
                   Acompanhe workflows, execuções, falhas e tendências em um único ambiente.
                 </p>
               </div>
-              <p className="text-xs font-medium text-[#7F8CC8]">Automação sob controle.</p>
+              <p className="hidden text-xs font-medium text-[#7F8CC8] md:block">Automação sob controle.</p>
             </div>
           </section>
 
           <section className="bg-[#F0EBE2] px-6 py-7 text-[#280E59] md:px-14 md:py-16">
             <div className="flex h-full min-h-0 flex-col justify-center md:min-h-[520px]">
-              <div className="mb-4 md:mb-8 flex h-14 w-14 items-center justify-center"><FluxoraMark className="h-12 w-12" /></div>
+              <div className="hidden mb-4 md:mb-8 md:flex h-14 w-14 items-center justify-center"><FluxoraMark className="h-12 w-12" /></div>
               <p className="text-[11px] font-bold uppercase tracking-[0.22em] text-[#72668A]">Acesso corporativo</p>
               <h2 className="mt-5 text-[34px] font-bold tracking-[-0.055em]">Entrar no painel</h2>
               <p className="mt-4 max-w-sm text-[15px] leading-6 text-[#667085]">Use sua conta corporativa para acessar o Fluxora.</p>
@@ -114,7 +114,7 @@ function LoginScreen() {
                 onClick={loginWithGoogle}
                 className="mt-9 h-14 w-full rounded-2xl bg-[#286EF7] text-[15px] font-bold text-white shadow-[0_12px_22px_rgba(40,110,247,.25)] hover:bg-[#1A5FE3]"
               >
-                <span className="mr-3 text-lg font-bold tracking-[-0.08em]"><span className="text-[#4285F4]">G</span></span>
+                <span className="mr-3 text-lg font-bold tracking-[-0.08em]"><span className="text-white">G</span></span>
                 {loading ? "Conectando…" : "Continuar com Google"}
               </Button>
 
@@ -344,12 +344,9 @@ export default function OperationsShell({ children }: { children: React.ReactNod
             </DropdownMenu>
           </div>
         </header>
-        <nav aria-label="Navegação principal" className="fixed inset-x-0 bottom-0 z-30 grid grid-cols-5 border-t border-border bg-card pb-[env(safe-area-inset-bottom)] lg:hidden">
-          {operationItems.slice(0, 4).map(({ label, path, icon: Icon }) => <Link key={path} href={path} aria-current={currentPath === path || (path === "/workflows" && currentPath.startsWith("/workflows/")) ? "page" : undefined} className="flex min-h-16 min-w-0 flex-col items-center justify-center gap-1 px-1 text-[11px] font-semibold text-muted-foreground aria-[current=page]:text-primary"><Icon aria-hidden="true" className="h-5 w-5" /><span>{label === "Visão geral" ? "Início" : label}</span></Link>)}
-          <Sheet><SheetTrigger asChild><button type="button" aria-label="Abrir mais áreas" className="flex min-h-16 flex-col items-center justify-center gap-1 text-[11px] font-semibold text-muted-foreground"><Menu aria-hidden="true" className="h-5 w-5" />Mais</button></SheetTrigger><SheetContent side="bottom" className="max-h-[85dvh] overflow-y-auto rounded-t-2xl pb-[env(safe-area-inset-bottom)]"><SheetHeader><SheetTitle>Mais áreas</SheetTitle><SheetDescription>Navegue pelas outras áreas do Fluxora.</SheetDescription></SheetHeader><nav aria-label="Outras áreas" className="space-y-1 px-4 pb-4">{visibleItems.slice(4).map(({ label, path, icon: Icon }) => <SheetClose key={path} asChild><Link href={path} aria-current={currentPath === path ? "page" : undefined} className="flex min-h-12 items-center gap-3 rounded-xl px-4 text-sm font-medium hover:bg-muted aria-[current=page]:bg-muted aria-[current=page]:text-primary"><Icon aria-hidden="true" className="h-5 w-5" />{label}</Link></SheetClose>)}</nav></SheetContent></Sheet>
-        </nav>
         {children}
       </main>
+      <MobileNavigation items={visibleItems} currentPath={currentPath} />
       <CommandDialog open={commandOpen} onOpenChange={setCommandOpen} title="Busca global" description="Encontre páginas, workflows e execuções.">
         <CommandInput placeholder="Buscar página, workflow ou execução..." />
         <CommandList className="max-h-[430px]">
@@ -382,4 +379,25 @@ export default function OperationsShell({ children }: { children: React.ReactNod
       </CommandDialog>
     </div>
   );
+}
+
+export function MobileNavigation({ items, currentPath }: { items: typeof allItems; currentPath: string }) {
+  return createPortal(
+        <div className="lg:hidden" style={{ position: "fixed", right: "max(16px, env(safe-area-inset-right))", bottom: "calc(16px + env(safe-area-inset-bottom))", zIndex: 40 }}>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button aria-label="Abrir navegação" className="group h-14 gap-2 rounded-full px-5 text-base shadow-lg shadow-black/20">
+                <Plus aria-hidden="true" className="h-5 w-5 transition-transform group-data-[state=open]:rotate-45 motion-reduce:transition-none" />Menu
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent aria-label="Áreas do Fluxora" side="top" align="end" sideOffset={12} className="w-[min(320px,calc(100vw-32px))] max-h-[min(70dvh,var(--radix-dropdown-menu-content-available-height))] rounded-2xl p-2 lg:hidden">
+              <DropdownMenuLabel>Navegar no Fluxora</DropdownMenuLabel>
+              <DropdownMenuSeparator />
+              {items.map(({ label, path, icon: Icon }) => <DropdownMenuItem key={path} asChild className="min-h-12 rounded-xl px-3 text-sm">
+                <Link href={path} aria-current={currentPath === path || (path === "/workflows" && currentPath.startsWith("/workflows/")) ? "page" : undefined} className="aria-[current=page]:bg-feedback-info-surface aria-[current=page]:font-semibold aria-[current=page]:text-feedback-info"><Icon aria-hidden="true" className="h-5 w-5" />{label}</Link>
+              </DropdownMenuItem>)}
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>, document.body
+      );
 }

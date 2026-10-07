@@ -52,6 +52,7 @@
 }
 
 :root {
+  color-scheme: only light;
   --primary: var(--color-blue-700);
   --primary-foreground: var(--color-blue-50);
   --sidebar-primary: var(--color-blue-600);
@@ -88,6 +89,7 @@
 }
 
 .dark {
+  color-scheme: only dark;
   --primary: var(--color-blue-700);
   --primary-foreground: var(--color-blue-50);
   --sidebar-primary: var(--color-blue-500);
