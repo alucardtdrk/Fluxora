@@ -6,12 +6,11 @@ import { FluxoraMark } from "./FluxoraBrand";
 vi.stubGlobal("React", React);
 afterAll(() => vi.unstubAllGlobals());
 
-it("uses the existing dark-background logo without inverting its pixels", () => {
+it("preserves the original white mark on dark backgrounds", () => {
   for (const light of [true, false]) {
     const html = renderToStaticMarkup(React.createElement(FluxoraMark, { light }));
-    expect(html).toContain(light ? "/fluxora-mark-dark.png" : "/fluxora-mark-transparent.png");
-    expect(html).not.toContain("brightness-0");
-    expect(html).not.toContain("invert");
+    expect(html).toContain("/fluxora-mark-transparent.png");
+    expect(html.includes("brightness-0 invert")).toBe(light);
     expect(html).toContain('aria-hidden="true"');
   }
 });
