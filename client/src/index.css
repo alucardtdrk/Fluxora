@@ -524,3 +524,13 @@ html[data-theme-transition="active"]::view-transition-new(theme-toggle) {
   .security-events td { display: block; padding: 6px 0; overflow-wrap: anywhere; }
   .security-events td::before { content: attr(data-label); display: block; margin-bottom: 4px; font-size: 12px; font-weight: 600; color: var(--muted-foreground); }
 }
+
+/* Radial mobile navigation, inspired by Uiverse.io / kennyotsu-monochromia. */
+.fluxora-radial-action { animation: fluxora-radial-reveal 240ms ease-out both; }
+.fluxora-radial-action[aria-current="page"] > span { background: var(--primary); color: var(--primary-foreground); }
+@keyframes fluxora-radial-reveal {
+  from { opacity: 0; translate: -50% 24px; scale: .75; }
+  to { opacity: 1; translate: -50% 0; scale: 1; }
+}
+
+.dark .fluxora-radial-panel { background-color: transparent; border: 0; }

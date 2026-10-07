@@ -25,3 +25,15 @@ it("anchors navigation to the body and marks nested workflow pages as active", (
   expect(links[0]["aria-current"]).toBeUndefined();
   expect(links[1]["aria-current"]).toBe("page");
 });
+
+it("keeps four primary destinations and puts remaining allowed routes in More", () => {
+  const paths = ["/", "/workflows", "/executions", "/errors", "/analytics", "/monitoring"];
+  const items = paths.map(path => ({ label: path, path, icon: Workflow }));
+  const tree = MobileNavigation({ items, currentPath: "/" }) as unknown as React.ReactElement<any>;
+  const nav = tree.props.children.props.children[1].props.children;
+  const primary = nav.props.children[0];
+  const more = nav.props.children[1].props.children;
+  expect(primary.map((item: any) => item.props.children.props.href)).toEqual(paths.slice(0, 4));
+  expect(more[0].props.children.props["aria-label"]).toBe("Mais áreas");
+  expect(more[1].props.children.map((item: any) => item.props.children.props.children.props.href)).toEqual(paths.slice(4));
+});
