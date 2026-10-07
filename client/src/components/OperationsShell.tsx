@@ -387,7 +387,7 @@ export function MobileNavigation({ items, currentPath }: { items: typeof allItem
   const positions = ["left-0 top-36", "left-[14.6%] top-12", "left-1/2 top-2", "left-[85.4%] top-12"];
   return createPortal(
     <div className="lg:hidden" style={{ position: "fixed", left: "50%", transform: "translateX(-50%)", bottom: "calc(16px + env(safe-area-inset-bottom))", zIndex: 40 }}>
-      <Popover modal>
+      <Popover modal={false}>
         <PopoverTrigger asChild>
           <Button aria-label="Abrir navegação" className="group h-[60px] w-[60px] rounded-full p-0 shadow-lg shadow-black/20">
             <Plus aria-hidden="true" className="size-7 transition-transform duration-300 group-data-[state=open]:rotate-45 motion-reduce:transition-none" />
@@ -401,7 +401,7 @@ export function MobileNavigation({ items, currentPath }: { items: typeof allItem
                 <span className="rounded-lg bg-card px-2 py-1 shadow-sm">{path === "/" ? "Início" : label}</span>
               </Link>
             </PopoverClose>)}
-            {items.length > 4 && <DropdownMenu>
+            {items.length > 4 && <DropdownMenu modal={false}>
               <DropdownMenuTrigger asChild><button type="button" aria-label="Mais áreas" className="fluxora-radial-action absolute left-full top-36 flex w-20 -translate-x-1/2 flex-col items-center gap-1 text-center text-xs font-semibold text-foreground" style={{ animationDelay: "160ms" }}><span className="grid h-12 w-12 place-items-center rounded-full border bg-card text-feedback-info shadow-lg"><MoreHorizontal aria-hidden="true" className="h-5 w-5" /></span><span className="rounded-lg bg-card px-2 py-1 shadow-sm">Mais</span></button></DropdownMenuTrigger>
               <DropdownMenuContent aria-label="Outras áreas" side="top" align="end" sideOffset={12} className="w-[min(280px,calc(100vw-32px))] max-h-[60dvh] rounded-2xl p-2 lg:hidden">
                 {items.slice(4).map(({ label, path, icon: Icon }) => <DropdownMenuItem key={path} asChild className="min-h-12 rounded-xl px-3 text-sm"><PopoverClose asChild><Link href={path} aria-current={currentPath === path ? "page" : undefined}><Icon aria-hidden="true" className="h-5 w-5" />{label}</Link></PopoverClose></DropdownMenuItem>)}
