@@ -1,5 +1,5 @@
 export function FluxoraMark({ className = "h-10 w-10", light = false }: { className?: string; light?: boolean }) {
-  return <img src="/fluxora-mark-transparent.png" alt="" aria-hidden="true" className={`shrink-0 object-contain ${light ? "brightness-0 invert drop-shadow-[0_2px_6px_rgba(40,110,247,0.45)]" : ""} ${className}`} />;
+  return <img src={light ? "/fluxora-mark-dark.png" : "/fluxora-mark-transparent.png"} alt="" aria-hidden="true" className={`shrink-0 object-contain ${className}`} />;
 }
 
 export function FluxoraBrand({ compact = false, light = false }: { compact?: boolean; light?: boolean }) {
