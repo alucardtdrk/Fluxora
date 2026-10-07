@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
+import { Close as PopoverClose } from "@radix-ui/react-popover";
 import { Link, useLocation } from "wouter";
 import {
   Activity,
@@ -11,6 +12,7 @@ import {
   LogOut,
   Search,
   Plus,
+  MoreHorizontal,
   ScrollText,
   Settings2,
   ShieldCheck,
@@ -382,22 +384,32 @@ export default function OperationsShell({ children }: { children: React.ReactNod
 }
 
 export function MobileNavigation({ items, currentPath }: { items: typeof allItems; currentPath: string }) {
+  const positions = ["left-0 top-36", "left-[14.6%] top-12", "left-1/2 top-2", "left-[85.4%] top-12"];
   return createPortal(
-        <div className="lg:hidden" style={{ position: "fixed", right: "max(16px, env(safe-area-inset-right))", bottom: "calc(16px + env(safe-area-inset-bottom))", zIndex: 40 }}>
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button aria-label="Abrir navegação" className="group h-14 gap-2 rounded-full px-5 text-base shadow-lg shadow-black/20">
-                <Plus aria-hidden="true" className="h-5 w-5 transition-transform group-data-[state=open]:rotate-45 motion-reduce:transition-none" />Menu
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent aria-label="Áreas do Fluxora" side="top" align="end" sideOffset={12} className="w-[min(320px,calc(100vw-32px))] max-h-[min(70dvh,var(--radix-dropdown-menu-content-available-height))] rounded-2xl p-2 lg:hidden">
-              <DropdownMenuLabel>Navegar no Fluxora</DropdownMenuLabel>
-              <DropdownMenuSeparator />
-              {items.map(({ label, path, icon: Icon }) => <DropdownMenuItem key={path} asChild className="min-h-12 rounded-xl px-3 text-sm">
-                <Link href={path} aria-current={currentPath === path || (path === "/workflows" && currentPath.startsWith("/workflows/")) ? "page" : undefined} className="aria-[current=page]:bg-feedback-info-surface aria-[current=page]:font-semibold aria-[current=page]:text-feedback-info"><Icon aria-hidden="true" className="h-5 w-5" />{label}</Link>
-              </DropdownMenuItem>)}
-            </DropdownMenuContent>
-          </DropdownMenu>
-        </div>, document.body
-      );
+    <div className="lg:hidden" style={{ position: "fixed", left: "50%", transform: "translateX(-50%)", bottom: "calc(16px + env(safe-area-inset-bottom))", zIndex: 40 }}>
+      <Popover modal>
+        <PopoverTrigger asChild>
+          <Button aria-label="Abrir navegação" className="group h-[60px] w-[60px] rounded-full p-0 shadow-lg shadow-black/20">
+            <Plus aria-hidden="true" className="size-7 transition-transform duration-300 group-data-[state=open]:rotate-45 motion-reduce:transition-none" />
+          </Button>
+        </PopoverTrigger>
+        <PopoverContent aria-label="Navegação do Fluxora" side="top" align="center" sideOffset={12} className="fluxora-radial-panel w-[min(352px,calc(100vw-24px))] border-0 bg-transparent px-10 py-0 shadow-none lg:hidden">
+          <nav aria-label="Áreas principais" className="relative h-56">
+            {items.slice(0, 4).map(({ label, path, icon: Icon }, index) => <PopoverClose key={path} asChild>
+              <Link href={path} aria-current={currentPath === path || (path === "/workflows" && currentPath.startsWith("/workflows/")) ? "page" : undefined} className={"fluxora-radial-action absolute flex w-20 -translate-x-1/2 flex-col items-center gap-1 text-center text-xs font-semibold text-foreground " + positions[index]} style={{ animationDelay: index * 40 + "ms" }}>
+                <span className="grid h-12 w-12 place-items-center rounded-full border bg-card text-feedback-info shadow-lg"><Icon aria-hidden="true" className="h-5 w-5" /></span>
+                <span className="rounded-lg bg-card px-2 py-1 shadow-sm">{path === "/" ? "Início" : label}</span>
+              </Link>
+            </PopoverClose>)}
+            {items.length > 4 && <DropdownMenu>
+              <DropdownMenuTrigger asChild><button type="button" aria-label="Mais áreas" className="fluxora-radial-action absolute left-full top-36 flex w-20 -translate-x-1/2 flex-col items-center gap-1 text-center text-xs font-semibold text-foreground" style={{ animationDelay: "160ms" }}><span className="grid h-12 w-12 place-items-center rounded-full border bg-card text-feedback-info shadow-lg"><MoreHorizontal aria-hidden="true" className="h-5 w-5" /></span><span className="rounded-lg bg-card px-2 py-1 shadow-sm">Mais</span></button></DropdownMenuTrigger>
+              <DropdownMenuContent aria-label="Outras áreas" side="top" align="end" sideOffset={12} className="w-[min(280px,calc(100vw-32px))] max-h-[60dvh] rounded-2xl p-2 lg:hidden">
+                {items.slice(4).map(({ label, path, icon: Icon }) => <DropdownMenuItem key={path} asChild className="min-h-12 rounded-xl px-3 text-sm"><PopoverClose asChild><Link href={path} aria-current={currentPath === path ? "page" : undefined}><Icon aria-hidden="true" className="h-5 w-5" />{label}</Link></PopoverClose></DropdownMenuItem>)}
+              </DropdownMenuContent>
+            </DropdownMenu>}
+          </nav>
+        </PopoverContent>
+      </Popover>
+    </div>, document.body
+  );
 }
