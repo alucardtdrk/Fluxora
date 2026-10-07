@@ -1,9 +1,10 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Minus, Plus, Search, Target, Workflow } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 
 const NODE_WIDTH = 180;
+const NODE_HEIGHT = 160;
 const NODE_MIDDLE_Y = 52;
 const NODE_OUT_X = NODE_WIDTH - 10;
 const NODE_IN_X = 10;
@@ -52,6 +53,7 @@ function buildEdges(connections: Record<string, unknown>) {
 }
 
 export default function WorkflowDiagram({ nodes, connections, selectedNodeName, onSelectNode, executionNodeStatuses }: DiagramProps) {
+  const viewportRef = useRef<HTMLDivElement>(null);
   const [search, setSearch] = useState("");
   const [zoom, setZoom] = useState(1);
   const [pan, setPan] = useState({ x: 0, y: 0 });
@@ -70,8 +72,8 @@ export default function WorkflowDiagram({ nodes, connections, selectedNodeName, 
       return {
         minX: 0,
         minY: 0,
-        width: 1200,
-        height: 700,
+        width: NODE_WIDTH,
+        height: NODE_HEIGHT,
         offsetX: 140,
         offsetY: 100,
       };
@@ -85,21 +87,29 @@ export default function WorkflowDiagram({ nodes, connections, selectedNodeName, 
     return {
       minX,
       minY,
-      width: (maxX - minX) * POSITION_SCALE_X + 520,
-      height: (maxY - minY) * POSITION_SCALE_Y + 360,
+      width: (maxX - minX) * POSITION_SCALE_X + NODE_WIDTH,
+      height: (maxY - minY) * POSITION_SCALE_Y + NODE_HEIGHT,
       offsetX: 140 - minX,
       offsetY: 100 - minY,
     };
   }, [renderNodes]);
 
-  const centerDiagram = () => {
-    setZoom(1);
-    setPan({ x: 0, y: 0 });
-  };
+  const centerDiagram = useCallback(() => {
+    const viewport = viewportRef.current;
+    if (!viewport || !viewport.clientWidth || !viewport.clientHeight) return;
+    const fitted = fitDiagram(layout, { width: viewport.clientWidth, height: viewport.clientHeight });
+    setZoom(fitted.zoom);
+    setPan(fitted.pan);
+  }, [layout]);
 
   useEffect(() => {
+    const viewport = viewportRef.current;
+    if (!viewport) return;
     centerDiagram();
-  }, [nodes.length, search]);
+    const observer = new ResizeObserver(centerDiagram);
+    observer.observe(viewport);
+    return () => observer.disconnect();
+  }, [centerDiagram]);
 
   function displayPosition(node: DiagramNode) {
     return {
@@ -124,13 +134,14 @@ export default function WorkflowDiagram({ nodes, connections, selectedNodeName, 
             <Search className="absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
             <Input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Buscar node" className="h-9 w-[220px] pl-9 text-xs" />
           </div>
-          <Button aria-label="Diminuir zoom" variant="outline" size="sm" onClick={() => setZoom((value) => Math.max(0.4, Number((value - 0.15).toFixed(2))))}><Minus className="h-4 w-4" /></Button>
-          <Button aria-label="Aumentar zoom" variant="outline" size="sm" onClick={() => setZoom((value) => Math.min(2.4, Number((value + 0.15).toFixed(2))))}><Plus className="h-4 w-4" /></Button>
+          <Button aria-label="Diminuir zoom" variant="outline" size="sm" onClick={() => setZoom((value) => Math.max(0.01, value / 1.25))}><Minus className="h-4 w-4" /></Button>
+          <Button aria-label="Aumentar zoom" variant="outline" size="sm" onClick={() => setZoom((value) => Math.min(2.4, value * 1.25))}><Plus className="h-4 w-4" /></Button>
           <Button variant="outline" size="sm" onClick={centerDiagram}><Target className="mr-2 h-4 w-4" />Centralizar</Button>
         </div>
       </div>
 
       <div
+        ref={viewportRef}
         className={`relative max-md:max-h-[65dvh] overflow-hidden rounded-b-[28px] bg-background select-none ${dragStart ? "cursor-grabbing" : "cursor-grab"}`}
         style={{ height: viewportHeight, minHeight: 320, touchAction: "none" }}
         onPointerDown={(event) => {
@@ -205,4 +216,15 @@ export default function WorkflowDiagram({ nodes, connections, selectedNodeName, 
       </div>
     </div>
   );
+}
+
+export function fitDiagram(bounds: { width: number; height: number }, viewport: { width: number; height: number }) {
+  const zoom = Math.min(1, Math.max(1, viewport.width - 48) / bounds.width, Math.max(1, viewport.height - 48) / bounds.height);
+  return {
+    zoom,
+    pan: {
+      x: (viewport.width - bounds.width * zoom) / 2 - 140 * zoom,
+      y: (viewport.height - bounds.height * zoom) / 2 - 100 * zoom,
+    },
+  };
 }
