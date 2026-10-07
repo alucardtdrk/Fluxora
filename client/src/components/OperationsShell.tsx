@@ -9,6 +9,7 @@ import {
   LayoutDashboard,
   LogOut,
   Search,
+  Menu,
   ScrollText,
   Settings2,
   ShieldCheck,
@@ -17,6 +18,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "@/_core/hooks/useAuth";
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription, SheetTrigger, SheetClose } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
@@ -82,16 +84,16 @@ function LoginScreen() {
       <div className="fluxora-login-aurora pointer-events-none fixed inset-0" />
       <div className="relative mx-auto flex min-h-[calc(100vh-4rem)] max-w-[1120px] items-center justify-center">
         <div className="grid w-full overflow-hidden rounded-[32px] border border-white/10 shadow-[0_35px_100px_rgba(16,4,42,.48)] md:grid-cols-[1.08fr_.92fr]">
-          <section className="fluxora-login-panel relative overflow-hidden px-9 py-12 md:px-14 md:py-16">
+          <section className="fluxora-login-panel relative overflow-hidden px-6 py-6 md:px-14 md:py-16">
             <div className="fluxora-circuit pointer-events-none absolute inset-0 opacity-70" />
             <div className="pointer-events-none absolute -right-24 -top-24 h-[420px] w-[420px] rounded-full bg-[#286EF7]/15 blur-[100px]" />
-            <div className="relative flex h-full min-h-[520px] flex-col">
+            <div className="relative flex h-full min-h-0 flex-col md:min-h-[520px]">
               <FluxoraBrand light />
-              <div className="my-auto py-12">
-                <h1 className="max-w-[560px] text-[44px] font-bold leading-[1.04] tracking-[-0.06em] md:text-[60px]">
+              <div className="my-auto py-5 md:py-12">
+                <h1 className="max-w-[560px] text-[28px] font-bold leading-[1.04] tracking-[-0.06em] md:text-[60px]">
                   Controle operacional para suas automações.
                 </h1>
-                <p className="mt-8 max-w-[470px] text-base leading-7 text-[#E2D8F5]">
+                <p className="mt-4 md:mt-8 max-w-[470px] text-base leading-7 text-[#E2D8F5]">
                   Acompanhe workflows, execuções, falhas e tendências em um único ambiente.
                 </p>
               </div>
@@ -99,9 +101,9 @@ function LoginScreen() {
             </div>
           </section>
 
-          <section className="bg-[#F0EBE2] px-9 py-12 text-[#280E59] md:px-14 md:py-16">
-            <div className="flex h-full min-h-[520px] flex-col justify-center">
-              <div className="mb-8 flex h-14 w-14 items-center justify-center"><FluxoraMark className="h-12 w-12" /></div>
+          <section className="bg-[#F0EBE2] px-6 py-7 text-[#280E59] md:px-14 md:py-16">
+            <div className="flex h-full min-h-0 flex-col justify-center md:min-h-[520px]">
+              <div className="mb-4 md:mb-8 flex h-14 w-14 items-center justify-center"><FluxoraMark className="h-12 w-12" /></div>
               <p className="text-[11px] font-bold uppercase tracking-[0.22em] text-[#72668A]">Acesso corporativo</p>
               <h2 className="mt-5 text-[34px] font-bold tracking-[-0.055em]">Entrar no painel</h2>
               <p className="mt-4 max-w-sm text-[15px] leading-6 text-[#667085]">Use sua conta corporativa para acessar o Fluxora.</p>
@@ -291,10 +293,10 @@ export default function OperationsShell({ children }: { children: React.ReactNod
         </div>
       </aside>
 
-      <main data-sidebar-collapsed={collapsed} className={`fluxora-main min-h-screen ${collapsed ? "lg:ml-[78px]" : "lg:ml-[252px]"}`}>
-        <header className="sticky top-0 z-20 flex h-[86px] items-center justify-between border-b border-border bg-background/90 px-5 backdrop-blur-xl md:px-9">
-          <div><p className="text-[11px] font-bold uppercase tracking-[0.18em] text-muted-foreground">Fluxora</p><h1 className="mt-1 text-xl font-semibold tracking-[-0.03em] text-foreground">{currentTitle}</h1></div>
-          <div className="flex items-center gap-2">
+      <main data-sidebar-collapsed={collapsed} className={`fluxora-main min-h-screen pb-[calc(76px+env(safe-area-inset-bottom))] lg:pb-0 ${collapsed ? "lg:ml-[78px]" : "lg:ml-[252px]"}`}>
+        <header className="sticky top-0 z-20 flex h-[72px] lg:h-[86px] items-center justify-between border-b border-border bg-background/90 px-5 backdrop-blur-xl md:px-9">
+          <div className="min-w-0 flex-1 pr-2"><p className="text-[11px] font-bold uppercase tracking-[0.18em] text-muted-foreground">Fluxora</p><h1 className="mt-1 truncate text-base sm:text-xl font-semibold tracking-[-0.03em] text-foreground">{currentTitle}</h1></div>
+          <div className="flex shrink-0 items-center gap-0 sm:gap-2">
             <Button type="button" variant="ghost" size="icon" onClick={() => setCommandOpen(true)} className="rounded-xl text-muted-foreground md:hidden" aria-label="Abrir busca global">
               <Search className="h-[18px] w-[18px]" />
             </Button>
@@ -319,7 +321,7 @@ export default function OperationsShell({ children }: { children: React.ReactNod
                   {unread.length > 0 && <span className="absolute right-1 top-1 min-w-[16px] rounded-full bg-feedback-error px-1 text-center text-[9px] font-bold leading-4 text-white">{Math.min(unread.length, 99)}</span>}
                 </Button>
               </PopoverTrigger>
-              <PopoverContent align="end" className="w-[360px] p-0">
+              <PopoverContent align="end" className="w-[min(360px,calc(100vw-24px))] p-0">
                 <div className="border-b px-4 py-3"><p className="text-sm font-semibold text-foreground">Notificações</p><p className="mt-1 text-xs text-muted-foreground">Falhas recentes detectadas pelo n8n.</p><Button variant="ghost" size="sm" className="fluxora-action mt-2" disabled={!unread.length || markRead.isPending} onClick={() => markNotificationsRead()}>{markRead.isPending ? "Salvando…" : "Marcar todas como lidas"}</Button></div>
                 <div className="max-h-[360px] overflow-y-auto">
                   {recentErrors.length === 0 ? <div className="px-4 py-8 text-center text-xs text-muted-foreground">Nenhuma falha recente.</div> : recentErrors.map((item: any) => (
@@ -332,7 +334,7 @@ export default function OperationsShell({ children }: { children: React.ReactNod
             </Popover>
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <button type="button" className="ml-1 grid h-9 w-9 place-items-center rounded-full bg-feedback-info-surface text-xs font-bold text-feedback-info focus:outline-none focus-visible:ring-2 focus-visible:ring-primary lg:hidden" aria-label="Abrir menu da conta">{user.name?.slice(0, 1).toUpperCase() || "F"}</button>
+                <button type="button" className="ml-1 grid h-11 w-11 place-items-center rounded-full bg-feedback-info-surface text-xs font-bold text-feedback-info focus:outline-none focus-visible:ring-2 focus-visible:ring-primary lg:hidden" aria-label="Abrir menu da conta">{user.name?.slice(0, 1).toUpperCase() || "F"}</button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-56 lg:hidden">
                 <DropdownMenuLabel className="font-normal"><p className="truncate text-sm font-semibold">{user.name}</p><p className="mt-1 truncate text-xs text-muted-foreground">{user.email}</p></DropdownMenuLabel>
@@ -342,7 +344,10 @@ export default function OperationsShell({ children }: { children: React.ReactNod
             </DropdownMenu>
           </div>
         </header>
-        <nav className="flex gap-1 overflow-x-auto border-b border-border bg-card px-5 py-2 lg:hidden">{visibleItems.map(({ label, path }) => <Link key={path} href={path} className={`whitespace-nowrap rounded-lg px-3 py-2 text-xs font-semibold ${currentPath === path ? "bg-feedback-info-surface text-feedback-info" : "text-muted-foreground"}`}>{label}</Link>)}</nav>
+        <nav aria-label="Navegação principal" className="fixed inset-x-0 bottom-0 z-30 grid grid-cols-5 border-t border-border bg-card pb-[env(safe-area-inset-bottom)] lg:hidden">
+          {operationItems.slice(0, 4).map(({ label, path, icon: Icon }) => <Link key={path} href={path} aria-current={currentPath === path || (path === "/workflows" && currentPath.startsWith("/workflows/")) ? "page" : undefined} className="flex min-h-16 min-w-0 flex-col items-center justify-center gap-1 px-1 text-[11px] font-semibold text-muted-foreground aria-[current=page]:text-primary"><Icon aria-hidden="true" className="h-5 w-5" /><span>{label === "Visão geral" ? "Início" : label}</span></Link>)}
+          <Sheet><SheetTrigger asChild><button type="button" aria-label="Abrir mais áreas" className="flex min-h-16 flex-col items-center justify-center gap-1 text-[11px] font-semibold text-muted-foreground"><Menu aria-hidden="true" className="h-5 w-5" />Mais</button></SheetTrigger><SheetContent side="bottom" className="max-h-[85dvh] overflow-y-auto rounded-t-2xl pb-[env(safe-area-inset-bottom)]"><SheetHeader><SheetTitle>Mais áreas</SheetTitle><SheetDescription>Navegue pelas outras áreas do Fluxora.</SheetDescription></SheetHeader><nav aria-label="Outras áreas" className="space-y-1 px-4 pb-4">{visibleItems.slice(4).map(({ label, path, icon: Icon }) => <SheetClose key={path} asChild><Link href={path} aria-current={currentPath === path ? "page" : undefined} className="flex min-h-12 items-center gap-3 rounded-xl px-4 text-sm font-medium hover:bg-muted aria-[current=page]:bg-muted aria-[current=page]:text-primary"><Icon aria-hidden="true" className="h-5 w-5" />{label}</Link></SheetClose>)}</nav></SheetContent></Sheet>
+        </nav>
         {children}
       </main>
       <CommandDialog open={commandOpen} onOpenChange={setCommandOpen} title="Busca global" description="Encontre páginas, workflows e execuções.">

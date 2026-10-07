@@ -507,3 +507,18 @@ html[data-theme-transition="active"]::view-transition-new(theme-toggle) {
   to { clip-path: circle(var(--theme-reveal-radius) at var(--theme-reveal-x) var(--theme-reveal-y)); }
 }
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { scroll-behavior: auto !important; transition-duration: 0.01ms !important; transition-delay: 0ms !important; animation-duration: 0.01ms !important; } }
+
+/* Touch controls and stacked security events on phones. */
+@media (max-width: 767px) {
+  .fluxora-app [data-slot="button"], .fluxora-app [data-slot="select-trigger"],
+  .fluxora-app .fluxora-action, .fluxora-app button[aria-pressed] { min-height: 44px; }
+  .fluxora-app [data-slot="button"]:has(> svg:only-child) { min-width: 44px; }
+  .fluxora-app input, .fluxora-app textarea { font-size: 16px; }
+  [data-slot="dialog-content"] { max-height: 85dvh; overflow-y: auto; }
+  [data-slot="sheet-content"] > button:last-child { min-width: 44px; min-height: 44px; top: 8px; right: 8px; }
+  .security-events, .security-events tbody { display: block; }
+  .security-events thead { display: none; }
+  .security-events tr { display: block; padding: 12px 0; }
+  .security-events td { display: block; padding: 6px 0; overflow-wrap: anywhere; }
+  .security-events td::before { content: attr(data-label); display: block; margin-bottom: 4px; font-size: 12px; font-weight: 600; color: var(--muted-foreground); }
+}

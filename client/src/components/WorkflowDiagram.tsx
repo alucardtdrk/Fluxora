@@ -55,7 +55,7 @@ export default function WorkflowDiagram({ nodes, connections, selectedNodeName, 
   const [search, setSearch] = useState("");
   const [zoom, setZoom] = useState(1);
   const [pan, setPan] = useState({ x: 0, y: 0 });
-  const [dragStart, setDragStart] = useState<{ x: number; y: number; panX: number; panY: number } | null>(null);
+  const [dragStart, setDragStart] = useState<{ x: number; y: number; panX: number; panY: number; pointerId: number } | null>(null);
 
   const lowered = search.trim().toLowerCase();
   const visibleNodes = useMemo(() => nodes.filter((node) => !lowered || node.name.toLowerCase().includes(lowered) || node.type.toLowerCase().includes(lowered)), [nodes, lowered]);
@@ -124,27 +124,29 @@ export default function WorkflowDiagram({ nodes, connections, selectedNodeName, 
             <Search className="absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
             <Input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Buscar node" className="h-9 w-[220px] pl-9 text-xs" />
           </div>
-          <Button variant="outline" size="sm" onClick={() => setZoom((value) => Math.max(0.4, Number((value - 0.15).toFixed(2))))}><Minus className="h-4 w-4" /></Button>
-          <Button variant="outline" size="sm" onClick={() => setZoom((value) => Math.min(2.4, Number((value + 0.15).toFixed(2))))}><Plus className="h-4 w-4" /></Button>
+          <Button aria-label="Diminuir zoom" variant="outline" size="sm" onClick={() => setZoom((value) => Math.max(0.4, Number((value - 0.15).toFixed(2))))}><Minus className="h-4 w-4" /></Button>
+          <Button aria-label="Aumentar zoom" variant="outline" size="sm" onClick={() => setZoom((value) => Math.min(2.4, Number((value + 0.15).toFixed(2))))}><Plus className="h-4 w-4" /></Button>
           <Button variant="outline" size="sm" onClick={centerDiagram}><Target className="mr-2 h-4 w-4" />Centralizar</Button>
         </div>
       </div>
 
       <div
-        className={`relative overflow-hidden rounded-b-[28px] bg-background select-none ${dragStart ? "cursor-grabbing" : "cursor-grab"}`}
-        style={{ height: viewportHeight }}
-        onMouseDown={(event) => {
-          if ((event.target as HTMLElement)?.closest("button")) return;
+        className={`relative max-md:max-h-[65dvh] overflow-hidden rounded-b-[28px] bg-background select-none ${dragStart ? "cursor-grabbing" : "cursor-grab"}`}
+        style={{ height: viewportHeight, minHeight: 320, touchAction: "none" }}
+        onPointerDown={(event) => {
+          if (!event.isPrimary || event.button !== 0 || (event.target as HTMLElement)?.closest("button")) return;
+          event.currentTarget.setPointerCapture(event.pointerId);
           event.preventDefault();
-          setDragStart({ x: event.clientX, y: event.clientY, panX: pan.x, panY: pan.y });
+          setDragStart({ x: event.clientX, y: event.clientY, panX: pan.x, panY: pan.y, pointerId: event.pointerId });
         }}
-        onMouseMove={(event) => {
-          if (!dragStart) return;
+        onPointerMove={(event) => {
+          if (!dragStart || dragStart.pointerId !== event.pointerId) return;
           event.preventDefault();
           setPan({ x: dragStart.panX + event.clientX - dragStart.x, y: dragStart.panY + event.clientY - dragStart.y });
         }}
-        onMouseUp={() => setDragStart(null)}
-        onMouseLeave={() => setDragStart(null)}
+        onPointerUp={() => setDragStart(null)}
+        onPointerCancel={() => setDragStart(null)}
+        onLostPointerCapture={() => setDragStart(null)}
       >
         <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(var(--border)_1px,transparent_1px),linear-gradient(90deg,var(--border)_1px,transparent_1px)] bg-[size:32px_32px]" />
         <svg className="absolute inset-0 h-full w-full">
