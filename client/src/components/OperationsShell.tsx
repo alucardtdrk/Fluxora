@@ -156,7 +156,7 @@ export default function OperationsShell({ children }: { children: React.ReactNod
   const errorExecutions = trpc.n8n.recentErrors.useQuery(undefined, {
     enabled: Boolean(user),
     retry: false,
-    refetchInterval: refreshIntervalMs,
+    refetchInterval: Math.max(refreshIntervalMs, 60_000),
   });
   const executions = trpc.n8n.executions.useQuery(undefined, { enabled: Boolean(user) && commandOpen, retry: false });
   const workflows = trpc.n8n.workflows.useQuery(undefined, { enabled: Boolean(user), retry: false });

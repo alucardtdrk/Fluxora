@@ -27,7 +27,7 @@ export default function Home() {
   const [period, setPeriod] = useState<Period>(() => readScopedPeriod("home"));
   const [focusIds, setFocusIds] = useState<string[]>(() => readFocusWorkflows());
   const workflows = trpc.n8n.workflows.useQuery(undefined, { enabled: Boolean(user), retry: false });
-  const overview = trpc.n8n.overview.useQuery({ period, workflowIds: focusIds }, { enabled: Boolean(user), retry: false, placeholderData: (previous) => previous, refetchInterval: refreshIntervalMs });
+  const overview = trpc.n8n.overview.useQuery({ period, workflowIds: focusIds }, { enabled: Boolean(user), retry: false, placeholderData: (previous) => previous, refetchInterval: period === "today" ? refreshIntervalMs : Math.max(refreshIntervalMs, 60_000) });
   const m = overview.data?.metrics;
   const initialLoading = overview.isPending && !overview.data;
 

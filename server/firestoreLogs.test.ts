@@ -23,9 +23,12 @@ it("includes active executions beyond the first Firestore page without treating 
     ...Array.from({ length: 1000 }, (_, index) => ({ executionId: `execution-${index}`, archiveRunId: "current" })),
     { executionId: "legacy", archiveRunId: "old" },
     { executionId: "last-current", archiveRunId: "current" },
-  ];
-  firestore.query.mockImplementation(async (query: { offset?: number; limit: number }) =>
-    rows.slice(query.offset ?? 0, (query.offset ?? 0) + query.limit));
+  ].map((row) => ({ ...row, startedAt: "2026-10-01T00:00:00Z", _documentName: `projects/test/databases/(default)/documents/logs/${row.executionId}` }));
+  firestore.query.mockImplementation(async (query: { startAt?: { values: Array<{ referenceValue?: string }> }; limit: number }) => {
+    const after = query.startAt?.values[1].referenceValue;
+    const start = after ? rows.findIndex((row) => row._documentName === after) + 1 : 0;
+    return rows.slice(start, start + query.limit);
+  });
 
   const archive = await listArchivedExecutions("all");
 

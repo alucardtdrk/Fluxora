@@ -35,6 +35,23 @@ function mockSource(items: unknown[]) {
   }), { status: 200 }));
 }
 
+it("queries only the dashboard period and keeps archived history cached across refreshes", async () => {
+  vi.useFakeTimers();
+  archive.archiveConfigured.mockReturnValue(true);
+  archive.getArchiveSyncState.mockResolvedValue({ backfillComplete: true });
+  archive.listArchivedExecutions.mockResolvedValue({ items: [{ id: "archived", workflowId: "wf", status: "success", startedAt: new Date().toISOString() }], truncated: false });
+  mockSource([{ id: "live", workflowId: "wf", status: "success", startedAt: new Date().toISOString() }]);
+  const n8n = await import("./n8n.js");
+  expect((await n8n.getN8nOverview("7d")).metrics?.executions).toBe(2);
+  expect(archive.listArchivedExecutions).toHaveBeenCalledWith("7d", true);
+  vi.advanceTimersByTime(61_000);
+  await n8n.getN8nOverview("7d");
+  expect(archive.listArchivedExecutions).toHaveBeenCalledTimes(1);
+  n8n.invalidateN8nCache();
+  await n8n.getN8nOverview("7d");
+  expect(archive.listArchivedExecutions).toHaveBeenCalledTimes(2);
+});
+
 it("reuses dashboard calculations, separates filters, expires and invalidates results", async () => {
   vi.useFakeTimers();
   const fetch = mockSource([{ id: "1", workflowId: "wf", status: "error", startedAt: new Date().toISOString() }]);
@@ -79,20 +96,20 @@ it("bounds notification archive reads and lets live successes replace archived e
   expect(result.items).toHaveLength(12);
   expect(result.items.some((item) => item.id === "0")).toBe(false);
   expect(archive.listArchivedExecutions).toHaveBeenCalledTimes(1);
-  expect(archive.listArchivedExecutions).toHaveBeenCalledWith("all", true, { limit: 100 });
+  expect(archive.listArchivedExecutions).toHaveBeenCalledWith("all", true, { limit: 100, errorsOnly: true });
   expect(await n8n.listN8nRecentErrors()).toBe(result);
 });
 
-it("continues reading when recent archive pages have too few errors", async () => {
+it("uses an error cursor when live corrections leave too few notifications", async () => {
   archive.archiveConfigured.mockReturnValue(true);
   archive.getArchiveSyncState.mockResolvedValue({ backfillComplete: true });
   archive.listArchivedExecutions
-    .mockResolvedValueOnce({ items: [{ id: "new", status: "success" }], hasMore: true })
+    .mockResolvedValueOnce({ items: [{ id: "new", status: "error" }], hasMore: true, nextCursor: { startedAt: "2026-10-01T00:00:00Z", documentName: "projects/test/databases/(default)/documents/logs/new" } })
     .mockResolvedValueOnce({ items: [{ id: "old", status: "crashed" }], hasMore: false });
-  mockSource([]);
+  mockSource([{ id: "new", status: "success" }]);
   const n8n = await import("./n8n.js");
   expect((await n8n.listN8nRecentErrors()).items).toMatchObject([{ id: "old" }]);
-  expect(archive.listArchivedExecutions).toHaveBeenLastCalledWith("all", true);
+  expect(archive.listArchivedExecutions).toHaveBeenLastCalledWith("all", true, { limit: 100, errorsOnly: true, after: { startedAt: "2026-10-01T00:00:00Z", documentName: "projects/test/databases/(default)/documents/logs/new" } });
 });
 
 it.each([false, true])("reconciles completed history only when the last successful scan is due: %s", async (due) => {

@@ -231,6 +231,7 @@ function decodeDocument(document: any): FirestoreRecord & { _documentId: string 
   return {
     _documentId: documentIdFromName(document?.name),
     ...decodeFields(document?.fields || {}),
+    _documentName: document?.name,
   };
 }
 

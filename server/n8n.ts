@@ -932,7 +932,7 @@ export async function preserveN8nExecutionDetails(batchSize?: number) {
 
 async function loadArchivedExecutions(period: Period, includeLegacy = false) {
   const scope = includeLegacy ? "all-stored" : "active";
-  return cached(`archive:executions:${scope}:${period}`, 20_000, 2 * 60_000, () => listArchivedExecutions(period, includeLegacy));
+  return cached(`archive:executions:${scope}:${period}`, 5 * 60_000, 0, () => listArchivedExecutions(period, includeLegacy));
 }
 
 async function loadLiveExecutions(period: Period) {
@@ -956,22 +956,19 @@ function mergeExecutions(archived: N8nExecution[], live: N8nExecution[]) {
   });
 }
 
-async function loadConsolidatedExecutions(backfillComplete: boolean) {
+async function loadConsolidatedExecutions(backfillComplete: boolean, period: Period) {
   // During the initial import, older executions may still exist only in n8n.
   // Once reconciliation is complete, the archive owns the long-term history
   // and only today's live data is needed to keep in-progress rows current.
-  // Always build one canonical snapshot. Every dashboard period is filtered
-  // from this same set so a shorter period can never exceed "all" because of
-  // independently refreshed caches.
-  const livePeriod: Period = backfillComplete ? "today" : "all";
-  const archive = await loadArchivedExecutions("all", true);
+  const livePeriod: Period = backfillComplete ? "today" : period;
+  const archive = await loadArchivedExecutions(period, true);
   const live = await loadLiveExecutions(livePeriod).catch((error) => {
     console.error("n8n live executions unavailable; using Firestore archive", { error: error instanceof Error ? error.name : "unknown" });
     return { items: [] as N8nExecution[], truncated: false };
   });
   const items = mergeExecutions(archive.items as N8nExecution[], live.items);
   console.info("Fluxora consolidated executions loaded", {
-    period: "all",
+    period,
     livePeriod,
     backfillComplete,
     archiveCount: archive.items.length,
@@ -996,10 +993,10 @@ async function loadExecutions(includeData = false, period: Period = "all") {
       const stateBefore = await getArchiveSyncState();
       const backfillComplete = stateBefore.backfillComplete === true;
       const snapshot = await cached(
-        `executions:consolidated:v3:${backfillComplete ? "complete" : "importing"}`,
+        `executions:consolidated:v4:${backfillComplete ? "complete" : "importing"}:${period}`,
         ttl,
         2 * 60_000,
-        () => loadConsolidatedExecutions(backfillComplete),
+        () => loadConsolidatedExecutions(backfillComplete, period),
       );
       return {
         ...snapshot,
@@ -1201,9 +1198,9 @@ export async function listN8nExecutions() {
   }
 }
 
-async function loadNormalizedExecutions() {
-  return cached("executions:normalized:all", 30_000, 30_000, async () => {
-    const [{ workflows }, raw] = await Promise.all([loadWorkflows(), loadExecutions(false, "all")]);
+async function loadNormalizedExecutions(period: Period = "all") {
+  return cached(`executions:normalized:${period}`, 30_000, 30_000, async () => {
+    const [{ workflows }, raw] = await Promise.all([loadWorkflows(), loadExecutions(false, period)]);
     const names = workflowMap(workflows);
     return { items: raw.items.map((item) => normalizeExecution(item, names)), truncated: raw.truncated };
   });
@@ -1222,14 +1219,14 @@ export async function listN8nRecentErrors() {
         const live = await loadLiveExecutions(state.backfillComplete ? "today" : "all").catch(() => ({ items: [] as N8nExecution[], truncated: false }));
         const liveById = new Map(live.items.map((item) => [String(item.id), item]));
         errors = mergeExecutions([], live.items).filter(isError).slice(0, 12);
-        const recent = await listArchivedExecutions("all", true, { limit: 100 });
-        errors = mergeExecutions(errors, recent.items.map((item) => ({ ...item, ...liveById.get(String(item.id)) }))).filter(isError).slice(0, 12);
-        const oldest = Date.parse(recent.items.at(-1)?.startedAt || "");
-        if (recent.hasMore && (errors.length < 12 || !(Date.parse(errors[11].startedAt || "") > oldest))) {
-          // Reuse the dashboard snapshot if older errors are needed; avoid repeated offset scans.
-          const history = await loadArchivedExecutions("all", true);
-          errors = mergeExecutions(history.items as N8nExecution[], live.items).filter(isError).slice(0, 12);
-        }
+        let after: { startedAt: string; documentName: string } | undefined;
+        do {
+          const recent = await listArchivedExecutions("all", true, { limit: 100, errorsOnly: true, ...(after ? { after } : {}) });
+          errors = mergeExecutions(errors, recent.items.map((item) => ({ ...item, ...liveById.get(String(item.id)) }))).filter(isError).slice(0, 12);
+          const oldest = Date.parse(recent.items.at(-1)?.startedAt || "");
+          if (!recent.hasMore || (errors.length === 12 && Date.parse(errors[11].startedAt || "") > oldest)) break;
+          after = recent.nextCursor;
+        } while (after);
       } else {
         errors = mergeExecutions([], (await loadExecutions(false, "all")).items).filter(isError).slice(0, 12);
       }
@@ -1252,7 +1249,7 @@ export async function listN8nExecutionsPage(input: {
   const empty = { items: [] as any[], total: 0, page: input.page, pageSize: input.pageSize, totalPages: 1, sections: [] as string[], truncated: false };
   if (!getConfig()) return { status: "not_configured" as const, connected: false as const, ...empty };
   try {
-    const raw = await loadNormalizedExecutions();
+    const raw = await loadNormalizedExecutions(input.period);
     const normalized = raw.items;
     const periodItems = normalized.filter((item) => withinPeriod(item, input.period));
     const workflowItems = periodItems.filter((item) => !input.workflowId || input.workflowId === "all" || item.workflowId === input.workflowId);
