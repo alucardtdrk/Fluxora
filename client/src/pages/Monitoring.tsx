@@ -88,9 +88,9 @@ export default function Monitoring() {
   const [alertPreferences, setAlertPreferences] = useState(() => readOperationalAlertPreferences());
   const refreshIntervalMs = refreshSeconds * 1000;
   const overview = trpc.n8n.overview.useQuery({ period: "7d", workflowIds: [], inactiveHours: alertPreferences.inactiveHours }, { retry: false, refetchInterval: refreshIntervalMs, placeholderData: (previous) => previous });
-  const workflows = trpc.n8n.workflows.useQuery(undefined, { retry: false, refetchInterval: refreshIntervalMs });
+  const workflows = trpc.n8n.workflows.useQuery(undefined, { retry: false, refetchInterval: Math.max(refreshIntervalMs, 60_000) });
   const analytics = trpc.n8n.analytics.useQuery({ period: "7d" }, { retry: false, refetchInterval: refreshIntervalMs, placeholderData: (previous) => previous });
-  const archiveStatus = trpc.n8n.archiveStatus.useQuery(undefined, { retry: false, refetchInterval: refreshIntervalMs, placeholderData: (previous) => previous });
+  const archiveStatus = trpc.n8n.archiveStatus.useQuery(undefined, { retry: false, refetchInterval: Math.max(refreshIntervalMs, 60_000), placeholderData: (previous) => previous });
   const metrics = overview.data?.metrics;
   const overviewLoading = overview.isPending && !overview.data;
   const workflowsLoading = workflows.isPending && !workflows.data;
@@ -116,7 +116,7 @@ export default function Monitoring() {
     <ReliabilityPanel analytics={analytics.data} loading={analytics.isPending && !analytics.data} />
     <div className="mt-6 grid gap-6 lg:grid-cols-2">
       <Card className="border-0"><CardHeader><CardTitle className="text-base">Estado dos workflows</CardTitle></CardHeader><CardContent className="space-y-3">{workflowsLoading ? <div className="space-y-3">{Array.from({ length: 4 }, (_, index) => <div key={index} className="h-16 animate-pulse rounded-xl bg-muted" />)}</div> : (workflows.data?.items ?? []).map((workflow: any) => <div key={workflow.id} className="flex items-center justify-between rounded-xl bg-background px-4 py-3"><div><p className="text-sm font-semibold">{workflow.name}</p><p className="mt-1 text-xs text-muted-foreground">{workflow.nodeCount} nodes</p></div><span className={`rounded-full px-2.5 py-1 text-[10px] font-bold ${workflow.active ? "bg-feedback-success-surface text-feedback-success" : "bg-muted text-muted-foreground"}`}>{workflow.active ? "Ativo" : "Inativo"}</span></div>)}</CardContent></Card>
-      <Card className="border-0 bg-code-background text-code-foreground"><CardHeader><CardTitle className="flex items-center gap-2 text-base"><ShieldCheck className="h-5 w-5 text-feedback-info"/>Monitoramento automático</CardTitle></CardHeader><CardContent><p className="text-sm leading-6 text-code-foreground/80">O painel consulta o backend periodicamente. Novas falhas aparecem no sino de notificações e podem gerar um alerta visual.</p><div className="mt-6 rounded-xl bg-white/10 p-4"><Activity className="h-4 w-4 text-feedback-info"/><p className="mt-3 text-2xl font-semibold">{refreshSeconds}s</p><p className="text-xs text-code-foreground/70">intervalo configurado para todas as consultas</p></div></CardContent></Card>
+      <Card className="border-0 bg-code-background text-code-foreground"><CardHeader><CardTitle className="flex items-center gap-2 text-base"><ShieldCheck className="h-5 w-5 text-feedback-info"/>Monitoramento automático</CardTitle></CardHeader><CardContent><p className="text-sm leading-6 text-code-foreground/80">O painel consulta o backend periodicamente. Novas falhas aparecem no sino de notificações e podem gerar um alerta visual.</p><div className="mt-6 rounded-xl bg-white/10 p-4"><Activity className="h-4 w-4 text-feedback-info"/><p className="mt-3 text-2xl font-semibold">{refreshSeconds}s</p><p className="text-xs text-code-foreground/70">intervalo configurado para as métricas</p></div></CardContent></Card>
     </div>
   </div></OperationsShell>;
 }

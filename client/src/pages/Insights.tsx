@@ -73,7 +73,7 @@ function AnalyticsPage() {
   const { user } = useAuth();
   const [refreshIntervalMs, setRefreshIntervalMs] = useState(() => readPreferredRefreshSeconds() * 1000);
   const [period, setPeriod] = useState<Period>(() => readScopedPeriod("analytics"));
-  const data = trpc.n8n.analytics.useQuery({ period }, { enabled: Boolean(user), retry: false, placeholderData: (previous) => previous, refetchInterval: refreshIntervalMs });
+  const data = trpc.n8n.analytics.useQuery({ period }, { enabled: Boolean(user), retry: false, placeholderData: (previous) => previous, refetchInterval: period === "today" ? refreshIntervalMs : Math.max(refreshIntervalMs, 60_000) });
   const dashboard = data.data;
   const initialLoading = data.isPending && !data.data;
 
@@ -203,7 +203,7 @@ function ErrorsPage() {
   const [errorPageSize, setErrorPageSize] = useState(() => readPreferredPageSize(50));
   const [selected, setSelected] = useState<string | null>(null);
   const [selectedIncident, setSelectedIncident] = useState<any | null>(null);
-  const data = trpc.n8n.analytics.useQuery({ period }, { enabled: Boolean(user), retry: false, placeholderData: (previous) => previous, refetchInterval: refreshIntervalMs });
+  const data = trpc.n8n.analytics.useQuery({ period }, { enabled: Boolean(user), retry: false, placeholderData: (previous) => previous, refetchInterval: period === "today" ? refreshIntervalMs : Math.max(refreshIntervalMs, 60_000) });
   const dashboard = data.data;
   const initialLoading = data.isPending && !data.data;
   const recentErrors = dashboard?.recentErrors ?? [];

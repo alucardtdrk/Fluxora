@@ -69,7 +69,7 @@ function eventExplanation(source: string, type: string) {
 
 export default function WorkspaceSecurity() {
   const { user } = useAuth();
-  const dashboard = trpc.workspaceSecurity.overview.useQuery(undefined, { retry: false, refetchInterval: 30_000 });
+  const dashboard = trpc.workspaceSecurity.overview.useQuery(undefined, { retry: false, refetchInterval: 300_000, staleTime: 300_000 });
   const automaticRefreshStarted = useRef(false);
   const refreshCurrent = trpc.workspaceSecurity.refreshCurrent.useMutation({
     onSuccess: async (result) => {

@@ -204,16 +204,17 @@ export async function getArchivedExecution(id: string): Promise<ArchivedExecutio
   return document as unknown as ArchivedExecution;
 }
 
-export async function listArchivedExecutions(period: ArchivePeriod, includeLegacy = false, page?: { limit: number; offset?: number }) {
+export async function listArchivedExecutions(period: ArchivePeriod, includeLegacy = false, page?: { limit: number; offset?: number; errorsOnly?: boolean; after?: { startedAt: string; documentName: string } }) {
   const activeArchiveRunId = includeLegacy ? null : (await getArchiveSyncState()).activeArchiveRunId || null;
   const limit = Math.min(page?.limit ?? readLimit(), readLimit());
   const cutoff = periodCutoff(period);
   const structuredQuery: FirestoreRecord = {
     select: { fields: summaryFields.map((fieldPath) => ({ fieldPath })) },
     from: [{ collectionId: logsCollection() }],
-    orderBy: [{ field: { fieldPath: "startedAt" }, direction: "DESCENDING" }],
+    orderBy: [{ field: { fieldPath: "startedAt" }, direction: "DESCENDING" }, { field: { fieldPath: "__name__" }, direction: "DESCENDING" }],
     limit,
     ...(page?.offset ? { offset: page.offset } : {}),
+    ...(page?.after ? { startAt: { before: false, values: [{ stringValue: page.after.startedAt }, { referenceValue: page.after.documentName }] } } : {}),
   };
   if (cutoff) {
     structuredQuery.where = {
@@ -225,11 +226,17 @@ export async function listArchivedExecutions(period: ArchivePeriod, includeLegac
     };
   }
 
+  if (page?.errorsOnly) {
+    const errors = { fieldFilter: { field: { fieldPath: "status" }, op: "IN", value: { arrayValue: { values: ["error", "failed", "crashed"].map((stringValue) => ({ stringValue })) } } } };
+    structuredQuery.where = structuredQuery.where ? { compositeFilter: { op: "AND", filters: [structuredQuery.where, errors] } } : errors;
+  }
+
   const rows = await runFirestoreQuery(structuredQuery);
-  if (period === "all" && !page) {
+  if (!page) {
     let pageSize = rows.length;
     while (pageSize === structuredQuery.limit) {
-      const page = await runFirestoreQuery({ ...structuredQuery, offset: rows.length });
+      const last = rows.at(-1)!;
+      const page = await runFirestoreQuery({ ...structuredQuery, startAt: { before: false, values: [{ stringValue: last.startedAt }, { referenceValue: last._documentName }] } });
       rows.push(...page);
       pageSize = page.length;
     }
@@ -257,7 +264,9 @@ export async function listArchivedExecutions(period: ArchivePeriod, includeLegac
     }))
     .filter((row) => row.id && row.id !== "teste_inicial" && (!activeArchiveRunId || row.archiveRunId === activeArchiveRunId));
 
-  return { items, rowsRead: rows.length, truncated: (period !== "all" || Boolean(page)) && rows.length >= readLimit(), hasMore: Boolean(page) && rows.length >= limit };
+  const last = rows.at(-1);
+  const nextCursor = typeof last?.startedAt === "string" && typeof last._documentName === "string" ? { startedAt: last.startedAt, documentName: last._documentName } : undefined;
+  return { items, rowsRead: rows.length, truncated: Boolean(page) && rows.length >= readLimit(), hasMore: Boolean(page) && rows.length >= limit, nextCursor };
 }
 
 export async function getArchiveSyncState(): Promise<ArchiveSyncState> {
@@ -274,6 +283,8 @@ export async function getArchiveDiagnostics() {
   const configured = archiveConfigured();
   if (!configured) return { configured: false, totalArchived: 0, state: null };
   const [state, totalStored] = await Promise.all([getArchiveSyncState(), countFirestoreCollection(logsCollection())]);
-  const active = state.activeArchiveRunId ? await listArchivedExecutions("all") : null;
-  return { configured: true, totalArchived: active?.items.length ?? totalStored, totalStored, state };
+  const totalArchived = state.activeArchiveRunId ? await countFirestoreCollection(logsCollection(), {
+    fieldFilter: { field: { fieldPath: "archiveRunId" }, op: "EQUAL", value: { stringValue: state.activeArchiveRunId } },
+  }) : totalStored;
+  return { configured: true, totalArchived, totalStored, state };
 }

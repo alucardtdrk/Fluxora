@@ -22,7 +22,7 @@ export default function Settings() {
   const { user } = useAuth();
   const utils = trpc.useUtils();
   const overview = trpc.n8n.overview.useQuery({ period: "7d", workflowIds: [] }, { retry: false });
-  const system = trpc.admin.systemStatus.useQuery(undefined, { retry: false, refetchInterval: 30000 });
+  const system = trpc.admin.systemStatus.useQuery(undefined, { retry: false, refetchInterval: 300_000, staleTime: 300_000 });
   const [notifications, setNotifications] = useState(() => localStorage.getItem("notificationsEnabled") !== "false");
   const [refreshInterval, setRefreshInterval] = useState(() => String(readPreferredRefreshSeconds()));
   const [defaultPeriod, setDefaultPeriod] = useState(() => readDefaultPeriod());
