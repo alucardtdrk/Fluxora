@@ -17,7 +17,7 @@ type Period = DashboardPeriod;
 const periods: [Period, string][] = [["today", "Hoje"], ["7d", "7 dias"], ["30d", "30 dias"], ["90d", "90 dias"], ["all", "Todas as execuções"]];
 
 function Metric({ title, value, detail, icon: Icon, loading = false }: { title: string; value: string; detail: string; icon: any; loading?: boolean }) {
-  return <Card className="border-0 bg-card shadow-sm"><CardContent className="p-5"><div className="flex justify-between gap-3"><div><p className="text-[10px] font-bold uppercase tracking-[.14em] text-muted-foreground">{title}</p>{loading ? <MetricSkeleton /> : <p className="mt-2 text-3xl font-semibold text-foreground">{value}</p>}<p className="mt-1 text-xs text-muted-foreground">{detail}</p></div><div className="grid h-10 w-10 place-items-center rounded-xl bg-feedback-info-surface text-feedback-info"><Icon className="h-4 w-4" /></div></div></CardContent></Card>;
+  return <Card className="min-w-0 border-0 bg-card shadow-sm"><CardContent className="p-5"><div className="flex justify-between gap-3"><div className="min-w-0 flex-1 [overflow-wrap:anywhere]"><p className="text-[10px] font-bold uppercase tracking-[.14em] text-muted-foreground">{title}</p>{loading ? <MetricSkeleton className="max-w-full" /> : <p className="mt-2 text-3xl font-semibold text-foreground">{value}</p>}<p className="mt-1 text-xs text-muted-foreground">{detail}</p></div><div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-feedback-info-surface text-feedback-info"><Icon className="h-4 w-4" /></div></div></CardContent></Card>;
 }
 
 export default function Home() {
