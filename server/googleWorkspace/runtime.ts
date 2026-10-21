@@ -177,6 +177,26 @@ export function createGoogleWorkspaceSecuritySync(input: {
 
   return {
     continueBackfill,
+    async runDaily() {
+      const deadline = Date.now() + 180_000;
+      const summary = await createWorkspaceSync({ now, sources: fullSources }).run();
+      await saveDiagnostics(summary);
+      let pending = fullSources.filter((source) => summary.sources[source.name]?.status === "incomplete");
+      while (pending.length && Date.now() < deadline) {
+        const next = await createWorkspaceSync({ now, sources: pending }).run();
+        await saveDiagnostics(next);
+        for (const [source, result] of Object.entries(next.sources)) {
+          const previous = summary.sources[source]!;
+          summary.sources[source] = { ...result, collected: previous.collected + result.collected, persisted: previous.persisted + result.persisted, received: (previous.received ?? 0) + (result.received ?? 0) };
+        }
+        pending = pending.filter((source) => summary.sources[source.name]?.status === "incomplete");
+      }
+      const posture = await this.runFullBatch(fullSources.length);
+      Object.assign(summary.sources, posture.sources);
+      summary.finishedAt = now().toISOString();
+      summary.status = Object.values(summary.sources).some((source) => source.status === "failure" || source.status === "incomplete") ? "partial" : "success";
+      return summary;
+    },
     async runFullBatch(startIndex: number) {
       if (startIndex === fullSources.length) {
         const posture = await collectDirectory({ client: input.client, customerId: input.config.customerId, domain: input.config.domain, capturedAt: now() });
@@ -237,6 +257,15 @@ export async function syncCurrentGoogleWorkspaceSecurity() {
   const tokenProvider = createGoogleWorkspaceTokenProvider(config);
   const client = createGoogleWorkspaceClient(tokenProvider);
   const result = await createGoogleWorkspaceSecuritySync({ config, client, repository: googleWorkspaceRepository }).runCurrent();
+  await pruneExpiredWorkspaceEvents().catch(() => console.warn("Workspace security retention cleanup failed"));
+  return result;
+}
+
+export async function syncDailyGoogleWorkspaceSecurity() {
+  const config = loadGoogleWorkspaceConfig();
+  const tokenProvider = createGoogleWorkspaceTokenProvider(config);
+  const client = createGoogleWorkspaceClient(tokenProvider);
+  const result = await createGoogleWorkspaceSecuritySync({ config, client, repository: googleWorkspaceRepository }).runDaily();
   await pruneExpiredWorkspaceEvents().catch(() => console.warn("Workspace security retention cleanup failed"));
   return result;
 }

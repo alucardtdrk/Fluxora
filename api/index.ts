@@ -13,7 +13,7 @@ import { syncN8nArchive } from "../server/n8n.js";
 import { archiveConfigured, getArchiveSyncState } from "../server/firestoreLogs.js";
 import { authorizeGoogleUser } from "../server/access.js";
 import { isInternalRequestAuthorized } from "../server/internalAuth.js";
-import { syncGoogleWorkspaceSecurity } from "../server/googleWorkspace/runtime.js";
+import { syncDailyGoogleWorkspaceSecurity } from "../server/googleWorkspace/runtime.js";
 
 const app = express();
 app.set("trust proxy", 1);
@@ -79,7 +79,7 @@ app.all("/api/internal/sync-n8n", async (req: any, res: any) => {
 app.get("/api/internal/sync-google-workspace", async (req: any, res: any) => {
   if (!isInternalRequestAuthorized(req.headers)) return res.status(401).json({ ok: false, error: "unauthorized" });
   try {
-    const summary = await syncGoogleWorkspaceSecurity();
+    const summary = await syncDailyGoogleWorkspaceSecurity();
     const ok = summary.status === "success" || summary.status === "partial" || summary.status === "skipped_locked";
     return res.status(ok ? 200 : 500).json({ ok, summary });
   } catch (error) {

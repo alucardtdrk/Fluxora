@@ -2,6 +2,35 @@ import { describe, expect, it } from "vitest";
 import { createGoogleWorkspaceSecuritySync } from "./runtime.js";
 
 describe("Google Workspace security runtime", () => {
+  it.each([false, true])("updates every source daily and preserves failures (failure=%s)", async (failDrive) => {
+    const states = new Map<string, any>();
+    const seen = new Set<string>();
+    let postureRuns = 0;
+    const sync = createGoogleWorkspaceSecuritySync({
+      config: { customerId: "customer", domain: "example.com" }, client: {} as never,
+      repository: {
+        getSourceState: async (source) => states.get(source) ?? null,
+        saveSourceBatch: async (batch) => {
+          states.set(batch.source, { lastSuccessfulEventAt: batch.lastSuccessfulEventAt ? new Date(batch.lastSuccessfulEventAt) : null, currentStart: new Date(batch.current!.start), currentEnd: new Date(batch.current!.end), currentPageToken: batch.current?.pageToken });
+          return { insertedOrUpdated: 0 };
+        },
+        saveDirectoryPosture: async () => { postureRuns++; }, listRecentEvents: async () => [], saveFindings: async () => ({ insertedOrUpdated: 0 }),
+      },
+      collectAlertCenterBatch: async () => ({ events: [], alertsRead: 0, truncated: false }),
+      collectReportsBatch: async (request) => {
+        seen.add(request.application);
+        if (failDrive && request.application === "drive") throw new Error("HTTP_403");
+        return { events: [], pagesRead: 1, recordsRead: 1, truncated: !request.startPageToken, nextPageToken: request.startPageToken ? undefined : "next" };
+      },
+      collectDirectory: async () => ({ capturedAt: new Date(), domain: "example.com" }) as never,
+    });
+    const result = await sync.runDaily();
+    expect(seen.size).toBe(13);
+    expect(postureRuns).toBe(1);
+    expect(result.status).toBe(failDrive ? "partial" : "success");
+    expect(result.sources.drive).toMatchObject(failDrive ? { status: "failure", safeError: "permission" } : { status: "empty", received: 2 });
+    expect(Object.keys(result.sources)).toHaveLength(15);
+  });
   it("collects the full set in bounded batches of at most three one-page sources", async () => {
     const reports: Array<{ application: string; maxPages?: number }> = [];
     let postureRuns = 0;

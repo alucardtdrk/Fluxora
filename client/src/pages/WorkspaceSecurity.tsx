@@ -9,7 +9,6 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { toast } from "sonner";
-import { Link } from "wouter";
 import { sourceLabels, shouldRefreshCurrentSecurity, summarizeSecurityCollection } from "@/lib/workspaceSecurityRefresh";
 
 
@@ -105,8 +104,8 @@ export default function WorkspaceSecurity() {
     <div className="mt-4 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground" aria-live="polite">
       <span>{dashboard.isLoading ? "Verificando coleta…" : dashboard.isError ? "Não foi possível verificar a coleta." : collection.latestCompletedAt ? `Última coleta registrada: ${new Date(collection.latestCompletedAt).toLocaleString("pt-BR")}` : "Nenhuma coleta registrada."}</span>
       {collection.failed > 0 && <span className="text-orange-700 dark:text-orange-300">Falha em {collection.failed} fonte(s).</span>}
-      {(collection.incomplete > 0 || collection.awaiting > 0 || (dashboard.data && summary.coveragePercent < 100)) && <span className="text-amber-700 dark:text-amber-300">Dados incompletos: há fontes ou histórico pendentes.</span>}
-      {user?.role === "admin" && <Link href="/settings" className="font-medium text-primary underline-offset-4 hover:underline">Configurações da integração</Link>}
+      {collection.incomplete > 0 && <span className="text-amber-700 dark:text-amber-300">{collection.incomplete} fonte(s) com páginas ainda não coletadas. Cada atualização processa um lote.</span>}
+      {collection.awaiting > 0 && <span className="text-amber-700 dark:text-amber-300">{collection.awaiting} fonte(s) aguardando coleta.</span>}
     </div>
     <div className="mt-7 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
       <MetricCard icon={ShieldCheck} label="Eventos na amostra" value={summary.recentEvents} description="Até 250 registros mais recentes; use a lista paginada para ver os anteriores." />
