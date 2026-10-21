@@ -95,7 +95,7 @@ export interface WorkspaceSecurityEvent {
   metadata: WorkspaceSecurityMetadata;
 }
 
-export type WorkspaceFindingRule = "distributed_login_failures" | "suspicious_login_then_oauth" | "admin_change_then_identity_risk" | "drive_activity_after_identity_risk" | "repeated_phishing_or_malware" | "two_step_verification_disabled" | "privilege_escalation" | "external_drive_sharing" | "high_severity_dlp";
+export type WorkspaceFindingRule = "rapid_login_country_change" | "suspicious_login" | "data_exfiltration" | "distributed_login_failures" | "suspicious_login_then_oauth" | "admin_change_then_identity_risk" | "drive_activity_after_identity_risk" | "repeated_phishing_or_malware" | "two_step_verification_disabled" | "privilege_escalation" | "external_drive_sharing" | "high_severity_dlp";
 
 export interface WorkspaceSecurityFinding {
   readonly id: string;

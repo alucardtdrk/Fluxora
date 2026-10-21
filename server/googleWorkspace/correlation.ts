@@ -24,8 +24,8 @@ export function correlateWorkspaceSecurityEvents(events: readonly WorkspaceSecur
   for (const actor of unique(failures.map((event) => event.actor))) {
     const actorFailures = failures.filter((event) => event.actor === actor);
     const window = actorFailures.filter((event) => event.occurredAt.getTime() - actorFailures[0]!.occurredAt.getTime() <= DISTRIBUTED_LOGIN_WINDOW_MS);
-    const locations = unique(window.flatMap((event) => [event.ipAddress, event.country]));
-    if (window.length < MIN_DISTRIBUTED_LOGIN_FAILURES || locations.length < 2) continue;
+    const differentOrigins = unique(window.map((event) => event.ipAddress)).length >= 2 || unique(window.map((event) => event.country)).length >= 2;
+    if (window.length < MIN_DISTRIBUTED_LOGIN_FAILURES || !differentOrigins) continue;
 
     findings.push({
       id: findingId("distributed_login_failures", actor, window[0]!.occurredAt),
@@ -108,7 +108,26 @@ export function correlateWorkspaceSecurityEvents(events: readonly WorkspaceSecur
     }
   }
 
+  for (const actor of unique(recentEvents.map((event) => event.actor))) {
+    const logins = recentEvents.filter((event) => event.actor === actor && event.source === "login" && event.type === "login_success" && event.country && event.ipAddress)
+      .sort((left, right) => left.occurredAt.getTime() - right.occurredAt.getTime());
+    for (let index = 1; index < logins.length; index++) {
+      const previous = logins[index - 1]!;
+      const current = logins[index]!;
+      if (previous.country === current.country || previous.ipAddress === current.ipAddress || current.occurredAt.getTime() - previous.occurredAt.getTime() > DISTRIBUTED_LOGIN_WINDOW_MS) continue;
+      findings.push({
+        id: findingId("rapid_login_country_change", `${actor}:${current.id}`, current.occurredAt), rule: "rapid_login_country_change", severity: "high",
+        title: "Logins em países diferentes em curto intervalo",
+        description: `A conta teve logins de ${previous.country} e ${current.country} em até 30 minutos. Confirme se o usuário reconhece os acessos e utiliza VPN; o sinal não confirma invasão.`,
+        subjects: [actor], ipAddresses: unique([previous.ipAddress, current.ipAddress]), eventIds: [previous.id, current.id],
+        firstOccurredAt: previous.occurredAt, lastOccurredAt: current.occurredAt, evidenceCount: 2,
+        expiresAt: new Date(Math.min(previous.expiresAt.getTime(), current.expiresAt.getTime())),
+      });
+    }
+  }
   const singleSignalRules = [
+    { rule: "suspicious_login", matches: (event: WorkspaceSecurityEvent) => (event.source === "login" && /login|suspicious/.test(event.type.toLowerCase()) && (event.severity === "high" || event.severity === "critical")) || (event.source === "alert_center" && /suspicious[ _](programmatic[ _])?login|account[ _]takeover|leaked[ _]password/.test(event.type.toLowerCase())), title: "Login suspeito requer investigação", description: "O Google sinalizou risco de acesso à conta. Confirme com o usuário o horário e a origem de rede; investigue acessos não reconhecidos no Admin Console." },
+    { rule: "data_exfiltration", matches: (event: WorkspaceSecurityEvent) => (event.source === "alert_center" || event.source === "rules" || event.source === "drive") && /exfiltrat|data[ _]export|takeout/.test(event.type.toLowerCase()), title: "Possível extração de dados", description: "Foi registrado um sinal de extração ou exportação de dados. Verifique a autorização, os recursos afetados e o contexto no Admin Console; o evento isolado não confirma vazamento." },
     { rule: "two_step_verification_disabled", matches: (event: WorkspaceSecurityEvent) => event.source === "login" && event.type.toLowerCase().includes("2sv_disable"), title: "Verificação em duas etapas desativada", description: "Uma conta teve a verificação em duas etapas desativada." },
     { rule: "privilege_escalation", matches: (event: WorkspaceSecurityEvent) => event.source === "admin" && /assign.*role|role.*assign|privilege/.test(event.type.toLowerCase()), title: "Alteração de privilégio administrativo", description: "Uma função ou privilégio administrativo sensível foi alterado." },
     { rule: "external_drive_sharing", matches: (event: WorkspaceSecurityEvent) => event.source === "drive" && (event.type.toLowerCase().includes("external_share") || (/change_user_access|change_document_visibility/.test(event.type.toLowerCase()) && /external|public/.test(String(event.metadata.visibility || "").toLowerCase()))), title: "Compartilhamento externo no Drive", description: "Um recurso do Drive foi exposto externamente ou publicamente." },
@@ -117,7 +136,7 @@ export function correlateWorkspaceSecurityEvents(events: readonly WorkspaceSecur
   for (const definition of singleSignalRules) {
     for (const signal of recentEvents.filter(definition.matches)) {
       const subject = signal.actor ?? signal.target ?? "workspace";
-      findings.push({ id: findingId(definition.rule, subject, signal.occurredAt), rule: definition.rule, severity: signal.severity === "critical" ? "critical" : "high", title: definition.title, description: definition.description, subjects: subject === "workspace" ? [] : [subject], ipAddresses: unique([signal.ipAddress]), eventIds: [signal.id], firstOccurredAt: signal.occurredAt, lastOccurredAt: signal.occurredAt, evidenceCount: 1, expiresAt: signal.expiresAt });
+      findings.push({ id: findingId(definition.rule, definition.rule === "suspicious_login" || definition.rule === "data_exfiltration" ? `${subject}:${signal.id}` : subject, signal.occurredAt), rule: definition.rule, severity: signal.severity === "critical" ? "critical" : "high", title: definition.title, description: definition.description, subjects: subject === "workspace" ? [] : [subject], ipAddresses: unique([signal.ipAddress]), eventIds: [signal.id], firstOccurredAt: signal.occurredAt, lastOccurredAt: signal.occurredAt, evidenceCount: 1, expiresAt: signal.expiresAt });
     }
   }
 
