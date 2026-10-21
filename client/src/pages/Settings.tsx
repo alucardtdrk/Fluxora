@@ -17,6 +17,8 @@ import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { broadcastPreferencesUpdated, PREFERENCE_SCOPES, readDefaultPeriod, readPreferredPageSize, readPreferredRefreshSeconds, rememberFiltersEnabled, type DashboardPeriod } from "@/lib/preferences";
 import { trpc } from "@/lib/trpc";
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
+import { sourceLabels } from "@/lib/workspaceSecurityRefresh";
 
 export default function Settings() {
   const { user } = useAuth();
@@ -38,6 +40,20 @@ export default function Settings() {
   const preserveDetails = trpc.n8n.preserveExecutionDetails.useMutation();
   const testN8n = trpc.admin.testN8n.useQuery(undefined, { enabled: false, retry: false });
   const testFirestore = trpc.admin.testFirestore.useQuery(undefined, { enabled: false, retry: false });
+
+  const securityDashboard = trpc.workspaceSecurity.overview.useQuery(undefined, { enabled: user?.role === "admin", retry: false, staleTime: 300_000 });
+  const securitySources = securityDashboard.data?.sources ?? [];
+  const continueBackfill = trpc.workspaceSecurity.continueBackfill.useMutation({
+    onSuccess: async (result) => {
+      await Promise.all([utils.workspaceSecurity.overview.invalidate(), utils.workspaceSecurity.eventsPage.invalidate()]);
+      if (result.windowsProcessed > 0) {
+        toast.success("Lote histórico processado", { description: `${result.eventsCollected.toLocaleString("pt-BR")} eventos coletados; ${result.sourcesCompleted} fonte${result.sourcesCompleted === 1 ? "" : "s"} concluiu${result.sourcesCompleted === 1 ? "" : "íram"} a cobertura.` });
+      } else {
+        toast.warning("Nenhum lote conseguiu avançar", { description: result.failedSources.length ? "Algumas fontes do Google Workspace não responderam. Consulte os avisos nas fontes abaixo." : "A cobertura disponível já foi processada." });
+      }
+    },
+    onError: (error) => toast.error("O histórico não avançou", { description: error.message || "Tente novamente em instantes." }),
+  });
 
   const archive = system.data?.archive;
 
@@ -206,6 +222,13 @@ export default function Settings() {
           <div className="flex items-center justify-between rounded-xl bg-background p-4"><div><p className="text-sm font-semibold">n8n</p><p className="mt-1 text-xs text-muted-foreground">Fonte operacional das automações.</p></div><span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${overview.data?.connected ? "bg-feedback-success-surface text-feedback-success" : "bg-feedback-error-surface text-feedback-error"}`}>{overview.isLoading ? "Verificando" : overview.data?.connected ? "Online" : "Indisponível"}</span></div>
           <div className="flex items-center justify-between rounded-xl bg-background p-4"><div><p className="text-sm font-semibold">Firestore</p><p className="mt-1 text-xs text-muted-foreground">Histórico permanente das execuções.</p></div><span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${system.data?.firestoreConfigured ? "bg-feedback-success-surface text-feedback-success" : "bg-feedback-error-surface text-feedback-error"}`}>{system.isLoading ? "Verificando" : system.data?.firestoreConfigured ? "Conectado" : "Indisponível"}</span></div>
           <div className="flex items-center justify-between rounded-xl bg-background p-4"><div><p className="text-sm font-semibold">Google Workspace Security</p><p className="mt-1 text-xs text-muted-foreground">Alertas, login, OAuth, Drive e postura do domínio.</p></div><span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${system.data?.googleWorkspaceSecurity?.configured ? "bg-feedback-success-surface text-feedback-success" : "bg-feedback-error-surface text-feedback-error"}`}>{system.isLoading ? "Verificando" : system.data?.googleWorkspaceSecurity?.configured ? "Pronto para sincronizar" : "Configuração pendente"}</span></div>
+          {user?.role === "admin" && <Accordion type="single" collapsible><AccordionItem value="workspace-diagnostics" className="border-0"><AccordionTrigger className="text-left text-sm">Google Workspace · Diagnóstico e histórico</AccordionTrigger><AccordionContent>
+            <p className="text-xs text-muted-foreground">Área administrativa. A cobertura histórica pode estar incompleta; cada ação processa apenas um lote e não garante a coleta de todo o histórico.</p>
+            <p className="mt-3 text-xs text-muted-foreground">{securityDashboard.data?.summary.coveragePercent ?? 0}% dos 90 dias cobertos · {securityDashboard.data?.summary.backfillPagesProcessed ?? 0} páginas históricas processadas.</p>
+            <Button className="mt-3" size="sm" variant="outline" disabled={continueBackfill.isPending || !system.data?.googleWorkspaceSecurity?.configured} onClick={() => continueBackfill.mutate()}>{continueBackfill.isPending ? "Processando lote…" : "Processar próximo lote histórico"}</Button>
+            {securityDashboard.isLoading ? <p className="mt-4 text-xs text-muted-foreground">Carregando fontes…</p> : securityDashboard.isError ? <p className="mt-4 text-xs text-orange-700 dark:text-orange-300">Não foi possível carregar o diagnóstico das fontes.</p> : <>    <Card className="mt-6 border-0"><CardHeader><CardTitle className="text-base">Fontes de auditoria</CardTitle><p className="text-xs text-muted-foreground">Os números abaixo mostram apenas a última coleta de cada fonte, não o total armazenado.</p></CardHeader><CardContent>{securitySources.length === 0 ? <p className="text-sm text-muted-foreground">Execute uma sincronização para registrar as fontes.</p> : <div className="grid gap-3 sm:grid-cols-2">{securitySources.map((item) => <div key={item.source} className="rounded-xl border p-3"><p className="font-medium">{sourceLabels[item.source] ?? item.source}</p><p className="mt-1 text-xs text-muted-foreground">{item.status === "ok" ? "Ativa" : item.status === "empty" ? "Sem eventos no último lote" : item.status === "incomplete" ? "Mais páginas pendentes" : item.status === "failure" ? "Requer atenção" : "Aguardando"}</p><p className="mt-1 text-xs text-muted-foreground">Última coleta: {item.received} recebidos · {item.collected} aceitos · {item.persisted} salvos{item.completedAt ? ` · ${new Date(item.completedAt).toLocaleString("pt-BR")}` : ""}</p>{item.safeError && <p className="mt-1 text-xs text-orange-700 dark:text-orange-300">{item.safeError === "permission" ? "Revise a delegação de domínio e os escopos desta fonte." : item.safeError === "configuration" ? "Revise a configuração da integração." : item.safeError === "invalid_request" ? "O Google rejeitou os parâmetros desta consulta." : item.safeError === "rate_limited" ? "O limite temporário do Google foi atingido; tente novamente depois." : item.safeError === "upstream" ? "O Google apresentou uma indisponibilidade temporária." : "A fonte não respondeu como esperado; tente novamente."}{item.httpStatus ? ` (HTTP ${item.httpStatus})` : ""}</p>}</div>)}</div>}</CardContent></Card>
+            </>}
+          </AccordionContent></AccordionItem></Accordion>}
           <div className="grid grid-cols-2 gap-3"><Button variant="outline" onClick={async () => { const r = await testN8n.refetch(); r.data?.ok ? toast.success("n8n conectado") : toast.error("n8n indisponível"); }}>Testar n8n</Button><Button variant="outline" onClick={async () => { const r = await testFirestore.refetch(); r.data?.ok ? toast.success("Firestore conectado") : toast.error("Firestore indisponível"); }}>Testar Firestore</Button></div>
         </CardContent></Card>
       </TabsContent>

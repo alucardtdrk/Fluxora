@@ -23,6 +23,41 @@ function event(overrides: Partial<WorkspaceSecurityEvent>): WorkspaceSecurityEve
 }
 
 describe("Workspace security correlation", () => {
+  it("flags successful logins from different countries within 30 minutes", () => {
+    const logins = [
+      event({ externalId: "br", type: "login_success", actor: "ana@example.com", country: "BR", ipAddress: "198.51.100.1" }),
+      event({ externalId: "us", type: "login_success", actor: "ana@example.com", country: "US", ipAddress: "203.0.113.2", occurredAt: new Date("2026-09-17T11:10:00Z") }),
+    ];
+    expect(correlateWorkspaceSecurityEvents(logins, observedAt)).toContainEqual(expect.objectContaining({ rule: "rapid_login_country_change", evidenceCount: 2, ipAddresses: ["198.51.100.1", "203.0.113.2"] }));
+    expect(correlateWorkspaceSecurityEvents(logins.map((login) => ({ ...login, country: "BR" })), observedAt)).toEqual([]);
+    expect(correlateWorkspaceSecurityEvents(logins.map((login) => ({ ...login, country: undefined })), observedAt)).toEqual([]);
+    expect(correlateWorkspaceSecurityEvents([logins[0]!, { ...logins[1]!, occurredAt: new Date("2026-09-17T11:40:00Z") }], observedAt)).toEqual([]);
+  });
+
+  it("flags standalone suspicious logins and data exfiltration", () => {
+    const findings = correlateWorkspaceSecurityEvents([
+      event({ externalId: "alert", source: "alert_center", type: "Suspicious login", severity: "high", target: "ana@example.com", ipAddress: "2001:db8::1" }),
+      event({ externalId: "login", type: "login_success", severity: "high", actor: "ana@example.com" }),
+      event({ externalId: "data", source: "alert_center", type: "Data exfiltration", severity: "critical", target: "ana@example.com" }),
+    ], observedAt);
+    expect(findings).toContainEqual(expect.objectContaining({ rule: "suspicious_login", subjects: ["ana@example.com"], ipAddresses: ["2001:db8::1"], eventIds: ["event-alert"] }));
+    expect(findings).toContainEqual(expect.objectContaining({ rule: "suspicious_login", eventIds: ["event-login"] }));
+    expect(findings).toContainEqual(expect.objectContaining({ rule: "data_exfiltration", severity: "critical" }));
+  });
+
+  it("does not count one IP and its country as different login origins", () => {
+    expect(correlateWorkspaceSecurityEvents([0, 1, 2].map(() => event({ actor: "ana@example.com", ipAddress: "198.51.100.1", country: "BR" })), observedAt)).toEqual([]);
+  });
+
+  it("does not flag routine logins, downloads, investigations or stale signals", () => {
+    expect(correlateWorkspaceSecurityEvents([
+      event({ type: "login_success", severity: "informational" }),
+      event({ source: "drive", type: "download", severity: "informational" }),
+      event({ source: "admin", type: "SECURITY_INVESTIGATION_QUERY", severity: "high" }),
+      event({ source: "alert_center", type: "Suspicious login", severity: "high", occurredAt: new Date("2026-09-15T11:00:00Z") }),
+    ], observedAt)).toEqual([]);
+  });
+
   it("finds distributed login failures for the same user", () => {
     const findings = correlateWorkspaceSecurityEvents([
       event({ externalId: "a", actor: "ana@example.com", ipAddress: "198.51.100.1", occurredAt: new Date("2026-09-17T11:00:00.000Z") }),
