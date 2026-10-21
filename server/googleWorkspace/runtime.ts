@@ -112,6 +112,7 @@ export function createGoogleWorkspaceSecuritySync(input: {
       eventSource("admin", "admin", true),
       eventSource("oauth_token", "token", true),
       eventSource("rules", "rules", true),
+      eventSource("drive", "drive", true),
     ],
   });
 

@@ -1,15 +1,16 @@
 import { useEffect, useState } from "react";
 import { AlertTriangle, ArrowLeft, BarChart3, Eye, RefreshCw, Timer, TrendingUp, Workflow } from "lucide-react";
 import { Link } from "wouter";
-import { Area, AreaChart, Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
+import { Area, AreaChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { toast } from "sonner";
 import { useAuth } from "@/_core/hooks/useAuth";
 import OperationsShell from "@/components/OperationsShell";
 import { MetricSkeleton } from "@/components/MetricSkeleton";
 import ExecutionDetailDialog from "@/components/ExecutionDetailDialog";
-import IncidentLifecycleDialog from "@/components/IncidentLifecycleDialog";
+import IncidentAttentionCenter from "@/components/IncidentAttentionCenter";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import PeriodFilter from "@/components/PeriodFilter";
 import { PREFERENCES_UPDATED_EVENT, readPreferredPageSize, readPreferredRefreshSeconds, readScopedPeriod, saveScopedPeriod, type DashboardPeriod } from "@/lib/preferences";
@@ -76,6 +77,8 @@ function AnalyticsPage() {
   const data = trpc.n8n.analytics.useQuery({ period }, { enabled: Boolean(user), retry: false, placeholderData: (previous) => previous, refetchInterval: period === "today" ? refreshIntervalMs : Math.max(refreshIntervalMs, 60_000) });
   const dashboard = data.data;
   const initialLoading = data.isPending && !data.data;
+  const rankedWorkflows = (dashboard?.workflowStats ?? []).filter((workflow) => workflow.executions > 0).sort((a, b) => b.executions - a.executions);
+  const totalWorkflowExecutions = rankedWorkflows.reduce((total, workflow) => total + workflow.executions, 0);
 
   const refresh = () => data.refetch().then(() => toast.success("Analytics atualizado"));
   useEffect(() => saveScopedPeriod("analytics", period), [period]);
@@ -131,9 +134,27 @@ function AnalyticsPage() {
             </AreaChart></ResponsiveContainer> : <Empty text={initialLoading ? "Carregando telemetria..." : "Sem dados no período"} />}</div></CardContent>
             </Card>
             <Card className="border-0 bg-card shadow-sm">
-              <CardHeader><CardTitle className="flex items-center gap-2 text-base"><Workflow className="h-4 w-4 text-feedback-info" />Top workflows por volume</CardTitle></CardHeader>
-              <CardContent><div className="h-[300px]">{(dashboard?.workflowStats?.length ?? 0) > 0 ? <ResponsiveContainer width="100%" height="100%"><BarChart data={(dashboard?.workflowStats ?? []).slice(0, 8)} layout="vertical" margin={{ left: 20 }}><CartesianGrid horizontal={false} stroke="var(--border)" strokeDasharray="3 3" strokeOpacity={0.6} /><XAxis type="number" tick={{ fontSize: 10, fill: "var(--muted-foreground)" }} tickLine={false} axisLine={false} allowDecimals={false} /><YAxis type="category" dataKey="name" width={150} tick={{ fontSize: 10, fill: "var(--muted-foreground)" }} tickLine={false} axisLine={false} /><Tooltip cursor={false} contentStyle={{ background: "var(--card)", border: "1px solid var(--border)", borderRadius: 12, color: "var(--foreground)", padding: "12px 16px", boxShadow: "0 8px 24px rgb(0 0 0 / 0.15)" }} labelStyle={{ color: "var(--foreground)", fontWeight: 600, borderBottom: "1px solid var(--border)", paddingBottom: 8, marginBottom: 8 }} itemStyle={{ fontSize: 12, fontVariantNumeric: "tabular-nums" }} formatter={(value, name) => [Number(value).toLocaleString("pt-BR"), name]} /><Bar name="Execuções" dataKey="executions" fill="var(--feedback-info)" radius={[0, 6, 6, 0]} /></BarChart></ResponsiveContainer> : <Empty text={initialLoading ? "Carregando workflows..." : "Nenhum workflow com execuções"} />}</div></CardContent>
-            </Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2 text-base"><Workflow className="h-4 w-4 text-feedback-info" />Top workflows por volume</CardTitle>
+                <p className="text-xs text-muted-foreground">{periodLabels[period]} · {initialLoading ? "Carregando workflows…" : `${rankedWorkflows.length.toLocaleString("pt-BR")} workflows com execuções`}</p>
+              </CardHeader>
+              <CardContent>
+                {initialLoading ? <div className="space-y-5" aria-label="Carregando ranking">{[0, 1, 2].map((index) => <div key={index} className="h-20 animate-pulse rounded-lg bg-muted" />)}</div> : rankedWorkflows.length ? <>
+                  <ScrollArea className="h-[300px]">
+                    <ol className="divide-y divide-border/60 pr-4">
+                      {rankedWorkflows.slice(0, 8).map((workflow, index) => <li key={workflow.id} className="py-4 first:pt-0 last:pb-0">
+                        <div className="flex items-start justify-between gap-3">
+                          <Link href={`/workflows/${encodeURIComponent(workflow.id)}`} className="min-w-0 break-words text-sm font-medium hover:text-primary hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"><span className="mr-2 text-xs tabular-nums text-muted-foreground">{index + 1}.</span>{workflow.name}</Link>
+                          <div className="shrink-0 text-right"><p className="text-base font-semibold tabular-nums">{workflow.executions.toLocaleString("pt-BR")}</p><p className="text-[10px] text-muted-foreground">execuções</p></div>
+                        </div>
+                        <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-primary/10" aria-hidden="true"><div className="h-full rounded-full bg-primary" style={{ width: `${workflow.executions / totalWorkflowExecutions * 100}%` }} /></div>
+                        <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-[11px] text-muted-foreground"><span>{(workflow.executions / totalWorkflowExecutions * 100).toLocaleString("pt-BR", { maximumFractionDigits: 1 })}% do volume</span><span>{workflow.successRate != null ? `${workflow.successRate.toLocaleString("pt-BR")}% de sucesso` : "Sucesso indisponível"}</span><span className={workflow.errors > 0 ? "font-medium text-feedback-error" : ""}>{workflow.errors.toLocaleString("pt-BR")} falha(s)</span></div>
+                      </li>)}
+                    </ol>
+                  </ScrollArea>
+                  <p className="mt-3 border-t pt-3 text-[11px] text-muted-foreground">{rankedWorkflows.length > 8 ? "Exibindo os 8 maiores volumes. " : ""}Selecione o nome para abrir o workflow.</p>
+                </> : <Empty text="Nenhum workflow com execuções no período" />}
+              </CardContent>            </Card>
           </div>
 
           <div className="mt-6"><ComparisonStrip comparison={dashboard?.comparison} loading={initialLoading} /></div>
@@ -202,7 +223,6 @@ function ErrorsPage() {
   const [errorPage, setErrorPage] = useState(1);
   const [errorPageSize, setErrorPageSize] = useState(() => readPreferredPageSize(50));
   const [selected, setSelected] = useState<string | null>(null);
-  const [selectedIncident, setSelectedIncident] = useState<any | null>(null);
   const data = trpc.n8n.analytics.useQuery({ period }, { enabled: Boolean(user), retry: false, placeholderData: (previous) => previous, refetchInterval: period === "today" ? refreshIntervalMs : Math.max(refreshIntervalMs, 60_000) });
   const dashboard = data.data;
   const initialLoading = data.isPending && !data.data;
@@ -230,7 +250,7 @@ function ErrorsPage() {
         <div className="mx-auto max-w-[1450px]">
           <Header title="Erros" description="Falhas reais, workflows críticos e acesso direto ao detalhe técnico da execução." period={period} setPeriod={(value) => { setPeriod(value); setErrorPage(1); }} refresh={refresh} loading={data.isFetching} />
           <div className="grid gap-4 md:grid-cols-3"><Metric title="Falhas no período" value={String(dashboard?.summary?.errors ?? 0)} loading={initialLoading} /><Metric title="Taxa de sucesso" value={dashboard?.summary?.successRate != null ? `${dashboard.summary.successRate}%` : "—"} loading={initialLoading} /><Metric title="Workflows com falha" value={String((dashboard?.workflowStats ?? []).filter((workflow) => workflow.errors > 0).length)} loading={initialLoading} /></div>
-          <Card className="mt-6 border-0 bg-card shadow-sm"><CardHeader><CardTitle className="flex items-center gap-2 text-base"><AlertTriangle className="h-4 w-4 text-feedback-error" />Incidentes agrupados por causa provável</CardTitle><p className="text-xs text-muted-foreground">Clique em um grupo para reconhecer, atribuir, investigar ou resolver o incidente.</p></CardHeader><CardContent className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">{(dashboard?.incidentGroups ?? []).slice(0, 9).map((incident: any) => <button key={incident.fingerprint} type="button" onClick={() => setSelectedIncident(incident)} className="min-w-0 rounded-xl border border-feedback-error-border bg-feedback-error-surface p-4 text-left transition hover:border-feedback-error"><div className="flex flex-wrap items-start justify-between gap-3"><p className="min-w-0 flex-1 break-words text-sm font-semibold text-foreground">{incident.automation}</p><Badge className="shrink-0 bg-feedback-error-surface text-feedback-error">{incident.count} falha(s)</Badge></div><p className="mt-2 break-words text-xs font-medium text-feedback-error">Causa provável: {incident.cause}</p><p className="mt-1 text-xs text-muted-foreground">Status: {incident.lifecycle?.status || "new"} · Última ocorrência: {incident.lastAt ? new Date(incident.lastAt).toLocaleString("pt-BR") : "-"}</p></button>)}{(dashboard?.incidentGroups?.length ?? 0) === 0 && <Empty text={initialLoading ? "Carregando incidentes..." : "Nenhum incidente neste período"} />}</CardContent></Card>
+          <IncidentAttentionCenter incidents={(dashboard?.incidentGroups ?? []) as any[]} loading={initialLoading} />
           <div className="mt-6 grid gap-6 xl:grid-cols-[1.5fr_1fr]">
             <Card className="border-0 bg-card shadow-sm">
               <CardHeader><CardTitle className="flex items-center gap-2 text-base"><AlertTriangle className="h-4 w-4 text-feedback-error" />Falhas recentes</CardTitle></CardHeader>
@@ -244,7 +264,6 @@ function ErrorsPage() {
         </div>
       </div>
       <ExecutionDetailDialog executionId={selected} open={Boolean(selected)} onOpenChange={(open) => !open && setSelected(null)} />
-      <IncidentLifecycleDialog incident={selectedIncident} open={Boolean(selectedIncident)} onOpenChange={(open) => !open && setSelectedIncident(null)} onOpenExecution={(id) => { setSelectedIncident(null); setSelected(id); }} />
     </OperationsShell>
   );
 }
