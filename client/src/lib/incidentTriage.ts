@@ -1,9 +1,10 @@
-export type IncidentFilter = "attention" | "open" | "resolved";
+export type IncidentFilter = "attention" | "investigating" | "resolved";
 
 export type IncidentLifecycle = {
   status: "new" | "acknowledged" | "investigating" | "resolved";
   severity: "critical" | "high" | "medium" | "low";
   owner?: string | null;
+  resolvedAt?: string | null;
   silencedUntil?: string | null;
 };
 
@@ -43,27 +44,25 @@ export function triageIncidents<T extends TriageIncident>(incidents: T[], filter
     const requiresOwner = incident.lifecycle.status !== "resolved" && !incident.lifecycle.owner;
     const overdue = incident.lifecycle.status !== "resolved" && ageMinutes != null && ageMinutes >= responseMinutes[incident.lifecycle.severity];
     const nextAction = incident.lifecycle.status === "new"
-      ? requiresOwner ? "Reconhecer e atribuir responsável" : "Reconhecer incidente"
-      : incident.lifecycle.status === "acknowledged"
-        ? "Iniciar investigação"
-        : incident.lifecycle.status === "investigating"
-          ? "Registrar diagnóstico ou resolver"
-          : "Nenhuma ação pendente";
+      ? requiresOwner ? "Atribuir responsável e iniciar investigação" : "Iniciar investigação"
+      : incident.lifecycle.status !== "resolved"
+        ? requiresOwner ? "Definir responsável pela investigação" : "Registrar diagnóstico, ação tomada e resultado"
+        : "Consultar a solução registrada";
     return { ...incident, ageMinutes, overdue, silenced, requiresOwner, nextAction };
   });
 
   const counts = {
-    attention: enriched.filter((item) => item.lifecycle.status !== "resolved" && !item.silenced).length,
-    open: enriched.filter((item) => item.lifecycle.status !== "resolved").length,
+    attention: enriched.filter((item) => item.lifecycle.status === "new").length,
+    investigating: enriched.filter((item) => item.lifecycle.status === "acknowledged" || item.lifecycle.status === "investigating").length,
     resolved: enriched.filter((item) => item.lifecycle.status === "resolved").length,
   };
   const items = enriched.filter((item) => filter === "attention"
-    ? item.lifecycle.status !== "resolved" && !item.silenced
-    : filter === "open"
-      ? item.lifecycle.status !== "resolved"
+    ? item.lifecycle.status === "new"
+    : filter === "investigating"
+      ? item.lifecycle.status === "acknowledged" || item.lifecycle.status === "investigating"
       : item.lifecycle.status === "resolved");
-
   items.sort((a, b) => {
+    if (filter === "resolved") return (timestamp(b.lifecycle.resolvedAt) ?? timestamp(b.lastAt) ?? 0) - (timestamp(a.lifecycle.resolvedAt) ?? timestamp(a.lastAt) ?? 0);
     const severity = severityWeight[b.lifecycle.severity] - severityWeight[a.lifecycle.severity];
     if (severity) return severity;
     if (a.overdue !== b.overdue) return a.overdue ? -1 : 1;
@@ -73,4 +72,17 @@ export function triageIncidents<T extends TriageIncident>(incidents: T[], filter
   });
 
   return { items, counts };
+}
+
+export const incidentStatusLabels = { new: "Pendente", acknowledged: "Em investigação", investigating: "Em investigação", resolved: "Resolvido" } as const;
+
+export function formatIncidentHistoryAction(action: string) {
+  const transition = action.match(/^(new|acknowledged|investigating|resolved) → (new|acknowledged|investigating|resolved)$/);
+  if (transition) {
+    const from = incidentStatusLabels[transition[1] as keyof typeof incidentStatusLabels];
+    const to = incidentStatusLabels[transition[2] as keyof typeof incidentStatusLabels];
+    return from === to ? "Investigação atualizada" : `${from} → ${to}`;
+  }
+  const initial = action.match(/^Incidente definido como (new|acknowledged|investigating|resolved)$/);
+  return initial ? `Status definido: ${incidentStatusLabels[initial[1] as keyof typeof incidentStatusLabels]}` : action;
 }

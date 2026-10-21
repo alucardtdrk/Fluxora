@@ -23,6 +23,43 @@ function event(overrides: Partial<WorkspaceSecurityEvent>): WorkspaceSecurityEve
 }
 
 describe("Workspace security correlation", () => {
+  it("flags persistence and weakened security without a suspicious login", () => {
+    const findings = correlateWorkspaceSecurityEvents([
+      event({ externalId: "oauth", source: "oauth_token", type: "authorize", metadata: { scope: ["https://www.googleapis.com/auth/gmail.readonly"] } }),
+      event({ externalId: "routing", source: "admin", type: "CREATE_GMAIL_SETTING", metadata: { SETTING_NAME: "EMAIL_ROUTING" } }),
+      event({ externalId: "auth", source: "admin", type: "ENFORCE_STRONG_AUTHENTICATION", metadata: { NEW_VALUE: "false" } }),
+      event({ externalId: "trust", source: "admin", type: "TRUST_DOMAIN_OWNED_OAUTH2_APPS" }),
+    ], observedAt);
+    expect(findings.map((finding) => finding.rule)).toEqual(expect.arrayContaining(["sensitive_oauth_grant", "email_routing_change", "authentication_policy_weakened", "oauth_trust_expanded"]));
+    expect(findings.every((finding) => finding.eventIds.length && finding.description.includes("Revise"))).toBe(true);
+  });
+
+  it("does not flag harmless scopes, revoked access, stronger policies or generic settings", () => {
+    expect(correlateWorkspaceSecurityEvents([
+      event({ source: "oauth_token", type: "authorize", metadata: { scope: "openid email profile" } }),
+      event({ source: "oauth_token", type: "revoke", metadata: { scope: "https://www.googleapis.com/auth/drive" } }),
+      event({ source: "admin", type: "ENFORCE_STRONG_AUTHENTICATION", metadata: { NEW_VALUE: "true" } }),
+      event({ source: "admin", type: "CREATE_GMAIL_SETTING", metadata: { SETTING_NAME: "SIGNATURE" } }),
+      event({ source: "admin", type: "unassign_role" }),
+    ], observedAt)).toEqual([]);
+  });
+
+  it("detects a download burst, but not isolated downloads or downloads across users", () => {
+    const downloads = Array.from({ length: 20 }, (_, index) => event({ externalId: `download-${index}`, source: "drive", type: "download", actor: "ana@example.com", occurredAt: new Date(observedAt.getTime() - index * 60_000) }));
+    expect(correlateWorkspaceSecurityEvents(downloads, observedAt)).toContainEqual(expect.objectContaining({ rule: "bulk_drive_download", evidenceCount: 20 }));
+    expect(correlateWorkspaceSecurityEvents(downloads.slice(0, 19), observedAt)).toEqual([]);
+    expect(correlateWorkspaceSecurityEvents(downloads.map((item) => ({ ...item, id: "duplicate" })), observedAt)).toEqual([]);
+    expect(correlateWorkspaceSecurityEvents(downloads.map((item, index) => ({ ...item, actor: `user-${index}@example.com` })), observedAt)).toEqual([]);
+    expect(correlateWorkspaceSecurityEvents(downloads.map((item, index) => ({ ...item, occurredAt: new Date(observedAt.getTime() - index * 120_000) })), observedAt)).toEqual([]);
+  });
+
+  it("correlates a risky Alert Center identity with subsequent Drive downloads", () => {
+    expect(correlateWorkspaceSecurityEvents([
+      event({ externalId: "identity", source: "alert_center", type: "Suspicious login", severity: "high", target: "ana@example.com" }),
+      event({ externalId: "download", source: "drive", type: "download", severity: "informational", actor: "ana@example.com", occurredAt: new Date("2026-09-17T11:10:00Z") }),
+    ], observedAt)).toContainEqual(expect.objectContaining({ rule: "drive_activity_after_identity_risk", evidenceCount: 2 }));
+  });
+
   it("flags successful logins from different countries within 30 minutes", () => {
     const logins = [
       event({ externalId: "br", type: "login_success", actor: "ana@example.com", country: "BR", ipAddress: "198.51.100.1" }),

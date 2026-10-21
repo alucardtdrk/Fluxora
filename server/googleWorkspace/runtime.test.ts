@@ -196,9 +196,9 @@ describe("Google Workspace security runtime", () => {
     const result = await sync.runCurrent();
 
     expect(alertCollections).toBe(1);
-    expect(reportApplications).toEqual(["login", "admin", "token", "rules"]);
+    expect(reportApplications).toEqual(["login", "admin", "token", "rules", "drive"]);
     expect(postureCollections).toBe(0);
-    expect(reportCollections).toBe(4);
+    expect(reportCollections).toBe(5);
     expect(result.sources).toHaveProperty("alert_center");
   });
 

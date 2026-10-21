@@ -1,4 +1,5 @@
 import { createHash } from "node:crypto";
+import { TRPCError } from "@trpc/server";
 import { getFirestoreDocument, runFirestoreQuery, setFirestoreDocument, type FirestoreRecord } from "./firestore.js";
 import { getFluxoraCollectionPaths } from "./fluxoraFirestorePaths.js";
 
@@ -91,25 +92,31 @@ export async function listIncidentStates(): Promise<IncidentState[]> {
 }
 
 export async function updateIncidentState(input: Omit<IncidentState, "history" | "updatedAt" | "updatedBy">, actor: string) {
+  input = { ...input, status: input.status === "acknowledged" ? "investigating" : input.status, owner: input.owner?.trim() || null, note: input.note?.trim() || null };
+  if (input.status !== "new" && !input.owner) throw new TRPCError({ code: "BAD_REQUEST", message: "Defina um responsável para o atendimento." });
+  if (input.status === "resolved" && !input.note) throw new TRPCError({ code: "BAD_REQUEST", message: "Registre a ação tomada e o resultado antes de resolver." });
   const id = documentId(input.fingerprint);
   const current = await getFirestoreDocument(INCIDENT_COLLECTION, id) as unknown as IncidentState | null;
   const now = new Date().toISOString();
   const firstSeenAt = current?.firstOccurredAt || input.firstOccurredAt || current?.history?.[0]?.at || now;
   const elapsedMinutes = Number(((new Date(now).getTime() - new Date(firstSeenAt).getTime()) / 60000).toFixed(1));
-  const action = current ? `${current.status} → ${input.status}` : `Incidente definido como ${input.status}`;
+  const labels = { new: "Pendente", acknowledged: "Em investigação", investigating: "Em investigação", resolved: "Resolvido" };
+  const previousStatus = current?.status === "acknowledged" ? "investigating" : current?.status;
+  const action = !current ? `Status definido: ${labels[input.status]}` : previousStatus === input.status ? input.status === "investigating" ? "Investigação atualizada" : "Incidente atualizado" : `${labels[current.status]} → ${labels[input.status]}`;
   const next: IncidentState = {
     ...current,
     ...input,
     fingerprint: input.fingerprint,
+    silencedUntil: input.status === "resolved" ? null : input.silencedUntil,
     updatedAt: now,
     updatedBy: actor,
     firstOccurredAt: current?.firstOccurredAt || input.firstOccurredAt || null,
-    acknowledgedAt: current?.acknowledgedAt || (input.status === "acknowledged" ? now : null),
+    acknowledgedAt: current?.acknowledgedAt || (input.status === "investigating" || input.status === "resolved" ? now : null),
     investigatingAt: current?.investigatingAt || (input.status === "investigating" ? now : null),
     resolvedAt: input.status === "resolved" ? (current?.resolvedAt || now) : input.status === current?.status ? current?.resolvedAt : null,
-    timeToAcknowledgeMinutes: current?.timeToAcknowledgeMinutes ?? (input.status === "acknowledged" ? elapsedMinutes : null),
+    timeToAcknowledgeMinutes: current?.timeToAcknowledgeMinutes ?? (input.status === "investigating" || input.status === "resolved" ? elapsedMinutes : null),
     timeToResolveMinutes: input.status === "resolved" ? (current?.timeToResolveMinutes ?? elapsedMinutes) : input.status === current?.status ? current?.timeToResolveMinutes : null,
-    history: [...(current?.history || []), { at: now, actor, action, note: input.note }].slice(-50),
+    history: [...(current?.history || []), { at: now, actor, action, note: input.note !== current?.note ? input.note : null }].slice(-50),
   };
   await setFirestoreDocument(INCIDENT_COLLECTION, id, next as unknown as FirestoreRecord);
   return next;
