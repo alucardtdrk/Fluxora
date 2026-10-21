@@ -13,6 +13,7 @@ import { syncN8nArchive } from "../server/n8n.js";
 import { archiveConfigured, getArchiveSyncState } from "../server/firestoreLogs.js";
 import { authorizeGoogleUser } from "../server/access.js";
 import { isInternalRequestAuthorized } from "../server/internalAuth.js";
+import { sendDailyChatSummary } from "../server/googleChatDailySummary.js";
 import { syncDailyGoogleWorkspaceSecurity } from "../server/googleWorkspace/runtime.js";
 
 const app = express();
@@ -80,9 +81,13 @@ app.get("/api/internal/sync-google-workspace", async (req: any, res: any) => {
   if (!isInternalRequestAuthorized(req.headers)) return res.status(401).json({ ok: false, error: "unauthorized" });
   try {
     const summary = await syncDailyGoogleWorkspaceSecurity();
+    const dailySummary = await sendDailyChatSummary(summary);
+    console.info(JSON.stringify({ message: "google_chat_daily_summary", status: dailySummary.status }));
     const ok = summary.status === "success" || summary.status === "partial" || summary.status === "skipped_locked";
-    return res.status(ok ? 200 : 500).json({ ok, summary });
+    return res.status(ok ? 200 : 500).json({ ok, summary, dailySummary });
   } catch (error) {
+    const dailySummary = await sendDailyChatSummary({ status: "failure", sources: {} });
+    console.info(JSON.stringify({ message: "google_chat_daily_summary", status: dailySummary.status }));
     const configurationError = error instanceof Error && error.message.startsWith("Missing required Google Workspace configuration:");
     console.error(JSON.stringify({ level: "error", message: "google_workspace_sync_failed", configurationError }));
     return res.status(configurationError ? 503 : 500).json({ ok: false, error: configurationError ? "configuration_missing" : "sync_failed" });

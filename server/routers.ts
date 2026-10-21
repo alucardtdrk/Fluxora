@@ -97,7 +97,7 @@ export const appRouter = router({
     systemStatus: adminProcedure.query(async () => {
       const archive = await getArchiveDiagnostics().catch((error) => ({ configured: archiveConfigured(), totalArchived: 0, state: { lastError: error instanceof Error ? error.message : String(error) } as ArchiveSyncState }));
       const workspaceConfigured = ["GOOGLE_WORKSPACE_SERVICE_ACCOUNT_EMAIL", "GOOGLE_WORKSPACE_PRIVATE_KEY", "GOOGLE_WORKSPACE_ADMIN_EMAIL", "GOOGLE_WORKSPACE_CUSTOMER_ID", "GOOGLE_WORKSPACE_DOMAIN"].every((key) => Boolean(String(process.env[key] || "").trim()));
-      return { firestoreConfigured: isFirestoreConfigured(), archive, googleWorkspaceSecurity: { configured: workspaceConfigured } };
+      return { firestoreConfigured: isFirestoreConfigured(), archive, googleWorkspaceSecurity: { configured: workspaceConfigured }, googleChatDailySummary: { configured: Boolean(process.env.GOOGLE_CHAT_DAILY_SUMMARY_WEBHOOK_URL?.trim()) } };
     }),
     testGoogleWorkspace: adminProcedure.query(() => testGoogleWorkspaceConnection()),
     testN8n: adminProcedure.query(async () => {

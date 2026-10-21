@@ -61,3 +61,16 @@ O portal agora possui uma tela de login própria. A sessão fica em cookie HttpO
 ## Observação sobre volume
 
 A integração percorre a paginação do n8n usando `nextCursor`, até `N8N_MAX_PAGES`. Cada página da API contém até 250 registros. Use um limite adequado ao volume da sua instância para evitar Function muito longa.
+
+## Resumo diário no Google Chat (opcional)
+
+Configure em Production, sem prefixo `VITE_`:
+
+- `GOOGLE_CHAT_DAILY_SUMMARY_WEBHOOK_URL`: URL completa do webhook do espaço de avisos. É uma credencial; não coloque seu valor no repositório.
+- `APP_BASE_URL`: endereço HTTPS público do Fluxora, usado nos links da mensagem.
+
+Sem webhook configurado, nenhum envio ou consulta para o resumo é realizado. O resumo é enviado após o cron existente `/api/internal/sync-google-workspace` (04:00 UTC, 1h de Brasília), inclusive quando a coleta informa falhas. Atualizações manuais da interface não enviam mensagens.
+
+O texto mostra incidentes com ocorrências nos últimos 7 dias, suas resoluções nas últimas 24h, prioridades sem responsável, achados de segurança das últimas 24h e o resultado da coleta. Dados indisponíveis ou parciais são identificados. Não inclui contas, IPs ou conteúdo de erros.
+
+O Firestore registra a mensagem pendente antes da entrega e a marca como enviada apenas após sucesso. Reexecuções no mesmo dia usam a mensagem pendente e o mesmo `requestId` do Google Chat para evitar duplicação. Falhas de entrega não repetem automaticamente a coleta; o resultado fica no log `google_chat_daily_summary`. O envio do dia seguinte gera um novo resumo, sem reenviar automaticamente dias anteriores.
