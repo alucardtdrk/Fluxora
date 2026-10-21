@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { AlertTriangle, ArrowLeft, BarChart3, Eye, RefreshCw, Timer, TrendingUp, Workflow } from "lucide-react";
+import { AlertTriangle, ArrowLeft, BarChart3, Eye, RefreshCw, Timer, TrendingUp } from "lucide-react";
 import { Link } from "wouter";
 import { Area, AreaChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { toast } from "sonner";
@@ -10,7 +10,6 @@ import ExecutionDetailDialog from "@/components/ExecutionDetailDialog";
 import IncidentAttentionCenter from "@/components/IncidentAttentionCenter";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import PeriodFilter from "@/components/PeriodFilter";
 import { PREFERENCES_UPDATED_EVENT, readPreferredPageSize, readPreferredRefreshSeconds, readScopedPeriod, saveScopedPeriod, type DashboardPeriod } from "@/lib/preferences";
@@ -79,6 +78,9 @@ function AnalyticsPage() {
   const initialLoading = data.isPending && !data.data;
   const rankedWorkflows = (dashboard?.workflowStats ?? []).filter((workflow) => workflow.executions > 0).sort((a, b) => b.executions - a.executions);
   const totalWorkflowExecutions = rankedWorkflows.reduce((total, workflow) => total + workflow.executions, 0);
+  const [selectedVolumeWorkflow, setSelectedVolumeWorkflow] = useState<string | null>(null);
+  const topVolumeWorkflows = rankedWorkflows.slice(0, 8);
+  const highlightedWorkflow = topVolumeWorkflows.find((workflow) => workflow.id === selectedVolumeWorkflow) ?? topVolumeWorkflows[0];
 
   const refresh = () => data.refetch().then(() => toast.success("Analytics atualizado"));
   useEffect(() => saveScopedPeriod("analytics", period), [period]);
@@ -133,28 +135,36 @@ function AnalyticsPage() {
               <Area name="Erros" dataKey="errors" type="monotone" stroke="var(--feedback-error)" strokeWidth={2} fill="url(#analytics-error-gradient)" />
             </AreaChart></ResponsiveContainer> : <Empty text={initialLoading ? "Carregando telemetria..." : "Sem dados no período"} />}</div></CardContent>
             </Card>
-            <Card className="border-0 bg-card shadow-sm">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2 text-base"><Workflow className="h-4 w-4 text-feedback-info" />Top workflows por volume</CardTitle>
-                <p className="text-xs text-muted-foreground">{periodLabels[period]} · {initialLoading ? "Carregando workflows…" : `${rankedWorkflows.length.toLocaleString("pt-BR")} workflows com execuções`}</p>
+            <Card className="overflow-hidden border border-violet-500/20 bg-card shadow-sm">
+              <CardHeader className="pb-0">
+                <CardTitle className="flex items-center gap-3 text-base"><span className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-indigo-500 to-violet-500 text-white"><TrendingUp className="size-4" aria-hidden="true" /></span>Top workflows por volume</CardTitle>
               </CardHeader>
-              <CardContent>
-                {initialLoading ? <div className="space-y-5" aria-label="Carregando ranking">{[0, 1, 2].map((index) => <div key={index} className="h-20 animate-pulse rounded-lg bg-muted" />)}</div> : rankedWorkflows.length ? <>
-                  <ScrollArea className="h-[300px]">
-                    <ol className="divide-y divide-border/60 pr-4">
-                      {rankedWorkflows.slice(0, 8).map((workflow, index) => <li key={workflow.id} className="py-4 first:pt-0 last:pb-0">
-                        <div className="flex items-start justify-between gap-3">
-                          <Link href={`/workflows/${encodeURIComponent(workflow.id)}`} className="min-w-0 break-words text-sm font-medium hover:text-primary hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"><span className="mr-2 text-xs tabular-nums text-muted-foreground">{index + 1}.</span>{workflow.name}</Link>
-                          <div className="shrink-0 text-right"><p className="text-base font-semibold tabular-nums">{workflow.executions.toLocaleString("pt-BR")}</p><p className="text-[10px] text-muted-foreground">execuções</p></div>
-                        </div>
-                        <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-primary/10" aria-hidden="true"><div className="h-full rounded-full bg-primary" style={{ width: `${workflow.executions / totalWorkflowExecutions * 100}%` }} /></div>
-                        <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-[11px] text-muted-foreground"><span>{(workflow.executions / totalWorkflowExecutions * 100).toLocaleString("pt-BR", { maximumFractionDigits: 1 })}% do volume</span><span>{workflow.successRate != null ? `${workflow.successRate.toLocaleString("pt-BR")}% de sucesso` : "Sucesso indisponível"}</span><span className={workflow.errors > 0 ? "font-medium text-feedback-error" : ""}>{workflow.errors.toLocaleString("pt-BR")} falha(s)</span></div>
-                      </li>)}
-                    </ol>
-                  </ScrollArea>
-                  <p className="mt-3 border-t pt-3 text-[11px] text-muted-foreground">{rankedWorkflows.length > 8 ? "Exibindo os 8 maiores volumes. " : ""}Selecione o nome para abrir o workflow.</p>
-                </> : <Empty text="Nenhum workflow com execuções no período" />}
-              </CardContent>            </Card>
+              <CardContent className="space-y-4">
+                {initialLoading ? <div className="h-64 animate-pulse rounded-xl bg-muted" aria-label="Carregando volumes" /> : <>
+                  <dl className="grid grid-cols-2 gap-3">
+                    <div className="rounded-xl bg-muted/50 p-3"><dt className="text-xs text-muted-foreground">Execuções no período</dt><dd className="mt-1 text-2xl font-semibold tracking-tight tabular-nums">{totalWorkflowExecutions.toLocaleString("pt-BR")}</dd></div>
+                    <div className="rounded-xl bg-muted/50 p-3"><dt className="text-xs text-muted-foreground">Workflows com execuções</dt><dd className="mt-1 text-2xl font-semibold tracking-tight tabular-nums">{rankedWorkflows.length.toLocaleString("pt-BR")}</dd></div>
+                  </dl>
+                  {highlightedWorkflow ? <>
+                    <div className="rounded-xl bg-muted/40 px-3 pb-2 pt-3">
+                      <div className="grid h-28 items-end gap-2" style={{ gridTemplateColumns: `repeat(${topVolumeWorkflows.length}, minmax(0, 1fr))` }} aria-label="Volumes dos principais workflows">
+                        {topVolumeWorkflows.map((workflow, index) => <button key={workflow.id} type="button" aria-pressed={highlightedWorkflow.id === workflow.id} aria-label={`${workflow.name}: ${workflow.executions.toLocaleString("pt-BR")} execuções. Mostrar detalhes.`} onClick={() => setSelectedVolumeWorkflow(workflow.id)} onFocus={() => setSelectedVolumeWorkflow(workflow.id)} onMouseEnter={() => setSelectedVolumeWorkflow(workflow.id)} className="group/bar flex h-full min-w-0 flex-col items-center justify-end gap-1 rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-500">
+                          <span className="text-[10px] font-medium tabular-nums text-muted-foreground">{workflow.executions.toLocaleString("pt-BR")}</span>
+                          <span className={`block w-full max-w-10 rounded-t-md bg-gradient-to-t from-indigo-500 to-violet-500 transition-opacity motion-reduce:transition-none ${highlightedWorkflow.id === workflow.id ? "opacity-100" : "opacity-45 group-hover/bar:opacity-100"}`} style={{ height: `${workflow.executions / topVolumeWorkflows[0]!.executions * 76}%` }} />
+                          <span className="text-[10px] tabular-nums text-muted-foreground">{index + 1}</span>
+                        </button>)}
+                      </div>
+                    </div>
+                    <div className="min-h-16" aria-live="polite">
+                      <Link href={`/workflows/${encodeURIComponent(highlightedWorkflow.id)}`} className="block break-words text-sm font-semibold hover:text-primary hover:underline">{highlightedWorkflow.name}</Link>
+                      <p className="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-[11px] text-muted-foreground"><span>{(highlightedWorkflow.executions / totalWorkflowExecutions * 100).toLocaleString("pt-BR", { maximumFractionDigits: 1 })}% do volume</span><span>{highlightedWorkflow.successRate != null ? `${highlightedWorkflow.successRate.toLocaleString("pt-BR")}% de sucesso` : "Sucesso indisponível"}</span><span className={highlightedWorkflow.errors > 0 ? "font-medium text-feedback-error" : ""}>{highlightedWorkflow.errors.toLocaleString("pt-BR")} falha(s)</span></p>
+                      <p className="mt-1 text-[10px] text-muted-foreground">Selecione uma barra para ver os detalhes.{rankedWorkflows.length > 8 ? " Exibindo os 8 maiores volumes." : ""}</p>
+                    </div>
+                  </> : <Empty text="Nenhum workflow com execuções no período" />}
+                </>}
+                <div className="flex flex-wrap items-center justify-between gap-3 border-t pt-3"><span className="text-xs text-muted-foreground">{periodLabels[period]}</span><Button asChild size="sm" className="bg-gradient-to-r from-indigo-600 to-violet-600 text-white hover:from-indigo-500 hover:to-violet-500"><Link href="/workflows">Ver workflows <span aria-hidden="true">→</span></Link></Button></div>
+              </CardContent>
+            </Card>
           </div>
 
           <div className="mt-6"><ComparisonStrip comparison={dashboard?.comparison} loading={initialLoading} /></div>
