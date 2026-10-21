@@ -1387,6 +1387,16 @@ export async function getN8nExecutionDetail(id: string) {
   }
 }
 
+export function summarizeDailyExecutions(executions: readonly { startedAt?: string; status?: string; workflowId?: string }[], now = new Date()) {
+  const cutoff = now.getTime() - 86_400_000;
+  const recent = executions.filter((execution) => {
+    const at = Date.parse(execution.startedAt || "");
+    return at >= cutoff && at <= now.getTime();
+  });
+  const success = recent.filter((execution) => statusKind(execution.status) === "success").length;
+  const errors = recent.filter((execution) => statusKind(execution.status) === "error").length;
+  return { executions: recent.length, success, errors, others: recent.length - success - errors, successRate: success + errors ? Number((success / (success + errors) * 100).toFixed(1)) : null, workflows: new Set(recent.map((execution) => execution.workflowId).filter(Boolean)).size };
+}
 export async function getN8nAnalytics(period: Period = "7d") {
   getConfig();
   const key = `dashboard:analytics:${period}`;
@@ -1396,7 +1406,7 @@ export async function getN8nAnalytics(period: Period = "7d") {
 }
 
 async function calculateN8nAnalytics(period: Period) {
-  if (!getConfig()) return { status: "not_configured" as const, connected: false as const, summary: null, trend: [], workflowStats: [], recentErrors: [], incidentGroups: [], nodeStats: [], nodeAnalyticsCoverage: 0, sloSummary: null, reliability: null, anomalies: [], alertSummary: null, truncated: false };
+  if (!getConfig()) return { status: "not_configured" as const, connected: false as const, summary: null, executionSummary24h: null, trend: [], workflowStats: [], recentErrors: [], incidentGroups: [], nodeStats: [], nodeAnalyticsCoverage: 0, sloSummary: null, reliability: null, anomalies: [], alertSummary: null, truncated: false };
   try {
     const [workflowResult, executionResult, incidentStateResult, sloResult, runbookResult, alertRuleResult] = await Promise.allSettled([loadWorkflows(), loadExecutions(false, period), listIncidentStates(), listWorkflowSlos(), listWorkflowRunbooks(), listWorkflowAlertRules()]);
     if (executionResult.status === "rejected") throw executionResult.reason;
@@ -1503,6 +1513,7 @@ async function calculateN8nAnalytics(period: Period) {
         p50Duration: durationSummary.p50,
         p95Duration: durationSummary.p95,
       },
+      executionSummary24h: period !== "today" ? summarizeDailyExecutions(executions) : null,
       trend,
       comparison: summarizeTrendComparison(trend),
       workflowStats: stats,
@@ -1517,7 +1528,7 @@ async function calculateN8nAnalytics(period: Period) {
       truncated: executionPage.truncated,
     };
   } catch (error) {
-    return { status: errorStatus(error), connected: false as const, summary: null, trend: [], workflowStats: [], recentErrors: [], incidentGroups: [], nodeStats: [], nodeAnalyticsCoverage: 0, sloSummary: null, reliability: null, anomalies: [], alertSummary: null, truncated: false };
+    return { status: errorStatus(error), connected: false as const, summary: null, executionSummary24h: null, trend: [], workflowStats: [], recentErrors: [], incidentGroups: [], nodeStats: [], nodeAnalyticsCoverage: 0, sloSummary: null, reliability: null, anomalies: [], alertSummary: null, truncated: false };
   }
 }
 

@@ -35,6 +35,11 @@ export async function sendDailyChatSummary(collection: { status: string; sources
       ]);
       const lines = [`*Resumo diário do Fluxora — ${now.toLocaleDateString("pt-BR", { timeZone: "America/Sao_Paulo" })}*`];
       if (operation.status === "fulfilled" && operation.value.status === "ok") {
+        const daily = operation.value.executionSummary24h;
+        if (daily) {
+          lines.push("", "*Execuções — últimas 24h*", `${daily.executions.toLocaleString("pt-BR")} execuções · ${daily.workflows.toLocaleString("pt-BR")} workflows`, `${daily.success.toLocaleString("pt-BR")} com sucesso · ${daily.errors.toLocaleString("pt-BR")} com erro`, `Taxa de sucesso nas execuções concluídas: ${daily.successRate == null ? "sem execuções concluídas" : `${daily.successRate.toLocaleString("pt-BR")}%`}`);
+          if (daily.others) lines.push(`${daily.others.toLocaleString("pt-BR")} em outros estados (em andamento, aguardando ou canceladas).`);
+        } else lines.push("", "Execuções nas últimas 24h: dados indisponíveis.");
         const incidents = operation.value.incidentGroups;
         const pending = incidents.filter((incident) => incident.lifecycle.status === "new").length;
         const investigating = incidents.filter((incident) => incident.lifecycle.status === "investigating" || incident.lifecycle.status === "acknowledged").length;
@@ -42,7 +47,7 @@ export async function sendDailyChatSummary(collection: { status: string; sources
         const unassigned = incidents.filter((incident) => incident.lifecycle.status !== "resolved" && ["high", "critical"].includes(incident.lifecycle.severity) && !incident.lifecycle.owner).length;
         lines.push("", "*Atendimento — incidentes com ocorrências nos últimos 7 dias*", `${pending} pendentes · ${investigating} em investigação`, `${resolved} resolvidos nas últimas 24h · ${unassigned} prioritários sem responsável`);
         if (operation.value.truncated) lines.push("Atenção: os dados de operação estão parciais.");
-      } else lines.push("", "Incidentes: dados indisponíveis. Consulte o Fluxora antes de concluir que não há pendências.");
+      } else lines.push("", "Execuções nas últimas 24h: dados indisponíveis.", "Incidentes: dados indisponíveis. Consulte o Fluxora antes de concluir que não há pendências.");
       if (security.status === "fulfilled") {
         const count = security.value.length;
         lines.push("", `*Segurança — últimas 24h:* ${count === 500 ? "pelo menos " : ""}${count} achados registrados para revisão.`);

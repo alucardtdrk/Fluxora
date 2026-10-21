@@ -14,7 +14,7 @@ beforeEach(() => {
   vi.mocked(getFirestoreDocument).mockResolvedValue(null);
   vi.mocked(setFirestoreDocument).mockResolvedValue(undefined);
   vi.mocked(runFirestoreQuery).mockResolvedValue([]);
-  vi.mocked(getN8nAnalytics).mockResolvedValue({ status: "ok", truncated: false, incidentGroups: [
+  vi.mocked(getN8nAnalytics).mockResolvedValue({ status: "ok", truncated: false, executionSummary24h: { executions: 120, success: 115, errors: 3, others: 2, workflows: 4, successRate: 97.5 }, incidentGroups: [
     { lifecycle: { status: "new", severity: "high", owner: null } },
     { lifecycle: { status: "acknowledged", severity: "low" } },
   ] } as never);
@@ -37,6 +37,9 @@ describe("daily Google Chat summary", () => {
     expect(options.redirect).toBe("error");
     const { text } = JSON.parse(options.body);
     expect(text).toContain("1 pendentes · 1 em investigação");
+    expect(text).toContain("120 execuções · 4 workflows");
+    expect(text).toContain("115 com sucesso · 3 com erro");
+    expect(text).toContain("97,5%");
     expect(text).toContain("Coleta Workspace: concluída");
     expect(text).toContain("https://fluxora.example.com/monitoring");
     expect(setFirestoreDocument).toHaveBeenCalledTimes(2);
