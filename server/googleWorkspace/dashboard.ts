@@ -226,6 +226,11 @@ export async function getWorkspaceEventPage(input: { offset: number; source?: st
   }));
 }
 
+export async function getWorkspaceEvent(id: string, getDocument: (collection: string, id: string) => Promise<FirestoreRecord | null> = getFirestoreDocument): Promise<WorkspaceDashboardEvent | null> {
+  const record = await getDocument(WORKSPACE_SECURITY_EVENTS_COLLECTION, id);
+  return record ? dashboardEvent({ ...record, id }) : null;
+}
+
 export async function getWorkspaceSecurityDashboard(): Promise<WorkspaceSecurityDashboard> {
   if (!isFirestoreConfigured()) return EMPTY_DASHBOARD;
   return createWorkspaceSecurityDashboard({

@@ -11,7 +11,7 @@ import { z } from "zod";
 import { listAuditEvents, recordAuditEventSafe, type AuditEventInput } from "./audit.js";
 import { continueGoogleWorkspaceSecurityBackfill, syncCurrentGoogleWorkspaceSecurity, syncGoogleWorkspaceSecurity } from "./googleWorkspace/runtime.js";
 import { testGoogleWorkspaceConnection } from "./googleWorkspace/connection.js";
-import { getWorkspaceEventPage, getWorkspaceSecurityDashboard } from "./googleWorkspace/dashboard.js";
+import { getWorkspaceEvent, getWorkspaceEventPage, getWorkspaceSecurityDashboard } from "./googleWorkspace/dashboard.js";
 
 const periodSchema = z.enum(["today", "7d", "30d", "90d", "all"]);
 const roleSchema = z.enum(["admin", "operator", "viewer"]);
@@ -43,6 +43,7 @@ export const appRouter = router({
       .mutation(({ input, ctx }) => saveNotificationReadState(ctx.user.email, input.executionIds)),
   }),
   workspaceSecurity: router({
+    event: protectedProcedure.input(z.object({ id: z.string().min(1).max(1500).regex(/^[^/]+$/) })).query(({ input }) => getWorkspaceEvent(input.id)),
     overview: protectedProcedure.query(() => getWorkspaceSecurityDashboard()),
     eventsPage: protectedProcedure.input(z.object({ offset: z.number().int().min(0).max(100000).default(0), source: z.string().optional(), severity: z.string().optional(), category: z.string().optional(), periodDays: z.number().int().min(1).max(90).default(90) })).query(({ input }) => getWorkspaceEventPage(input)),
     refreshCurrent: adminProcedure.mutation(({ ctx }) => audited({ action: "google_workspace.refresh_current", category: "configuration", actor: ctx.user.email, actorRole: ctx.user.role, targetType: "google_workspace", summary: "Atualizou os sinais atuais de segurança do Google Workspace" }, () => syncCurrentGoogleWorkspaceSecurity())),
@@ -89,6 +90,7 @@ export const appRouter = router({
     list: adminProcedure.input(z.object({ period: periodSchema.default("30d"), category: z.enum(["workflow", "incident", "configuration", "access", "history", "data"]).optional(), status: z.enum(["success", "failure"]).optional(), search: z.string().max(160).optional() })).query(({ input }) => listAuditEvents(input)),
   }),
   admin: router({
+    refreshArchiveStatus: adminProcedure.query(() => getArchiveDiagnostics(true)),
     users: adminProcedure.query(() => listFluxoraUsers()),
     saveUser: adminProcedure.input(z.object({ email: z.string().email(), name: z.string().max(120).optional(), role: roleSchema, active: z.boolean().default(true) })).mutation(({ input, ctx }) => audited({ action: "user.save", category: "access", actor: ctx.user.email, actorRole: ctx.user.role, targetType: "user", targetId: input.email, targetName: input.name, summary: `Criou ou atualizou o acesso de ${input.email}`, after: input }, () => upsertFluxoraUser({ ...input, actor: ctx.user.email }))),
     setUserActive: adminProcedure.input(z.object({ email: z.string().email(), active: z.boolean() })).mutation(({ input, ctx }) => audited({ action: "user.status", category: "access", actor: ctx.user.email, actorRole: ctx.user.role, targetType: "user", targetId: input.email, summary: `${input.active ? "Ativou" : "Bloqueou"} o acesso de ${input.email}`, after: { active: input.active } }, () => setFluxoraUserActive(input.email, input.active, ctx.user.email))),

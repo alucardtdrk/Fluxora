@@ -60,7 +60,7 @@ export default function HistoryBackupPanel({ archive, loading, syncing, activity
         </div>
         <div className="flex flex-wrap gap-2">
           <Button onClick={onRunCycle} disabled={syncing || loading}>{cycleButtonLabel}</Button>
-          <Button variant="outline" onClick={onRefresh} disabled={syncing}><RefreshCw className="mr-2 h-4 w-4" />Atualizar status</Button>
+          <Button variant="outline" onClick={onRefresh} disabled={syncing || loading}><RefreshCw className="mr-2 h-4 w-4" />Atualizar status</Button>
         </div>
       </CardHeader>
       <CardContent>

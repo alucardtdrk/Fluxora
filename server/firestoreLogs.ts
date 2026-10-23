@@ -279,12 +279,19 @@ export async function setArchiveSyncState(state: ArchiveSyncState) {
 }
 
 
-export async function getArchiveDiagnostics() {
+export async function getArchiveDiagnostics(refreshDetails = false) {
   const configured = archiveConfigured();
   if (!configured) return { configured: false, totalArchived: 0, state: null };
   const [state, totalStored] = await Promise.all([getArchiveSyncState(), countFirestoreCollection(logsCollection())]);
   const totalArchived = state.activeArchiveRunId ? await countFirestoreCollection(logsCollection(), {
     fieldFilter: { field: { fieldPath: "archiveRunId" }, op: "EQUAL", value: { stringValue: state.activeArchiveRunId } },
   }) : totalStored;
-  return { configured: true, totalArchived, totalStored, state };
+  if (!refreshDetails) return { configured: true, totalArchived, totalStored, state };
+  const [detailsHydrated, queued, detailsUnavailable] = await Promise.all(
+    ["detailsAvailable", "detailsPending", "detailUnavailable"].map((fieldPath) => countFirestoreCollection(logsCollection(), {
+      fieldFilter: { field: { fieldPath }, op: "EQUAL", value: { booleanValue: true } },
+    })),
+  );
+  const detailsPending = state.detailsQueueVersion === 1 ? queued : Math.max(queued, totalStored - detailsHydrated - detailsUnavailable);
+  return { configured: true, totalArchived, totalStored, state: { ...state, detailsHydrated, detailsPending, detailsUnavailable } };
 }

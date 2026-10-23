@@ -69,8 +69,22 @@ it("counts active archive diagnostics without reading history", async () => {
   vi.mocked(getFirestoreDocument).mockResolvedValue({ activeArchiveRunId: "active" });
   vi.mocked(countFirestoreCollection).mockResolvedValueOnce(50000).mockResolvedValueOnce(40000);
   expect(await getArchiveDiagnostics()).toMatchObject({ totalStored: 50000, totalArchived: 40000 });
-  expect(countFirestoreCollection).toHaveBeenLastCalledWith(expect.any(String), { fieldFilter: { field: { fieldPath: "archiveRunId" }, op: "EQUAL", value: { stringValue: "active" } } });
+  expect(countFirestoreCollection).toHaveBeenCalledTimes(2);
+  expect(countFirestoreCollection).toHaveBeenCalledWith(expect.any(String), { fieldFilter: { field: { fieldPath: "archiveRunId" }, op: "EQUAL", value: { stringValue: "active" } } });
   expect(runFirestoreQuery).not.toHaveBeenCalled();
+});
+
+it.each([undefined, 1])("refreshes stale detail counters without processing the queue (version %s)", async (detailsQueueVersion) => {
+  const { isFirestoreConfigured } = await import("./firestore.js");
+  vi.mocked(isFirestoreConfigured).mockReturnValue(true);
+  vi.mocked(getFirestoreDocument).mockResolvedValue({ detailsQueueVersion, detailsHydrated: 34212, detailsPending: 1, detailsUnavailable: 7943 });
+  vi.mocked(countFirestoreCollection).mockImplementation(async (_collection, where: any) => {
+    const field = where?.fieldFilter.field.fieldPath;
+    return field === "detailsAvailable" ? 34511 : field === "detailUnavailable" ? 7943 : field === "detailsPending" ? 258 : 42712;
+  });
+  expect((await getArchiveDiagnostics(true)).state).toMatchObject({ detailsHydrated: 34511, detailsPending: 258, detailsUnavailable: 7943 });
+  expect(runFirestoreQuery).not.toHaveBeenCalled();
+  expect(commitFirestoreDocuments).not.toHaveBeenCalled();
 });
 
 it("bounds recent archive reads and retains the existing history limit", async () => {
