@@ -40,14 +40,21 @@ function eventName(source: string, type: string, fallback: string) {
   const names: Record<string, string> = {
     login_success: "Login realizado", login_failure: "Falha de login", login_verification: "Verificação de login", suspicious_login: "Login suspeito",
     authorize: "Aplicativo autorizado a acessar a conta", activity: "Atividade de acesso por aplicativo", change_event: "Evento da agenda alterado", ALERT_CENTER_VIEW: "Alerta consultado no Admin Console",
+    content_matched: "Conteúdo correspondente à regra", content_unmatched: "Conteúdo deixou de corresponder à regra", action_complete: "Ação da regra concluída",
+    access_item_content: "Conteúdo do arquivo acessado", download: "Arquivo baixado", upload: "Arquivo enviado", view: "Recurso visualizado", edit: "Recurso editado", delete: "Recurso excluído",
   };
   return names[type] ?? (source === "alert_center" ? fallback : type.replaceAll("_", " ").replace(/^./, (letter) => letter.toUpperCase()));
 }
 
 function eventExplanation(source: string, type: string) {
+  if (source === "rules" && type === "content_matched") return "Uma verificação encontrou conteúdo correspondente a uma regra. Confira o documento, o proprietário, os detectores e as ações da regra abaixo. O proprietário não é necessariamente quem realizou a ação.";
+  if (source === "rules" && type === "content_unmatched") return "O conteúdo verificado deixou de corresponder à regra. Confira o recurso e a regra abaixo.";
+  if (source === "rules" && type === "action_complete") return "O Google registrou a conclusão de uma ação da regra. Confira as ações e o recurso abaixo para identificar o que foi executado.";
+  if (source === "drive" && type === "access_item_content") return "O Google registrou um acesso ao conteúdo de um arquivo. Confira o ator, documento, proprietário e aplicativo quando informados.";
+  if (source === "drive" && type === "download") return "O Google registrou o download de um arquivo. Confira quem realizou o download e qual documento foi baixado nos campos abaixo.";
   if (source === "admin" && type === "ALERT_CENTER_VIEW") return "Um administrador consultou um alerta no Admin Console. Este registro não indica que o alerta foi alterado.";
   if (source === "admin" && type === "SECURITY_INVESTIGATION_QUERY") return "Um administrador executou uma consulta na ferramenta de investigação de segurança. O registro não informa o conteúdo da consulta.";
-  if (source === "login" && type === "login_success") return "A conta concluiu uma autenticação. Confira o ator, horário, método e endereço IP para entender o contexto.";
+  if (source === "login" && type === "login_success") return "A conta concluiu uma autenticação. Um login bem-sucedido também pode ser marcado como suspeito pelo Google. Confira essa indicação, o método e as etapas registradas abaixo; a marcação, por si só, não confirma uma invasão.";
   if (source === "login" && type === "login_failure") return "Houve uma tentativa de autenticação sem sucesso. Confira o motivo, a conta e o endereço IP quando disponíveis.";
   return "O Google registrou esta atividade. Confira abaixo quem participou, quando ocorreu e os dados adicionais fornecidos pela fonte.";
 }
@@ -193,6 +200,7 @@ export default function WorkspaceSecurity() {
             <EventDetail label="Tipo" value={selectedEvent.type} />
             <EventDetail label="Identificador do evento" value={selectedEvent.externalId ?? selectedEvent.id} />
             <EventDetail label="Ator" value={selectedEvent.actor} />
+            {!selectedEvent.actor && <div><dt className="text-xs font-medium text-muted-foreground">Ator</dt><dd className="mt-1 text-sm text-muted-foreground">Não informado no registro. Proprietários e usuários afetados são apresentados separadamente quando disponíveis.</dd></div>}
             <EventDetail label="Alvo" value={selectedEvent.target} />
             <EventDetail label="Endereço IP" value={selectedEvent.ipAddress} />
             <EventDetail label="País" value={selectedEvent.country} />

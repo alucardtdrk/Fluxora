@@ -3,6 +3,60 @@ import { createWorkspaceSecurityDashboard, createWorkspaceEventPage, getWorkspac
 import { WORKSPACE_SECURITY_EVENTS_COLLECTION } from "./repository.js";
 
 describe("Workspace security dashboard", () => {
+  it.each([true, false])("shows login suspicion (%s) and preserves authentication sequence", async (isSuspicious) => {
+    const event = await getWorkspaceEvent("login", async () => ({
+      source: "login", type: "login_success", metadata: {
+        is_suspicious: isSuspicious, login_type: "google_password",
+        login_challenge_method: '["password","password","device_prompt"]',
+      },
+    }));
+    expect(event?.details).toEqual(expect.arrayContaining([
+      { label: "Marcado como suspeito pelo Google", value: isSuspicious ? "Sim" : "Não" },
+      { label: "Método de login", value: "Senha do Google" },
+      { label: "Etapas de autenticação registradas", value: "Senha → Senha → Confirmação no dispositivo" },
+    ]));
+  });
+
+  it.each(['invalid JSON', '{}', '[null,{},1]', '[]'])("ignores malformed authentication steps: %s", async (steps) => {
+    const event = await getWorkspaceEvent("login", async () => ({
+      source: "login", metadata: { login_challenge_method: steps },
+    }));
+    expect(event?.details).toEqual([]);
+  });
+
+  it("explains stored DLP evidence without attributing ownership to the actor", async () => {
+    const event = await getWorkspaceEvent("rule", async () => ({
+      source: "rules", type: "content_matched", metadata: {
+        resource_title: "Documento de exemplo", resource_owner_email: "owner@example.com",
+        resource_recipients: '["recipient@example.com"]', rule_name: "Regra DLP", data_source: "DRIVE",
+        triggered_actions: JSON.stringify([{ parameter: [{ name: "action_type", value: "DRIVE_WARN_ON_EXTERNAL_SHARING" }, { name: "token", value: "hidden" }] }]),
+        matched_detectors: JSON.stringify([{ parameter: [{ name: "display_name", value: "FDA_CODE" }] }]),
+        token: "hidden",
+      },
+    }));
+    expect(event?.actor).toBeUndefined();
+    expect(event?.details).toEqual(expect.arrayContaining([
+      { label: "Documento", value: "Documento de exemplo" },
+      { label: "Proprietário", value: "owner@example.com" },
+      { label: "Destinatários", value: "recipient@example.com" },
+      { label: "Regra", value: "Regra DLP" },
+      { label: "Ações da regra", value: "Avisar sobre compartilhamento externo no Drive" },
+      { label: "Detectores correspondentes", value: "FDA_CODE" },
+    ]));
+    expect(JSON.stringify(event)).not.toContain("hidden");
+  });
+
+  it.each(["drive", "admin", "gmail", "calendar", "chat", "meet", "mobile", "groups", "oauth_token", "login", "saml", "user_accounts"])("preserves useful %s details and ignores unknown fields", async (source) => {
+    const event = await getWorkspaceEvent(source, async () => ({ source, metadata: {
+      resource_name: "Recurso acessado", event_type: "read", status: "success", user_email: "user@example.com",
+      is_external: false, num_recipients: 2, resource_recipients: "invalid JSON", secret: "hidden",
+    } }));
+    expect(event?.details).toEqual(expect.arrayContaining([
+      { label: "Recurso", value: "Recurso acessado" }, { label: "Tipo de ação", value: "read" },
+      { label: "Externo", value: "Não" }, { label: "Quantidade de destinatários", value: "2" },
+    ]));
+    expect(JSON.stringify(event)).not.toContain("hidden");
+  });
   it("loads an older evidence directly by ID and exposes only safe details", async () => {
     const event = await getWorkspaceEvent("older-event", async (collection, id) => {
       expect(collection).toBe(WORKSPACE_SECURITY_EVENTS_COLLECTION);
