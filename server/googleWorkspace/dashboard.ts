@@ -90,12 +90,66 @@ function dateValue(value: unknown): string {
   return Number.isFinite(parsed.getTime()) ? parsed.toISOString() : new Date(0).toISOString();
 }
 
+function eventDetailValue(key: string, value: unknown): string | undefined {
+  if (typeof value === "boolean") return value ? "Sim" : "Não";
+  if (typeof value === "number" && Number.isFinite(value)) return String(value);
+  if (typeof value !== "string" || !value.trim()) return undefined;
+  if (key === "login_type" && value === "google_password") return "Senha do Google";
+  if (key === "login_challenge_method") {
+    try {
+      const steps: unknown = JSON.parse(value);
+      if (!Array.isArray(steps)) return undefined;
+      const labels: Record<string, string> = { password: "Senha", device_prompt: "Confirmação no dispositivo" };
+      return steps.filter((step): step is string => typeof step === "string" && Boolean(step.trim()))
+        .map((step) => labels[step] ?? step).join(" → ").slice(0, 2_000) || undefined;
+    } catch {
+      return undefined;
+    }
+  }
+  if (["triggered_actions", "matched_detectors", "resource_recipients", "recipients"].includes(key)) {
+    try {
+      const items: unknown = JSON.parse(value);
+      if (!Array.isArray(items)) return undefined;
+      const values = items.flatMap((item: unknown): string[] => {
+        if (key === "resource_recipients" || key === "recipients") return typeof item === "string" ? [item] : [];
+        if (!item || typeof item !== "object" || !("parameter" in item) || !Array.isArray(item.parameter)) return [];
+        return item.parameter.flatMap((parameter: unknown): string[] => {
+          if (!parameter || typeof parameter !== "object" || !("name" in parameter) || !("value" in parameter) || typeof parameter.value !== "string") return [];
+          if (key === "triggered_actions" && parameter.name === "action_type") {
+            return [parameter.value === "DRIVE_WARN_ON_EXTERNAL_SHARING" ? "Avisar sobre compartilhamento externo no Drive" : parameter.value];
+          }
+          return key === "matched_detectors" && parameter.name === "display_name" ? [parameter.value] : [];
+        });
+      });
+      return [...new Set(values)].join(", ").slice(0, 2_000) || undefined;
+    } catch {
+      return undefined;
+    }
+  }
+  return value.trim().slice(0, 2_000);
+}
+
 function dashboardEvent(record: FirestoreRecord): WorkspaceDashboardEvent {
   const metadata = record.metadata && typeof record.metadata === "object" ? record.metadata as FirestoreRecord : {};
-  const detailKeys: ReadonlyArray<[string, string]> = [["app_name", "Aplicativo"], ["client_name", "Aplicativo"], ["client_id", "ID do aplicativo"], ["scope", "Permissões"], ["scopes", "Permissões"], ["event_type", "Tipo de ação"], ["status", "Resultado"], ["failure_type", "Motivo da falha"], ["login_type", "Método de login"], ["role_name", "Função administrativa"], ["resource_name", "Recurso"], ["doc_title", "Documento"], ["visibility", "Visibilidade"], ["owner", "Proprietário"], ["user_email", "Usuário afetado"]];
+  const detailKeys: ReadonlyArray<[string, string]> = [["app_name", "Aplicativo"], ["client_name", "Aplicativo"], ["client_id", "ID do aplicativo"], ["scope", "Permissões"], ["scopes", "Permissões"], ["event_type", "Tipo de ação"], ["status", "Resultado"], ["failure_type", "Motivo da falha"], ["login_type", "Método de login"], ["role_name", "Função administrativa"], ["resource_name", "Recurso"], ["doc_title", "Documento"], ["visibility", "Visibilidade"], ["owner", "Proprietário"], ["user_email", "Usuário afetado"],
+    ["is_suspicious", "Marcado como suspeito pelo Google"], ["login_challenge_method", "Etapas de autenticação registradas"],
+    ["resource_title", "Documento"], ["resource_id", "ID do recurso"], ["doc_id", "ID do documento"], ["resource_type", "Tipo de recurso"],
+    ["resource_owner_email", "Proprietário"], ["resource_recipients", "Destinatários"], ["recipients", "Destinatários"],
+    ["rule_name", "Regra"], ["rule_type", "Tipo de regra"], ["rule_resource_name", "ID da regra"],
+    ["data_source", "Fonte dos dados"], ["scan_type", "Tipo de verificação"], ["severity", "Severidade informada pela fonte"],
+    ["triggered_actions", "Ações da regra"], ["matched_detectors", "Detectores correspondentes"],
+    ["actor_email", "Responsável informado no evento"], ["target_user", "Usuário de destino"], ["target_user_email", "E-mail de destino"],
+    ["group_email", "Grupo"], ["org_unit_name", "Unidade organizacional"], ["setting_name", "Configuração"],
+    ["permission", "Permissão"],
+    ["is_external", "Externo"], ["num_recipients", "Quantidade de destinatários"],
+    ["message_id", "ID da mensagem"], ["subject", "Assunto"], ["sender", "Remetente"], ["recipient", "Destinatário"],
+    ["calendar_id", "ID da agenda"], ["event_id", "ID do evento"], ["event_title", "Título do evento"],
+    ["meeting_code", "Código da reunião"], ["conference_id", "ID da conferência"],
+    ["device_id", "ID do dispositivo"], ["device_type", "Tipo de dispositivo"], ["device_model", "Modelo do dispositivo"],
+  ];
   const details = detailKeys.flatMap(([key, label]) => {
-    const value = metadata[key];
-    return typeof value === "string" && value.trim() ? [{ label, value: value.slice(0, 500) }] : [];
+    const value = eventDetailValue(key, metadata[key]);
+    return value ? [{ label, value }] : [];
   });
   const safe = record.safeDetails && typeof record.safeDetails === "object" ? record.safeDetails as FirestoreRecord : null;
   const safeDetails = safe ? {
