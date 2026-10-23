@@ -54,6 +54,20 @@ function eventExplanation(source: string, type: string) {
 
 export default function WorkspaceSecurity() {
   const { user } = useAuth();
+  const utils = trpc.useUtils();
+  const [loadingEvidence, setLoadingEvidence] = useState<string | null>(null);
+  async function analyzeEvidence(id: string) {
+    setLoadingEvidence(id);
+    try {
+      const event = await utils.workspaceSecurity.event.fetch({ id });
+      if (event) setSelectedEvent(event);
+      else toast.message("Evidência indisponível", { description: "O registro não está mais disponível no histórico armazenado." });
+    } catch {
+      toast.error("Não foi possível carregar a evidência", { description: "Tente novamente em instantes." });
+    } finally {
+      setLoadingEvidence(null);
+    }
+  }
   const dashboard = trpc.workspaceSecurity.overview.useQuery(undefined, { retry: false, refetchInterval: 300_000, staleTime: 300_000 });
   const automaticRefreshStarted = useRef(false);
   const refreshCurrent = trpc.workspaceSecurity.refreshCurrent.useMutation({
@@ -116,7 +130,7 @@ export default function WorkspaceSecurity() {
 
     <Card className="mt-6 border-orange-500/40 bg-orange-500/5"><CardHeader><CardTitle className="flex items-center gap-2 text-base"><ShieldAlert className="h-5 w-5 text-orange-600 dark:text-orange-300" />Requer atenção{dashboard.data && <span className="rounded-full bg-orange-500/20 px-2 py-0.5 text-xs">{findings.length + attentionEvents.length}</span>}</CardTitle><p className="text-xs text-muted-foreground">Sinais de risco e eventos prioritários para investigação. Um alerta isolado também merece revisão.</p></CardHeader><CardContent>
       {dashboard.isLoading ? <p className="text-sm text-muted-foreground">Carregando alertas de segurança…</p> : dashboard.isError ? <p className="text-sm text-orange-700 dark:text-orange-300">Não foi possível carregar os alertas. Tente atualizar a segurança novamente.</p> : findings.length + attentionEvents.length === 0 ? <p className="text-sm text-muted-foreground">Nenhum alerta encontrado nos achados armazenados e na amostra dos 250 eventos mais recentes. Isso não garante ausência de risco; consulte o histórico e a cobertura das fontes.</p> : <div className="max-h-[560px] space-y-3 overflow-y-auto">
-        {findings.map((finding) => <div key={finding.id} className="rounded-xl border border-orange-500/30 p-4"><div className="flex flex-wrap items-center gap-2"><span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${severityClass(finding.severity)}`}>{severityLabels[finding.severity] ?? finding.severity}</span><p className="font-medium">{finding.title}</p></div><p className="mt-2 text-sm text-muted-foreground">{finding.description}</p><p className="mt-3 break-words text-xs text-muted-foreground">{finding.subjects.join(", ") || "Usuário não disponibilizado pelo Google"} · {new Date(finding.lastOccurredAt).toLocaleString("pt-BR")} · {finding.evidenceCount} evidências</p><p className="mt-1 break-words text-xs text-muted-foreground">IP: {finding.ipAddresses.join(", ") || "não informado pelo Google"}</p><div className="mt-3 flex flex-wrap gap-2">{(dashboard.data?.events ?? []).filter((event) => finding.eventIds.includes(event.id)).map((event) => <Button key={event.id} size="sm" variant="outline" onClick={() => setSelectedEvent(event)}>Analisar evidência · {sourceLabels[event.source] ?? event.source}</Button>)}</div></div>)}
+        {findings.map((finding) => <div key={finding.id} className="rounded-xl border border-orange-500/30 p-4"><div className="flex flex-wrap items-center gap-2"><span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${severityClass(finding.severity)}`}>{severityLabels[finding.severity] ?? finding.severity}</span><p className="font-medium">{finding.title}</p></div><p className="mt-2 text-sm text-muted-foreground">{finding.description}</p><p className="mt-3 break-words text-xs text-muted-foreground">{finding.subjects.join(", ") || "Usuário não disponibilizado pelo Google"} · {new Date(finding.lastOccurredAt).toLocaleString("pt-BR")} · {finding.evidenceCount} evidências</p><p className="mt-1 break-words text-xs text-muted-foreground">IP: {finding.ipAddresses.join(", ") || "não informado pelo Google"}</p><div className="mt-3 flex flex-wrap gap-2">{finding.eventIds.map((id, index) => <Button key={id} size="sm" variant="outline" disabled={loadingEvidence !== null} onClick={() => void analyzeEvidence(id)}>{loadingEvidence === id ? "Carregando…" : finding.eventIds.length === 1 ? "Analisar evento" : `Analisar evidência ${index + 1}`}</Button>)}</div></div>)}
         {attentionEvents.map((event) => <div key={event.id} className="rounded-xl border border-orange-500/30 p-4"><div className="flex flex-wrap items-center gap-2"><span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${severityClass(event.severity)}`}>{severityLabels[event.severity] ?? event.severity}</span><p className="font-medium">{eventName(event.source, event.type, event.title)}</p></div><p className="mt-2 break-words text-sm text-muted-foreground">{event.target ?? event.actor ?? "Usuário não disponibilizado pelo Google"} · {new Date(event.occurredAt).toLocaleString("pt-BR")}</p><p className="mt-1 break-words text-xs text-muted-foreground">IP: {event.ipAddress ?? "não informado pelo Google"}{event.country ? ` · País: ${event.country}` : ""}</p><Button className="mt-3" size="sm" variant="outline" onClick={() => setSelectedEvent(event)}>Analisar evento</Button></div>)}
       </div>}
       <p className="mt-4 text-xs text-muted-foreground">Confirme acessos e exportações com o usuário e revise as evidências no Google Admin Console. IPs diferentes podem decorrer de VPN ou rede móvel; o endereço sozinho não confirma invasão.</p>

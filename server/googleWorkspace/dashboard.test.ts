@@ -1,7 +1,18 @@
 import { describe, expect, it } from "vitest";
-import { createWorkspaceSecurityDashboard, createWorkspaceEventPage } from "./dashboard.js";
+import { createWorkspaceSecurityDashboard, createWorkspaceEventPage, getWorkspaceEvent } from "./dashboard.js";
+import { WORKSPACE_SECURITY_EVENTS_COLLECTION } from "./repository.js";
 
 describe("Workspace security dashboard", () => {
+  it("loads an older evidence directly by ID and exposes only safe details", async () => {
+    const event = await getWorkspaceEvent("older-event", async (collection, id) => {
+      expect(collection).toBe(WORKSPACE_SECURITY_EVENTS_COLLECTION);
+      expect(id).toBe("older-event");
+      return { id, source: "login", type: "suspicious_login", metadata: { login_type: "password", token: "hidden" } };
+    });
+    expect(event).toMatchObject({ id: "older-event", details: [{ label: "Método de login", value: "password" }] });
+    expect(event).not.toHaveProperty("metadata");
+    expect(await getWorkspaceEvent("missing", async () => null)).toBeNull();
+  });
   it("pages filtered events without losing later matches", async () => {
     const records = Array.from({ length: 60 }, (_, index) => ({ id: `event-${index}`, source: index % 2 ? "login" : "drive", category: "identity", severity: "high", occurredAt: new Date("2026-09-23T10:00:00Z") }));
     const listBatch = async (offset: number, limit: number) => records.slice(offset, offset + limit);

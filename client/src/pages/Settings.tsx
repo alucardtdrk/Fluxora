@@ -25,7 +25,7 @@ export default function Settings() {
   const utils = trpc.useUtils();
   const [activeTab, setActiveTab] = useState("general");
   const overview = trpc.n8n.overview.useQuery({ period: "7d", workflowIds: [] }, { retry: false });
-  const system = trpc.admin.systemStatus.useQuery(undefined, { retry: false, refetchInterval: 300_000, staleTime: 300_000 });
+  const system = trpc.admin.systemStatus.useQuery(undefined, { retry: false, staleTime: 300_000 });
   const [notifications, setNotifications] = useState(() => localStorage.getItem("notificationsEnabled") !== "false");
   const [refreshInterval, setRefreshInterval] = useState(() => String(readPreferredRefreshSeconds()));
   const [defaultPeriod, setDefaultPeriod] = useState(() => readDefaultPeriod());
@@ -36,6 +36,7 @@ export default function Settings() {
   const [savingSettings, setSavingSettings] = useState(false);
   const [syncingHistory, setSyncingHistory] = useState(false);
   const [syncProgress, setSyncProgress] = useState("");
+  const [refreshingHistory, setRefreshingHistory] = useState(false);
 
   const sync = trpc.n8n.syncArchive.useMutation();
   const preserveDetails = trpc.n8n.preserveExecutionDetails.useMutation();
@@ -131,6 +132,18 @@ export default function Settings() {
     restoreDraft();
     broadcastPreferencesUpdated();
     toast.success("Cache local limpo");
+  };
+
+  const refreshHistoryStatus = async () => {
+    setRefreshingHistory(true);
+    try {
+      const archive = await utils.client.admin.refreshArchiveStatus.query();
+      utils.admin.systemStatus.setData(undefined, (current) => current ? { ...current, archive } : current);
+    } catch {
+      toast.error("Não foi possível atualizar o status do histórico. Tente novamente.");
+    } finally {
+      setRefreshingHistory(false);
+    }
   };
 
   const synchronizeHistory = async () => {
@@ -238,7 +251,7 @@ export default function Settings() {
       </TabsContent>
 
       <TabsContent value="history" className="mt-6">
-        <HistoryBackupPanel archive={archive} loading={system.isLoading} syncing={syncingHistory} activity={syncProgress} onRunCycle={synchronizeHistory} onRefresh={() => { void system.refetch(); }} />
+        <HistoryBackupPanel archive={archive} loading={system.isLoading || refreshingHistory} syncing={syncingHistory} activity={syncProgress} onRunCycle={synchronizeHistory} onRefresh={refreshHistoryStatus} />
       </TabsContent>
 
       <TabsContent value="workflows" className="mt-6 space-y-6">
