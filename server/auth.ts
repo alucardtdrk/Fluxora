@@ -51,7 +51,7 @@ export function setSessionCookie(res: any, user: AuthenticatedUser) {
 }
 export function clearSessionCookie(res: any) {
   if (typeof res.clearCookie === "function") {
-    res.clearCookie(COOKIE_NAME, { httpOnly: true, secure: true, sameSite: "none", path: "/", maxAge: -1 });
+    res.clearCookie(COOKIE_NAME, { httpOnly: true, secure: process.env.NODE_ENV === "production", sameSite: "lax", path: "/" });
     return;
   }
   res.setHeader("Set-Cookie", serialize(COOKIE_NAME, "", { httpOnly: true, secure: process.env.NODE_ENV === "production", sameSite: "lax", path: "/", maxAge: 0 }));

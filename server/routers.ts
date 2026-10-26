@@ -20,9 +20,12 @@ async function audited<T>(event: AuditEventInput, operation: () => Promise<T>) {
   try {
     const result = await operation();
     if (["workflow", "incident", "history"].includes(event.category) || ["slo.save", "runbook.save", "alert_rule.save"].includes(event.action)) invalidateN8nCache();
-    const resultStatus = result && typeof result === "object" && "status" in result ? String((result as { status?: unknown }).status || "ok") : "ok";
-    const failureReason = resultStatus === "error" && result && typeof result === "object" && "message" in result ? String((result as { message?: unknown }).message || "A ação não foi concluída") : event.reason;
-    await recordAuditEventSafe({ ...event, status: resultStatus === "error" ? "failure" : "success", reason: failureReason, metadata: { ...event.metadata, resultStatus } });
+    let resultStatus = result && typeof result === "object" && "status" in result ? String((result as { status?: unknown }).status || "ok") : "ok";
+    if (result && typeof result === "object" && "failedSources" in result && Array.isArray(result.failedSources) && result.failedSources.length) resultStatus = "partial";
+    // Incident records return their lifecycle state, rather than an operation status.
+    const succeeded = ["ok", "success"].includes(resultStatus) || (event.action === "incident.update" && ["new", "acknowledged", "investigating", "resolved"].includes(resultStatus));
+    const failureReason = succeeded ? event.reason : String(result && typeof result === "object" && "message" in result && result.message || `A ação não foi concluída (${resultStatus}).`);
+    await recordAuditEventSafe({ ...event, status: succeeded ? "success" : "failure", reason: failureReason, metadata: { ...event.metadata, resultStatus } });
     return result;
   } catch (error) {
     await recordAuditEventSafe({ ...event, status: "failure", reason: error instanceof Error ? error.message : String(error) });
@@ -87,7 +90,7 @@ export const appRouter = router({
     restoreWorkflowVersion: adminProcedure.input(z.object({ workflowId: z.string().min(1), snapshotId: z.string().min(1) })).mutation(({ input, ctx }) => audited({ action: "workflow.restore", category: "workflow", actor: ctx.user.email, actorRole: ctx.user.role, targetType: "workflow", targetId: input.workflowId, summary: `Restaurou uma versão anterior do workflow ${input.workflowId}`, metadata: { snapshotId: input.snapshotId } }, () => restoreN8nWorkflowVersion(input.workflowId, input.snapshotId, { email: ctx.user.email, role: ctx.user.role }))),
   }),
   audit: router({
-    list: adminProcedure.input(z.object({ period: periodSchema.default("30d"), category: z.enum(["workflow", "incident", "configuration", "access", "history", "data"]).optional(), status: z.enum(["success", "failure"]).optional(), search: z.string().max(160).optional() })).query(({ input }) => listAuditEvents(input)),
+    list: adminProcedure.input(z.object({ period: periodSchema.default("30d"), category: z.enum(["workflow", "incident", "configuration", "access", "history", "data"]).optional(), status: z.enum(["success", "failure"]).optional(), search: z.string().max(160).optional(), pageSize: z.number().int().min(1).max(100).default(50), cursor: z.object({ createdAt: z.string().datetime(), documentName: z.string().max(1500).regex(/^projects\/[^/]+\/databases\/\(default\)\/documents\/fluxora\/data\/audit-events\/[^/]+$/) }).nullish() })).query(({ input }) => listAuditEvents(input)),
   }),
   admin: router({
     refreshArchiveStatus: adminProcedure.query(() => getArchiveDiagnostics(true)),

@@ -11,11 +11,20 @@ No projeto do Vercel, abra **Settings > Environment Variables** e configure para
 - `N8N_MAX_PAGES` = `20` (ajuste se necessário)
 - `CRON_SECRET` = segredo longo e aleatório usado pela Vercel para autenticar a rotina diária
 - `FLUXORA_SYNC_SECRET` = segredo longo e aleatório para acionamentos administrativos do sincronizador
-- `APP_ACCESS_PASSWORD` = senha de acesso ao portal
 - `JWT_SECRET` = segredo longo e aleatório para assinar a sessão
+- `GOOGLE_CLIENT_ID` e `GOOGLE_CLIENT_SECRET` = credenciais OAuth Google do tipo aplicação Web
+- `GOOGLE_ALLOWED_DOMAIN` = domínio corporativo permitido, sem `@`
+- `APP_BASE_URL` = origem HTTPS pública do Fluxora
+- `GOOGLE_REDIRECT_URI` = opcional; se definido, use a origem pública seguida de `/api/auth/google/callback`
+- `FLUXORA_ADMIN_EMAILS` = e-mails dos administradores iniciais, separados por vírgula
+- `FIREBASE_PROJECT_ID`, `FIREBASE_CLIENT_EMAIL` e `FIREBASE_PRIVATE_KEY` = conta de serviço do Firestore
 - `CONTROL_ACTIONS_ENABLED` = `false` inicialmente
 
 Depois de validar o portal, altere `CONTROL_ACTIONS_ENABLED=true` se quiser permitir ativar/desativar workflows diretamente pelo site.
+
+Cadastre o callback HTTPS no cliente OAuth Google. O ambiente local usa o mesmo fluxo, com seu próprio callback, por exemplo `http://localhost:3000/api/auth/google/callback`. Não use uma origem ou um callback de produção nas variáveis locais.
+
+A auditoria não exige novos índices compostos: utiliza a indexação automática de `createdAt`, que deve permanecer habilitada. Categoria, resultado e texto são filtrados em lotes no servidor, com até 1.000 registros examinados por requisição e continuação pelo botão Continuar busca. Filtros muito específicos podem consumir mais leituras. Preserve os índices existentes de outras coleções.
 
 ## 2. Deploy
 
@@ -47,16 +56,17 @@ O Cron Job só roda em deployments de produção. Sem `CRON_SECRET`, o endpoint 
 
 Não crie `VITE_N8N_API_KEY` ou `NEXT_PUBLIC_N8N_API_KEY`. Variáveis com prefixo público podem ser incorporadas ao bundle do navegador.
 
-O portal agora possui uma tela de login própria. A sessão fica em cookie HttpOnly assinado pelo servidor.
+O portal usa login Google com e-mail verificado, restrição de domínio quando configurada e verificação de acesso ativo no Fluxora. A sessão fica em cookie HttpOnly assinado pelo servidor. A rota legada `/api/logs` também exige esse acesso e não permite cache compartilhado.
 
 ## 5. Teste pós-deploy
 
 1. Acesse a URL do Vercel.
-2. Entre com `APP_ACCESS_PASSWORD`.
+2. Entre com uma conta Google autorizada em `FLUXORA_ADMIN_EMAILS` ou cadastrada e ativa no Fluxora.
 3. Confirme que Visão geral, Workflows, Execuções, Erros e Analytics carregam.
 4. Abra `/api/health` e confirme retorno `ok: true`.
 5. Valide os números contra o n8n.
-6. Só depois habilite `CONTROL_ACTIONS_ENABLED=true` se quiser liberar ações administrativas.
+6. Confirme login e logout, bloqueio de usuário, busca de um evento antigo na auditoria e recusa de `/api/logs` sem sessão.
+7. Só depois habilite `CONTROL_ACTIONS_ENABLED=true` se quiser liberar ações administrativas.
 
 ## Observação sobre volume
 

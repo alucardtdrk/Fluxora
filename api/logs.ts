@@ -1,3 +1,5 @@
+import { createContext } from '../server/_core/context.js';
+
 const WORKFLOWS = [
   { id: 'XBNVQcEZcOK7O817', name: 'Onboarding / Offboarding' },
   { id: 'f0knDy7mQL5J4f2E', name: 'Automações Gerais' },
@@ -152,7 +154,10 @@ function stats(executions: any[]) {
 }
 
 export default async function handler(req: any, res: any) {
+  res.setHeader('Cache-Control', 'private, no-store');
   if (req.method !== 'GET') return res.status(405).json({ error: 'Method not allowed' });
+  const { user } = await createContext({ req, res } as Parameters<typeof createContext>[0]);
+  if (!user) return res.status(401).json({ error: 'unauthorized' });
 
   const apiKey = process.env.N8N_API_KEY;
   const baseUrl = (process.env.N8N_BASE_URL || 'https://n8n-adm.saipos.center').replace(/\/$/, '');
@@ -228,7 +233,6 @@ export default async function handler(req: any, res: any) {
 
     const totalStats = stats(executions);
 
-    res.setHeader('Cache-Control', 's-maxage=15, stale-while-revalidate=30');
     return res.status(200).json({
       generatedAt: new Date().toISOString(),
       periodDays: days,
