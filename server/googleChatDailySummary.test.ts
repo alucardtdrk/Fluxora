@@ -33,16 +33,29 @@ describe("daily Google Chat summary", () => {
   it("sends counts and links without exposing incident details", async () => {
     expect(await sendDailyChatSummary(collection)).toEqual({ status: "sent" });
     const [url, options] = request.mock.calls[0];
-    expect(url.searchParams.get("requestId")).toBeTruthy();
+    expect(url.searchParams.has("requestId")).toBe(false);
     expect(options.redirect).toBe("error");
     const { text } = JSON.parse(options.body);
-    expect(text).toContain("1 pendentes · 1 em investigação");
+    expect(text).toContain("📊 *Fluxora · Resumo diário*");
+    expect(text).toContain("• 1 incidentes pendentes");
+    expect(text).toContain("• Em investigação: 1");
+    expect(text.indexOf("*Pontos de atenção*")).toBeLessThan(text.indexOf("*Execuções"));
     expect(text).toContain("120 execuções · 4 workflows");
     expect(text).toContain("115 com sucesso · 3 com erro");
     expect(text).toContain("97,5%");
     expect(text).toContain("Coleta Workspace: concluída");
     expect(text).toContain("https://fluxora.example.com/monitoring");
     expect(setFirestoreDocument).toHaveBeenCalledTimes(2);
+  });
+  it("keeps an empty summary brief and warns when security collection is partial", async () => {
+    vi.mocked(getN8nAnalytics).mockResolvedValue({ status: "ok", truncated: false, executionSummary24h: { executions: 0, success: 0, errors: 0, others: 0, workflows: 0, successRate: null }, incidentGroups: [] } as never);
+    await sendDailyChatSummary({ status: "partial", sources: { drive: { status: "incomplete" } } });
+    const { text } = JSON.parse(request.mock.calls[0][1].body);
+    expect(text).toContain("Nenhuma execução registrada no período.");
+    expect(text).not.toContain("Taxa de sucesso");
+    expect(text).toContain("Coleta Workspace: parcial · 1 fontes com páginas pendentes");
+    expect(text).toContain("Nenhum achado registrado no período.");
+    expect(text).toContain("A coleta está parcial; esse resultado pode estar incompleto.");
   });
   it("does not send a second summary already delivered for the day", async () => {
     const day = new Intl.DateTimeFormat("en-CA", { timeZone: "America/Sao_Paulo" }).format(new Date());
@@ -56,7 +69,7 @@ describe("daily Google Chat summary", () => {
     await sendDailyChatSummary({ status: "failure", sources: {} });
     const { text } = JSON.parse(request.mock.calls[0][1].body);
     expect(text).toContain("Incidentes: dados indisponíveis");
-    expect(text).toContain("Segurança: dados indisponíveis");
+    expect(text).toContain("Não foi possível verificar os achados recentes.");
     expect(text).toContain("Coleta Workspace: falhou");
     expect(text).not.toContain("private error");
   });

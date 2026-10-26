@@ -18,7 +18,8 @@ export async function sendDailyChatSummary(collection: { status: string; sources
   const since = new Date(now.getTime() - 86_400_000);
   const hash = createHash("sha256").update(`fluxora-daily:${day}:${destination.pathname}`).digest("hex");
   const requestId = `${hash.slice(0, 8)}-${hash.slice(8, 12)}-${hash.slice(12, 16)}-${hash.slice(16, 20)}-${hash.slice(20, 32)}`;
-  destination.searchParams.set("requestId", requestId);
+  // Incoming webhooks reject requestId; delivery tracking stays in Firestore.
+  destination.searchParams.delete("requestId");
   const systemCollection = getFluxoraCollectionPaths("system").destination;
   const deliveryId = `google-chat-daily-${day}-${hash.slice(0, 8)}`;
   try {
@@ -33,33 +34,55 @@ export async function sendDailyChatSummary(collection: { status: string; sources
           { fieldFilter: { field: { fieldPath: "lastOccurredAt" }, op: "LESS_THAN_OR_EQUAL", value: { timestampValue: now.toISOString() } } },
         ] } }, orderBy: [{ field: { fieldPath: "lastOccurredAt" }, direction: "DESCENDING" }], limit: 500 }),
       ]);
-      const lines = [`*Resumo diário do Fluxora — ${now.toLocaleDateString("pt-BR", { timeZone: "America/Sao_Paulo" })}*`];
+      const lines = ["📊 *Fluxora · Resumo diário*", now.toLocaleDateString("pt-BR", { timeZone: "America/Sao_Paulo" })];
+      const attention: string[] = [];
+      const details: string[] = [];
       if (operation.status === "fulfilled" && operation.value.status === "ok") {
         const daily = operation.value.executionSummary24h;
-        if (daily) {
-          lines.push("", "*Execuções — últimas 24h*", `${daily.executions.toLocaleString("pt-BR")} execuções · ${daily.workflows.toLocaleString("pt-BR")} workflows`, `${daily.success.toLocaleString("pt-BR")} com sucesso · ${daily.errors.toLocaleString("pt-BR")} com erro`, `Taxa de sucesso nas execuções concluídas: ${daily.successRate == null ? "sem execuções concluídas" : `${daily.successRate.toLocaleString("pt-BR")}%`}`);
-          if (daily.others) lines.push(`${daily.others.toLocaleString("pt-BR")} em outros estados (em andamento, aguardando ou canceladas).`);
-        } else lines.push("", "Execuções nas últimas 24h: dados indisponíveis.");
+        details.push("", "⚙️ *Execuções · últimas 24h*");
+        if (daily?.executions === 0) details.push("Nenhuma execução registrada no período.");
+        else if (daily) {
+          details.push(`${daily.executions.toLocaleString("pt-BR")} execuções · ${daily.workflows.toLocaleString("pt-BR")} workflows`, `${daily.success.toLocaleString("pt-BR")} com sucesso · ${daily.errors.toLocaleString("pt-BR")} com erro`);
+          if (daily.successRate != null) details.push(`Taxa de sucesso: ${daily.successRate.toLocaleString("pt-BR")}%`);
+          if (daily.others) details.push(`${daily.others.toLocaleString("pt-BR")} em outros estados (em andamento, aguardando ou canceladas).`);
+          if (daily.errors) attention.push(`• ${daily.errors.toLocaleString("pt-BR")} execuções com erro nas últimas 24h`);
+        } else {
+          details.push("Dados indisponíveis.");
+          attention.push("• Execuções nas últimas 24h: dados indisponíveis");
+        }
         const incidents = operation.value.incidentGroups;
         const pending = incidents.filter((incident) => incident.lifecycle.status === "new").length;
         const investigating = incidents.filter((incident) => incident.lifecycle.status === "investigating" || incident.lifecycle.status === "acknowledged").length;
         const resolved = incidents.filter((incident) => incident.lifecycle.status === "resolved" && incident.lifecycle.resolvedAt && Date.parse(incident.lifecycle.resolvedAt) >= since.getTime() && Date.parse(incident.lifecycle.resolvedAt) <= now.getTime()).length;
         const unassigned = incidents.filter((incident) => incident.lifecycle.status !== "resolved" && ["high", "critical"].includes(incident.lifecycle.severity) && !incident.lifecycle.owner).length;
-        lines.push("", "*Atendimento — incidentes com ocorrências nos últimos 7 dias*", `${pending} pendentes · ${investigating} em investigação`, `${resolved} resolvidos nas últimas 24h · ${unassigned} prioritários sem responsável`);
-        if (operation.value.truncated) lines.push("Atenção: os dados de operação estão parciais.");
-      } else lines.push("", "Execuções nas últimas 24h: dados indisponíveis.", "Incidentes: dados indisponíveis. Consulte o Fluxora antes de concluir que não há pendências.");
-      if (security.status === "fulfilled") {
-        const count = security.value.length;
-        lines.push("", `*Segurança — últimas 24h:* ${count === 500 ? "pelo menos " : ""}${count} achados registrados para revisão.`);
-      } else lines.push("", "Segurança: dados indisponíveis. Não foi possível verificar os achados recentes.");
+        if (pending) attention.push(`• ${pending} incidentes pendentes`);
+        if (unassigned) attention.push(`• ${unassigned} incidentes prioritários sem responsável`);
+        details.push("", "👥 *Atendimento · ocorrências dos últimos 7 dias*", `• Em investigação: ${investigating}`, `• Resolvidos nas últimas 24h: ${resolved}`, `• Prioritários sem responsável: ${unassigned}`);
+        if (operation.value.truncated) attention.push("• Os dados de operação estão parciais");
+      } else {
+        attention.push("• Execuções e incidentes: dados indisponíveis");
+        details.push("", "⚙️ *Execuções · últimas 24h*", "Dados indisponíveis.", "", "👥 *Atendimento · ocorrências dos últimos 7 dias*", "Incidentes: dados indisponíveis. Consulte o Fluxora antes de concluir que não há pendências.");
+      }
       const states = Object.values(collection.sources);
       const failed = states.filter((source) => source.status === "failure").length;
       const pending = states.filter((source) => source.status === "incomplete").length;
       const status = collection.status === "success" ? "concluída" : collection.status === "partial" ? "parcial" : collection.status === "skipped_locked" ? "não executada: outro ciclo em andamento" : "falhou";
-      lines.push("", `Coleta Workspace: ${status}${failed ? ` · ${failed} fontes com falha` : ""}${pending ? ` · ${pending} fontes com páginas pendentes` : ""}.`, "Achados são sinais para investigação; não confirmam invasão.");
+      const partial = collection.status !== "success" || failed > 0 || pending > 0;
+      const collectionLine = `Coleta Workspace: ${status}${failed ? ` · ${failed} fontes com falha` : ""}${pending ? ` · ${pending} fontes com páginas pendentes` : ""}`;
+      if (partial) attention.push(`• ${collectionLine}`);
+      if (security.status === "rejected") attention.push("• Segurança: dados indisponíveis");
+      if (attention.length) lines.push("", "⚠️ *Pontos de atenção*", ...attention);
+      lines.push(...details, "", "🛡️ *Segurança · últimas 24h*");
+      if (security.status === "fulfilled") {
+        const count = security.value.length;
+        lines.push(count ? `${count === 500 ? "Pelo menos " : ""}${count} achados registrados para revisão.` : "Nenhum achado registrado no período.");
+        if (count) lines.push("Achados são sinais para investigação; não confirmam invasão.");
+      } else lines.push("Não foi possível verificar os achados recentes.");
+      if (partial) lines.push(collection.status === "partial" ? "A coleta está parcial; esse resultado pode estar incompleto." : "A coleta não foi concluída integralmente; esse resultado pode estar incompleto.");
+      else lines.push(collectionLine + ".");
       try {
         const base = new URL(process.env.APP_BASE_URL || "");
-        if (base.protocol === "https:" && !base.username && !base.password) lines.push("", `<${base.origin}/monitoring|Abrir Monitoramento> · <${base.origin}/workspace-security|Abrir Workspace Security>`);
+        if (base.protocol === "https:" && !base.username && !base.password) lines.push("", `🔗 <${base.origin}/monitoring|Abrir Monitoramento> · <${base.origin}/workspace-security|Abrir Segurança>`);
       } catch { /* Links are omitted when the public URL is not configured. */ }
       text = lines.join("\n");
       await setFirestoreDocument(systemCollection, deliveryId, { day, requestId, text, status: "pending", createdAt: now.toISOString() });
