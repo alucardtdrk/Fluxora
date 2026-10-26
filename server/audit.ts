@@ -1,5 +1,5 @@
 import crypto from "node:crypto";
-import { isFirestoreConfigured, runFirestoreQuery, setFirestoreDocument } from "./firestore.js";
+import { isFirestoreConfigured, runFirestoreQuery, setFirestoreDocument, type FirestoreRecord } from "./firestore.js";
 import { getFluxoraCollectionPaths } from "./fluxoraFirestorePaths.js";
 
 export type AuditCategory = "workflow" | "incident" | "configuration" | "access" | "history" | "data";
@@ -67,18 +67,19 @@ export async function recordAuditEventSafe(input: AuditEventInput) {
   }
 }
 
+type AuditCursor = { createdAt: string; documentName: string };
+type AuditPage = { items: FirestoreRecord[]; nextCursor: AuditCursor | null; searchIncomplete: boolean };
+
 export async function listAuditEvents(input: {
   period?: "today" | "7d" | "30d" | "90d" | "all";
   category?: AuditCategory;
   status?: AuditStatus;
   search?: string;
-}) {
-  if (!isFirestoreConfigured()) return [];
-  const rows = await runFirestoreQuery({
-    from: [{ collectionId: COLLECTION }],
-    orderBy: [{ field: { fieldPath: "createdAt" }, direction: "DESCENDING" }],
-    limit: 500,
-  });
+  pageSize?: number;
+  cursor?: AuditCursor | null;
+}): Promise<AuditPage> {
+  const items: FirestoreRecord[] = [];
+  if (!isFirestoreConfigured()) return { items, nextCursor: null, searchIncomplete: false };
   const now = Date.now();
   const since = input.period === "today" ? new Date(new Date().setHours(0, 0, 0, 0)).getTime()
     : input.period === "7d" ? now - 7 * 86_400_000
@@ -86,11 +87,30 @@ export async function listAuditEvents(input: {
     : input.period === "90d" ? now - 90 * 86_400_000
     : 0;
   const search = String(input.search || "").trim().toLowerCase();
-  return rows.filter((row) => {
-    if (since && new Date(String(row.createdAt || 0)).getTime() < since) return false;
-    if (input.category && row.category !== input.category) return false;
-    if (input.status && row.status !== input.status) return false;
-    if (!search) return true;
-    return [row.actor, row.summary, row.targetName, row.targetId, row.action].some((value) => String(value || "").toLowerCase().includes(search));
-  }).slice(0, 250);
+  const pageSize = input.pageSize ?? 50;
+  const hasFilters = Boolean(search || input.category || input.status);
+  let cursor = input.cursor ?? null;
+  let scanned = 0;
+  // shortcut: filters scan up to 1,000 records per request to avoid custom indexes; revisit if read volume becomes costly.
+  const scanLimit = hasFilters ? 1000 : pageSize;
+  while (scanned < scanLimit) {
+    const limit = Math.min(hasFilters ? 250 : pageSize, scanLimit - scanned);
+    const rows = await runFirestoreQuery({
+      from: [{ collectionId: COLLECTION }],
+      orderBy: ["createdAt", "__name__"].map((fieldPath) => ({ field: { fieldPath }, direction: "DESCENDING" })),
+      ...(since ? { where: { fieldFilter: { field: { fieldPath: "createdAt" }, op: "GREATER_THAN_OR_EQUAL", value: { stringValue: new Date(since).toISOString() } } } } : {}),
+      ...(cursor ? { startAt: { before: false, values: [{ stringValue: cursor.createdAt }, { referenceValue: cursor.documentName }] } } : {}),
+      limit,
+    });
+    for (const [index, row] of rows.entries()) {
+      scanned++;
+      cursor = { createdAt: String(row.createdAt), documentName: String(row._documentName) };
+      if (input.category && row.category !== input.category) continue;
+      if (input.status && row.status !== input.status) continue;
+      if (!search || [row.actor, row.summary, row.targetName, row.targetId, row.action].some((value) => String(value || "").toLowerCase().includes(search))) items.push(row);
+      if (items.length === pageSize) return { items, nextCursor: index < rows.length - 1 || rows.length === limit ? cursor : null, searchIncomplete: false };
+    }
+    if (rows.length < limit) return { items, nextCursor: null, searchIncomplete: false };
+  }
+  return { items, nextCursor: cursor, searchIncomplete: hasFilters };
 }
