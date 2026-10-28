@@ -13,6 +13,8 @@ import { continueGoogleWorkspaceSecurityBackfill, syncCurrentGoogleWorkspaceSecu
 import { testGoogleWorkspaceConnection } from "./googleWorkspace/connection.js";
 import { getWorkspaceEvent, getWorkspaceEventPage, getWorkspaceSecurityDashboard } from "./googleWorkspace/dashboard.js";
 
+import { WORKSPACE_SECURITY_SOURCES } from "../shared/workspaceSecurity.js";
+
 const periodSchema = z.enum(["today", "7d", "30d", "90d", "all"]);
 const roleSchema = z.enum(["admin", "operator", "viewer"]);
 
@@ -49,7 +51,7 @@ export const appRouter = router({
     event: protectedProcedure.input(z.object({ id: z.string().min(1).max(1500).regex(/^[^/]+$/) })).query(({ input }) => getWorkspaceEvent(input.id)),
     overview: protectedProcedure.query(() => getWorkspaceSecurityDashboard()),
     eventsPage: protectedProcedure.input(z.object({ offset: z.number().int().min(0).max(100000).default(0), source: z.string().optional(), severity: z.string().optional(), category: z.string().optional(), periodDays: z.number().int().min(1).max(90).default(90) })).query(({ input }) => getWorkspaceEventPage(input)),
-    refreshCurrent: adminProcedure.mutation(({ ctx }) => audited({ action: "google_workspace.refresh_current", category: "configuration", actor: ctx.user.email, actorRole: ctx.user.role, targetType: "google_workspace", summary: "Atualizou os sinais atuais de segurança do Google Workspace" }, () => syncCurrentGoogleWorkspaceSecurity())),
+    refreshCurrent: adminProcedure.input(z.object({ sources: z.array(z.enum(WORKSPACE_SECURITY_SOURCES)).min(1).max(3) }).optional()).mutation(({ ctx, input }) => audited({ action: "google_workspace.refresh_current", category: "configuration", actor: ctx.user.email, actorRole: ctx.user.role, targetType: "google_workspace", summary: "Atualizou os sinais atuais de segurança do Google Workspace" }, () => syncCurrentGoogleWorkspaceSecurity(input?.sources))),
     continueBackfill: adminProcedure.mutation(({ ctx }) => audited({ action: "google_workspace.backfill", category: "configuration", actor: ctx.user.email, actorRole: ctx.user.role, targetType: "google_workspace", summary: "Avançou o histórico de segurança do Google Workspace" }, () => continueGoogleWorkspaceSecurityBackfill())),
   }),
   n8n: router({

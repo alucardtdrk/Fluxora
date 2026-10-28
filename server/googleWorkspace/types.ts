@@ -1,4 +1,5 @@
-export type WorkspaceSecuritySource = "alert_center" | "login" | "admin" | "oauth_token" | "drive" | "groups" | "mobile" | "rules" | "gmail" | "user_accounts" | "saml" | "calendar" | "chat" | "meet";
+export type { WorkspaceSecuritySource } from "../../shared/workspaceSecurity.js";
+import type { WorkspaceSecuritySource } from "../../shared/workspaceSecurity.js";
 
 export type SecuritySeverity = "critical" | "high" | "medium" | "low" | "informational";
 

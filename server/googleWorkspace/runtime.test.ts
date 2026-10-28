@@ -196,10 +196,14 @@ describe("Google Workspace security runtime", () => {
     const result = await sync.runCurrent();
 
     expect(alertCollections).toBe(1);
-    expect(reportApplications).toEqual(["login", "admin", "token", "rules", "drive"]);
+    expect(reportApplications).toEqual(["login", "admin", "token", "drive", "groups", "mobile", "rules", "gmail", "user_accounts", "saml", "calendar", "chat", "meet"]);
     expect(postureCollections).toBe(0);
-    expect(reportCollections).toBe(5);
+    expect(reportCollections).toBe(13);
     expect(result.sources).toHaveProperty("alert_center");
+    reportApplications.length = 0;
+    const retry = await sync.runCurrent(["gmail"]);
+    expect(reportApplications).toEqual(["gmail"]);
+    expect(Object.keys(retry.sources)).toEqual(["gmail"]);
   });
 
   it("finishes a current refresh after one page per source and resumes remaining pages", async () => {
