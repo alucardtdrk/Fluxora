@@ -104,18 +104,6 @@ export function createGoogleWorkspaceSecuritySync(input: {
     ],
   });
 
-  const currentSourceSync = createWorkspaceSync({
-    now,
-    sources: [
-      eventSource("alert_center", undefined, true),
-      eventSource("login", "login", true),
-      eventSource("admin", "admin", true),
-      eventSource("oauth_token", "token", true),
-      eventSource("rules", "rules", true),
-      eventSource("drive", "drive", true),
-    ],
-  });
-
   const fullSources = [
     eventSource("alert_center", undefined, true),
     eventSource("login", "login", true),
@@ -210,8 +198,8 @@ export function createGoogleWorkspaceSecuritySync(input: {
       await saveDiagnostics(summary);
       return { ...summary, nextIndex: Math.min(startIndex + 3, fullSources.length) };
     },
-    async runCurrent() {
-      const summary = await currentSourceSync.run();
+    async runCurrent(sources?: readonly WorkspaceSecuritySource[]) {
+      const summary = await createWorkspaceSync({ now, sources: fullSources.filter(source => !sources || sources.includes(source.name)) }).run();
       await saveDiagnostics(summary);
       try {
         return { ...summary, findings: await saveCurrentFindings() };
@@ -253,11 +241,11 @@ export async function continueGoogleWorkspaceSecurityBackfill() {
   return result;
 }
 
-export async function syncCurrentGoogleWorkspaceSecurity() {
+export async function syncCurrentGoogleWorkspaceSecurity(sources?: readonly WorkspaceSecuritySource[]) {
   const config = loadGoogleWorkspaceConfig();
   const tokenProvider = createGoogleWorkspaceTokenProvider(config);
   const client = createGoogleWorkspaceClient(tokenProvider);
-  const result = await createGoogleWorkspaceSecuritySync({ config, client, repository: googleWorkspaceRepository }).runCurrent();
+  const result = await createGoogleWorkspaceSecuritySync({ config, client, repository: googleWorkspaceRepository }).runCurrent(sources);
   await pruneExpiredWorkspaceEvents().catch(() => console.warn("Workspace security retention cleanup failed"));
   return result;
 }

@@ -9,9 +9,8 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { toast } from "sonner";
-import { sourceLabels, shouldRefreshCurrentSecurity, summarizeSecurityCollection } from "@/lib/workspaceSecurityRefresh";
-
-
+import { sourceLabels, shouldRefreshCurrentSecurity, summarizeSecurityCollection, runSecurityRefresh, type RefreshSourceResult } from "@/lib/workspaceSecurityRefresh";
+import { WORKSPACE_SECURITY_SOURCES } from "@shared/workspaceSecurity";
 
 const severityLabels: Record<string, string> = {
   critical: "Crítica",
@@ -77,19 +76,53 @@ export default function WorkspaceSecurity() {
   }
   const dashboard = trpc.workspaceSecurity.overview.useQuery(undefined, { retry: false, refetchInterval: 300_000, staleTime: 300_000 });
   const automaticRefreshStarted = useRef(false);
-  const refreshCurrent = trpc.workspaceSecurity.refreshCurrent.useMutation({
-    onSuccess: async (result) => {
-      await Promise.all([dashboard.refetch(), page.refetch()]);
-      const statuses = Object.values(result.sources);
-      const saved = statuses.reduce((total, item) => total + item.persisted, 0);
-      const failures = statuses.filter((item) => item.status === "failure").length;
-      const pending = statuses.filter((item) => item.status === "incomplete").length;
-      if (failures > 0) toast.warning("Segurança atualizada parcialmente", { description: `${saved.toLocaleString("pt-BR")} eventos salvos; ${failures} fonte${failures === 1 ? "" : "s"} requer${failures === 1 ? "" : "em"} atenção.` });
-      else if (pending > 0) toast.message("Lote de segurança concluído", { description: `${saved.toLocaleString("pt-BR")} eventos processados; há mais páginas em ${pending} fonte${pending === 1 ? "" : "s"}. Clique novamente para continuar.` });
-      else toast.success("Segurança atualizada", { description: `${saved.toLocaleString("pt-BR")} eventos salvos a partir dos sinais atuais.` });
-    },
-    onError: (error) => toast.error("A segurança não foi atualizada", { description: error.message || "Tente novamente em instantes." }),
-  });
+  const mounted = useRef(true);
+  const refreshInFlight = useRef(false);
+  const [refreshing, setRefreshing] = useState(false);
+  const [refreshResults, setRefreshResults] = useState<Record<string, RefreshSourceResult>>({});
+  const [refreshMessage, setRefreshMessage] = useState<string | null>(null);
+  const refreshCurrent = trpc.workspaceSecurity.refreshCurrent.useMutation();
+  useEffect(() => {
+    mounted.current = true;
+    return () => { mounted.current = false; };
+  }, []);
+
+  async function updateSecurity(retry = false) {
+    if (refreshInFlight.current) return;
+    const pending = WORKSPACE_SECURITY_SOURCES.filter(name => {
+      const status = refreshResults[name]?.status ?? dashboard.data?.sources.find(item => item.source === name)?.status;
+      return !status || !["ok", "empty"].includes(status);
+    });
+    const selected = retry && pending.length ? pending : [...WORKSPACE_SECURITY_SOURCES];
+    const initial = Object.fromEntries(selected.map(name => [name, { status: "pending" }]));
+    refreshInFlight.current = true;
+    setRefreshing(true);
+    setRefreshMessage(null);
+    setRefreshResults(previous => ({ ...previous, ...initial }));
+    try {
+      const result = await runSecurityRefresh(sources => refreshCurrent.mutateAsync({ sources }), {
+        sources: selected,
+        isActive: () => mounted.current,
+        onBatch: results => {
+          if (mounted.current) setRefreshResults(previous => ({ ...previous, ...results }));
+        },
+      });
+      if (mounted.current && selected.some(name => !result[name] || result[name].status === "incomplete")) {
+        setRefreshMessage("Atualização pausada. O progresso foi salvo; continue de onde parou.");
+      }
+    } catch {
+      if (mounted.current) setRefreshMessage("A atualização foi interrompida. O progresso salvo será retomado na próxima tentativa.");
+    } finally {
+      if (mounted.current) {
+        await Promise.all([dashboard.refetch(), page.refetch()]);
+        if (mounted.current) {
+          setRefreshResults({});
+          setRefreshing(false);
+        }
+      }
+      refreshInFlight.current = false;
+    }
+  }
   const [source, setSource] = useState("all");
   const [severity, setSeverity] = useState("all");
   const [period, setPeriod] = useState("90d");
@@ -102,7 +135,10 @@ export default function WorkspaceSecurity() {
   const summary = dashboard.data?.summary ?? { recentEvents: 0, highOrCriticalEvents: 0, coveragePercent: 0, backfillPagesProcessed: 0 };
   const posture = dashboard.data?.posture;
   const findings = dashboard.data?.findings ?? [];
-  const sources = dashboard.data?.sources ?? [];
+  const sources = WORKSPACE_SECURITY_SOURCES.map(name => {
+    const stored = dashboard.data?.sources.find(item => item.source === name);
+    return { ...stored, ...refreshResults[name], source: name, status: refreshResults[name]?.status ?? stored?.status ?? "unknown" };
+  });
   const collection = summarizeSecurityCollection(sources);
   const attentionEvents = (dashboard.data?.events ?? []).filter((event) =>
     (event.severity === "critical" || (event.severity === "high" && ["login", "alert_center", "drive", "rules"].includes(event.source))) &&
@@ -113,20 +149,35 @@ export default function WorkspaceSecurity() {
   useEffect(() => {
     if (automaticRefreshStarted.current || user?.role !== "admin" || !dashboard.data) return;
     automaticRefreshStarted.current = true;
-    if (shouldRefreshCurrentSecurity(dashboard.data.sources)) refreshCurrent.mutate();
-  }, [dashboard.data, refreshCurrent, user?.role]);
+    if (shouldRefreshCurrentSecurity(dashboard.data.sources)) void updateSecurity();
+  }, [dashboard.data, user?.role]);
 
   return <OperationsShell><div className="mx-auto max-w-[1180px] px-5 py-8 md:px-9">
     <p className="text-[11px] font-bold uppercase tracking-[.18em] text-muted-foreground">Operação / Workspace Security</p>
     <h2 className="mt-2 text-4xl font-semibold tracking-[-.05em]">Segurança do Google Workspace</h2>
     <p className="mt-2 text-sm text-muted-foreground">Eventos de segurança e postura do domínio coletados pelo Fluxora.</p>
-    {user?.role === "admin" && <div className="mt-4"><Button disabled={refreshCurrent.isPending} onClick={() => refreshCurrent.mutate()}>{refreshCurrent.isPending ? "Atualizando…" : "Atualizar segurança agora"}</Button></div>}
-
-    <div className="mt-4 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground" aria-live="polite">
-      <span>{dashboard.isLoading ? "Verificando coleta…" : dashboard.isError ? "Não foi possível verificar a coleta." : collection.latestCompletedAt ? `Última coleta registrada: ${new Date(collection.latestCompletedAt).toLocaleString("pt-BR")}` : "Nenhuma coleta registrada."}</span>
-      {collection.failed > 0 && <span className="text-orange-700 dark:text-orange-300">Falha em {collection.failed} fonte(s).</span>}
-      {collection.incomplete > 0 && <span className="text-amber-700 dark:text-amber-300">{collection.incomplete} fonte(s) com páginas ainda não coletadas. Cada atualização processa um lote.</span>}
-      {collection.awaiting > 0 && <span className="text-amber-700 dark:text-amber-300">{collection.awaiting} fonte(s) aguardando coleta.</span>}
+    <div className="mt-4 rounded-xl border bg-card p-4">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div aria-live="polite" role="status">
+          <p className="text-sm font-medium">{dashboard.isLoading ? "Verificando atualização…" : dashboard.isError ? "Não foi possível verificar as fontes" : refreshing ? `Atualizando fontes · ${collection.completed} de ${collection.total} concluídas` : collection.completed === collection.total ? "Todas as fontes atualizadas" : `${collection.completed} de ${collection.total} fontes atualizadas`}</p>
+          <p className="mt-1 text-xs text-muted-foreground">{refreshMessage ?? (refreshing ? "A coleta continua automaticamente. Mantenha esta página aberta para concluir." : collection.failed ? `${collection.failed} fonte(s) precisam de atenção. Consulte os detalhes e tente novamente.` : collection.completedAt ? `Todas as fontes concluíram a coleta até ${new Date(collection.completedAt).toLocaleString("pt-BR")}.` : "Há fontes com atualização pendente. O progresso salvo será retomado automaticamente ao atualizar.")}</p>
+        </div>
+        {user?.role === "admin" && <Button disabled={refreshing || dashboard.isLoading} onClick={() => void updateSecurity(true)}>{refreshing ? "Atualizando…" : collection.failed ? "Tentar fontes com pendência" : collection.completed < collection.total ? "Continuar atualização" : "Atualizar segurança"}</Button>}
+      </div>
+      <details className="mt-3 text-xs">
+        <summary className="cursor-pointer font-medium">Ver detalhes das {collection.total} fontes</summary>
+        <ul className="mt-3 grid gap-2 sm:grid-cols-2">
+          {sources.map(item => <li key={item.source} className="rounded-lg bg-muted/40 p-3">
+            <p className="font-medium">{sourceLabels[item.source]} · {item.status === "ok" || item.status === "empty" ? "Atualizada" : item.status === "failure" ? "Falha na atualização" : item.status === "incomplete" ? refreshing ? "Coletando páginas" : "Páginas pendentes" : "Aguardando atualização"}</p>
+            {item.completedAt && <p className="mt-1 text-muted-foreground">Última tentativa: {new Date(item.completedAt).toLocaleString("pt-BR")}</p>}
+            {item.status === "failure" && <p className="mt-1 text-orange-700 dark:text-orange-300">{item.safeError === "permission" ? "Verifique as permissões de acesso desta fonte." : item.safeError === "rate_limited" ? "O Google limitou as consultas. Tente novamente em instantes." : "Não foi possível concluir. Tente novamente; se persistir, verifique a conexão."}</p>}
+          </li>)}
+        </ul>
+      </details>
+    </div>
+    <div className="mt-3 text-xs text-muted-foreground">
+      <p className="font-medium">Importação de histórico antigo · {Math.round(summary.coveragePercent)}% de cobertura</p>
+      <p className="mt-1">{summary.backfillPagesProcessed.toLocaleString("pt-BR")} páginas importadas. O histórico avança separadamente e não impede a atualização dos eventos recentes.</p>
     </div>
     <div className="mt-7 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
       <MetricCard icon={ShieldCheck} label="Eventos na amostra" value={summary.recentEvents} description="Até 250 registros mais recentes; use a lista paginada para ver os anteriores." />
