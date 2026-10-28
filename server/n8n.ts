@@ -764,17 +764,18 @@ export async function syncN8nArchive(options: { recentPages?: number; backfillPa
     // Always archive the newest executions first. The document id is the n8n
     // execution id, so repeating this step is idempotent and never duplicates logs.
     for (let page = 0; page < recentPages; page += 1) {
-      const response = await measureSyncStage("recent_collection", () => fetchArchivePage(recentCursor, preserveRecentDetails));
+      // Fetch details individually below; bulk execution data can exceed the n8n gateway limits.
+      const response = await measureSyncStage("recent_collection", () => fetchArchivePage(recentCursor));
       const rows = response.data ?? [];
       rows.forEach(trackExecution);
       if (!newestId && rows[0]?.id) newestId = String(rows[0].id);
       const documents = await measureSyncStage("recent_transform", async () => rows.flatMap((row) => {
-        const document = toArchivedExecution(row, names, preserveRecentDetails, archiveRunId);
+        const document = toArchivedExecution(row, names, false, archiveRunId);
         return document ? [document] : [];
       }));
       processed += rows.length;
       if (isFirstBackfillRun) backfillScanned += rows.length;
-      saved += await saveArchivePageDocuments(documents, preserveRecentDetails);
+      saved += await saveArchivePageDocuments(documents, false);
       recentCursor = response.nextCursor;
       if (!recentCursor || (stateBeforeSyncComplete && rows.some((row) => String(row.id) === state.lastRecentExecutionId))) break;
     }

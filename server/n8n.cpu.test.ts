@@ -147,6 +147,28 @@ it("stops at the recent overlap but updates older running executions", async () 
   expect(console.info).toHaveBeenCalledWith(expect.stringContaining('"cpuMs":'));
 });
 
+it("collects scheduled summaries without bulk data and preserves details individually", async () => {
+  archive.archiveConfigured.mockReturnValue(true);
+  archive.getArchiveSyncState.mockResolvedValue({
+    archiveFormatVersion: 2, activeArchiveRunId: "run", backfillStarted: true, backfillComplete: true,
+    missingExecutionCount: 0, reconciliationCheckedAt: new Date().toISOString(),
+  });
+  archive.listArchivedExecutions.mockResolvedValue({ items: [], truncated: false });
+  archive.getArchiveDetailBatch.mockResolvedValue({ candidates: [{ id: "recent", archiveRunId: "run" }], available: 0, pending: 1, unavailable: 0, queueState: {} });
+  const fetch = vi.spyOn(globalThis, "fetch").mockImplementation(async (url) => {
+    const path = new URL(String(url));
+    if (path.pathname === "/api/v1/executions" && path.searchParams.get("includeData") === "true") return new Response("Bad Gateway", { status: 502 });
+    return new Response(JSON.stringify(path.pathname.endsWith("/workflows") ? { data: [] }
+      : path.pathname.endsWith("/executions/recent") ? { id: "recent", workflowId: "wf", status: "success", finished: true, data: { resultData: { runData: {} } } }
+      : { data: [{ id: "recent", workflowId: "wf", status: "success", finished: true }] }));
+  });
+  const n8n = await import("./n8n.js");
+  expect(await n8n.syncN8nArchive({ recentPages: 1, backfillPages: 2, hydrateDetails: true, detailBatchSize: 300, trigger: "scheduled" })).toMatchObject({ status: "ok", detailsHydrated: 1, detailsPending: 0 });
+  expect(archive.saveArchivedExecutions).toHaveBeenCalledWith([expect.objectContaining({ executionId: "recent", detailsAvailable: undefined })]);
+  expect(fetch.mock.calls.some(([url]) => String(url).includes("/executions/recent?includeData=true"))).toBe(true);
+  expect(archive.saveArchivedExecution).toHaveBeenCalledWith(expect.objectContaining({ executionId: "recent", detailsAvailable: true }));
+});
+
 it.each([503, 404])("keeps temporary detail failures pending and retires only confirmed missing records: %s", async (status) => {
   archive.archiveConfigured.mockReturnValue(true);
   archive.getArchiveSyncState.mockResolvedValue({});
